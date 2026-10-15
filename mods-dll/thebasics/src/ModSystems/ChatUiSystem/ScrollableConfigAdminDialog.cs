@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using thebasics.Models;
+using thebasics.ModSystems.AdminConfig;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
 
@@ -12,14 +14,19 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
     // ponytail: reuse vanilla's private composer and controls; rerun native previews on game API upgrades.
     private static readonly MethodInfo ComposeElement = typeof(GuiJsonDialog).GetMethod("ComposeElement", BindingFlags.Instance | BindingFlags.NonPublic);
     private readonly JsonDialogSettings _settings;
+    private readonly IReadOnlyList<ConfigAdminPrivilegeSuggestion> _privilegeSuggestions;
     private readonly Dictionary<string, (string Control, double Y)> _controls = new();
+    private readonly Dictionary<string, GuiElementPrivilegePicker> _privilegePickers = new();
     private ElementBounds _content;
     private double _viewport;
 
-    internal ScrollableConfigAdminDialog(JsonDialogSettings settings, ICoreClientAPI api, bool focusFirstElement)
+    internal ScrollableConfigAdminDialog(JsonDialogSettings settings, ICoreClientAPI api, bool focusFirstElement,
+        IEnumerable<ConfigAdminPrivilegeSuggestion> privilegeSuggestions = null)
         : base(settings, api, focusFirstElement)
     {
         _settings = settings;
+        _privilegeSuggestions = ConfigAdminPrivilegeSuggestions.ForClient(privilegeSuggestions,
+            ConfigAdminSettingRegistry.Settings.Where(setting => setting.IsPrivilege).Select(setting => settings.OnGet?.Invoke(setting.Key)));
         ComposeScrollable();
     }
 
@@ -29,6 +36,7 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
     {
         Composers.ClearComposers();
         _controls.Clear();
+        _privilegePickers.Clear();
         var rows = _settings.Rows;
         var first = Array.FindIndex(rows, row => row.Elements.Any(element => element.Type == EnumDialogElementType.Text && element.Code?.StartsWith("group-", StringComparison.Ordinal) == true));
         var last = Array.FindIndex(rows, row => row.Elements.Any(element => element.Code == "save"));
@@ -55,6 +63,18 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
             .GetField("staticElements", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(composer);
         var interactive = (Dictionary<string, GuiElement>)typeof(GuiComposer)
             .GetField("interactiveElements", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(composer);
+        foreach (var control in _controls)
+        {
+            if (!ConfigAdminSettingRegistry.TryGet(control.Key, out var definition) || !definition.IsPrivilege ||
+                !interactive.TryGetValue(control.Value.Control, out var widget)) continue;
+            var font = ((GuiElementTextBase)widget).Font.Clone();
+            var key = control.Key;
+            var picker = new GuiElementPrivilegePicker(capi, widget.Bounds, _settings.OnGet?.Invoke(key), _privilegeSuggestions,
+                value => _settings.OnSet?.Invoke(key, value), font) { TabIndex = widget.TabIndex, InsideClipBounds = widget.InsideClipBounds };
+            elements[control.Value.Control] = interactive[control.Value.Control] = picker;
+            _privilegePickers[key] = picker;
+            widget.Dispose();
+        }
         foreach (var pair in elements.Where(pair => pair.Value.Bounds.ParentBounds == _content).ToList())
         {
             var widget = new ScrollingWidget(capi, pair.Value, clip);
@@ -129,8 +149,37 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
         }
     }
 
+    public override bool OnEscapePressed()
+    {
+        var picker = OpenPrivilegePicker();
+        if (picker == null) return base.OnEscapePressed();
+        picker.CloseSuggestions();
+        return true;
+    }
+
+    public override void OnMouseDown(MouseEvent args)
+    {
+        OpenPrivilegePicker()?.OnMouseDown(capi, args);
+        if (!args.Handled) base.OnMouseDown(args);
+    }
+
+    public override void OnMouseMove(MouseEvent args)
+    {
+        OpenPrivilegePicker()?.OnMouseMove(capi, args);
+        if (!args.Handled) base.OnMouseMove(args);
+    }
+
+    public override void OnMouseWheel(MouseWheelEventArgs args)
+    {
+        OpenPrivilegePicker()?.OnMouseWheel(capi, args);
+        if (!args.IsHandled) base.OnMouseWheel(args);
+    }
+
+    private GuiElementPrivilegePicker OpenPrivilegePicker() => _privilegePickers.Values.FirstOrDefault(picker => picker.IsSuggestionsOpen);
+
     private void Scroll(float value)
     {
+        foreach (var picker in _privilegePickers.Values) picker.CloseSuggestions();
         _content.fixedY = -value;
         _content.MarkDirtyRecursive();
         _content.CalcWorldBounds();
@@ -175,15 +224,21 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
             // when the complete control is visible; its cached background still clips.
             if (Bounds.absY >= _clip.absY && Bounds.absY + Bounds.OuterHeight <= _clip.absY + _clip.OuterHeight)
             {
-                _widget.RenderInteractiveElements(deltaTime);
+                if (_widget is GuiElementPrivilegePicker picker) picker.RenderControl(deltaTime);
+                else _widget.RenderInteractiveElements(deltaTime);
                 MouseOverCursor = _widget.MouseOverCursor;
             }
             api.Render.PopScissor();
+            if (_widget is GuiElementPrivilegePicker privilegePicker) privilegePicker.RenderSuggestions(deltaTime);
         }
 
         public override void OnFocusGained() { base.OnFocusGained(); _widget.OnFocusGained(); }
         public override void OnFocusLost() { base.OnFocusLost(); _widget.OnFocusLost(); }
-        public override void OnMouseDown(ICoreClientAPI api, MouseEvent args) => _widget.OnMouseDown(api, args);
+        public override void OnMouseDown(ICoreClientAPI api, MouseEvent args)
+        {
+            if (_widget is GuiElementPrivilegePicker picker && !picker.IsSuggestionsOpen && !_clip.PointInside(args.X, args.Y)) return;
+            _widget.OnMouseDown(api, args);
+        }
         public override void OnMouseUp(ICoreClientAPI api, MouseEvent args) => _widget.OnMouseUp(api, args);
         public override void OnMouseMove(ICoreClientAPI api, MouseEvent args) => _widget.OnMouseMove(api, args);
         public override void OnMouseWheel(ICoreClientAPI api, MouseWheelEventArgs args) => _widget.OnMouseWheel(api, args);

@@ -14,8 +14,8 @@ $scenes = @(
     'wizard-hub', 'wizard-chat-default', 'wizard-chat-edited', 'wizard-chat-presentation', 'wizard-chat-language', 'wizard-chat-ranges', 'wizard-chat-tabs',
     'wizard-travel-default', 'wizard-travel-edited', 'wizard-notifications-default', 'wizard-notifications-edited', 'wizard-notifications-sleep',
     'wizard-review', 'wizard-error', 'wizard-restart-dedicated', 'wizard-restart-integrated',
-    'wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-characters-sheets',
-    'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats'
+    'wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-map-managed', 'wizard-map-hidden', 'wizard-characters-sheets',
+    'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats', 'wizard-privileges'
 )
 if ($Scenarios) {
     foreach ($scene in $Scenarios) { if ($scene -notin $scenes) { throw "Unknown wizard capture scene: $scene" } }

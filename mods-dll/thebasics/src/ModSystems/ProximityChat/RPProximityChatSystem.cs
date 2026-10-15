@@ -803,7 +803,12 @@ public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProxi
     {
         if (player?.HasPrivilege(Privilege.root) != true)
         {
-            SendConfigAdminResult(player, false, "You do not have permission to edit The BASICs config.", Array.Empty<string>());
+            if (player != null)
+                _serverConfigChannel?.SendPacket(new TheBasicsConfigAdminResultMessage
+                {
+                    Success = false,
+                    Message = "You do not have permission to edit The BASICs config."
+                }, player);
             return;
         }
 
@@ -1351,7 +1356,8 @@ public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProxi
             Config = Config,
             Values = GetConfigAdminValues(Config),
             ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
-            StatusMessage = statusMessage
+            StatusMessage = statusMessage,
+            PrivilegeSuggestions = ConfigAdminPrivilegeSuggestions.Snapshot(API, Config)
         }, player);
     }
 
@@ -1425,7 +1431,8 @@ public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProxi
             Values = GetConfigAdminValues(Config),
             ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
             LiveAppliedKeys = liveApplied,
-            RestartRequiredKeys = restartRequired
+            RestartRequiredKeys = restartRequired,
+            PrivilegeSuggestions = ConfigAdminPrivilegeSuggestions.Snapshot(API, Config)
         }, player);
     }
 

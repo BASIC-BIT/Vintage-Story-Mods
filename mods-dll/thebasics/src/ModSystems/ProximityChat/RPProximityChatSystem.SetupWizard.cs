@@ -182,7 +182,8 @@ public partial class RPProximityChatSystem
             RestartRequiredKeys = includeSnapshot ? _setupWizardState.GetPendingRestartKeys(Config).ToList() : [],
             IsDedicated = API.Server?.IsDedicated == true,
             ConflictKeys = conflicts ?? [],
-            RuntimeApplyFailed = includeSnapshot && _setupWizardRuntimeApplyFailed
+            RuntimeApplyFailed = includeSnapshot && _setupWizardRuntimeApplyFailed,
+            PrivilegeSuggestions = includeSnapshot ? ConfigAdminPrivilegeSuggestions.Snapshot(API, Config) : []
         };
     }
 

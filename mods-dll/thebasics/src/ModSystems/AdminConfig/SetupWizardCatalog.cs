@@ -73,7 +73,7 @@ public static class SetupWizardCatalog
             "ShowNicknameInNametag", "ShowPlayerNameInNametag", "HideNametagUnlessTargeting", "NametagRenderRange", "NametagRequiresLineOfSight"),
         Page("appearance.nametagcolors", "appearance", "Nametag colors", "Set default background and border colors for BASICs nametags. Empty colors use the game theme. Players' saved colors take priority over these defaults.",
             "NametagBackgroundColor", "NametagBorderColor", "AllowPlayersToChangeNametagColors", "ChangeNametagColorPermission"),
-        Page("map.visibility", "map", "Players on the map", "Control other players on the minimap and world map. Managed maps turn off same-group visibility. Use -1 for unlimited range, or hide other players.",
+        Page("map.visibility", "map", "Players on the map", "Choose who appears on the minimap and world map. Managed maps turn off same-group visibility. Use -1 for unlimited range. The preview uses sample players; when management is off, world map settings apply.",
             "ManageMapPlayerVisibility", "MapHideOtherPlayers", "MapPlayerRenderDistance"),
         Page("characters.sheets", "characters", "Character sheets", "Let players write a character sheet and inspect nearby characters. Opening a sheet with the C menu is a server default that players can override for themselves.",
             "EnableCharacterSheets", "CharacterSheetAutoOpenOnCharacterScreen"),

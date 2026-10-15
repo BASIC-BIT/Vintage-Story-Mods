@@ -194,7 +194,7 @@ switch ($Command) {
 }
 @{ok = $true; result = $result} | ConvertTo-Json -Depth 15
 '@ | Set-Content -LiteralPath $fakeVsctl -Encoding utf8
-$newScenes = @('wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-characters-sheets', 'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats')
+$newScenes = @('wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-map-managed', 'wizard-map-hidden', 'wizard-characters-sheets', 'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats', 'wizard-privileges')
 $nativeArguments = @{ExpectedSourceTreeHash = ('a' * 64); Vsctl = $fakeVsctl; DataPath = $profile; Scenarios = $newScenes}
 $nativeDirectory = Join-Path $root 'native-new-branches'
 & $nativeScript @nativeArguments -OutputDirectory $nativeDirectory

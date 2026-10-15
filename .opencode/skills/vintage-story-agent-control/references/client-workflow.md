@@ -94,7 +94,7 @@ For a connected enabled session, first inspect the current capabilities:
 & $vsctl observe --pipe vintage-story-agentcontrol-profile2
 ```
 
-The native runner discovers the three wizard operations, opens a server-authorized capture-only dialog, queues a named scene, and polls its job. It checks the fixed profile capture directory, source identity and native coverage before copying images. Omitting `-Scenarios` captures all 23 scenes, including overhead speech, nametags, map visibility, character sheets, dice, chat history and activity stats. Outputs include action receipts, per-image provenance and `captures.json` with profile and pipe identity.
+The native runner discovers the three wizard operations, opens a server-authorized capture-only dialog, queues a named scene, and polls its job. It checks the fixed profile capture directory, source identity and native coverage before copying images. Omitting `-Scenarios` captures all 26 scenes, including overhead speech, nametags, map visibility, character sheets, dice, chat history and activity stats. Map fixtures cover management off (`wizard-map-visibility`), distance filtering at 80 blocks (`wizard-map-managed`), and other players hidden (`wizard-map-hidden`). The privilege fixture (`wizard-privileges`) opens the chat history permission picker with registered privilege descriptions. Outputs include action receipts, per-image provenance and `captures.json` with profile and pipe identity.
 
 ```powershell
 $sourceHash = ./scripts/gui-source-identity.ps1

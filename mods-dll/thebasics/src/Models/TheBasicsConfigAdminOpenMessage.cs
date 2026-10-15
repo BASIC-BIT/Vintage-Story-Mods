@@ -18,4 +18,7 @@ public class TheBasicsConfigAdminOpenMessage
 
     [ProtoMember(4)]
     public string StatusMessage { get; set; }
+
+    [ProtoMember(5)]
+    public List<ConfigAdminPrivilegeSuggestion> PrivilegeSuggestions { get; set; } = new();
 }

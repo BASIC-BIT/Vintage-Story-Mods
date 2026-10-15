@@ -371,7 +371,7 @@ public class SetupWizardChatPreviewTests
         {
             wizard.ShowPage(page.Id);
             var appearance = page.TopicId == "appearance";
-            AssertPreviewElements(wizard, chat: false, diagram: true, layoutGuide: appearance);
+            AssertPreviewElements(wizard, chat: false, diagram: SetupWizardFeaturePreview.Supports(page.Id), layoutGuide: appearance);
             if (appearance)
                 Assert.Contains(Elements(wizard).Values.OfType<GuiElementStaticText>(), text => text.Text == "Native 3D Pip omitted");
             host.RenderGuiDialog(wizard, 0);
@@ -422,6 +422,244 @@ public class SetupWizardChatPreviewTests
         }
         Assert.Empty(host.UnsupportedCalls);
         Assert.DoesNotContain(host.UsedCalls, call => call.Contains("SendChatMessage", StringComparison.Ordinal));
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void SettingsOnlyPagesUseACenteredColumnWithoutAnUnrelatedPreview(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        using var wizard = CreateWizard(host, draft);
+        wizard.TryOpen();
+        var pages = new[] { "characters.access", "roleplay.scenemarkers", "roleplay.nicknamechanges",
+            "roleplay.nicknamerules", "server.retention", "server.notelimits" };
+        foreach (var pageId in pages)
+        {
+            wizard.ShowPage(pageId);
+            AssertPreviewElements(wizard, chat: false, diagram: false);
+            Assert.True(SetupWizardCatalog.TryGetPage(pageId, out var page));
+            Assert.DoesNotContain(Elements(wizard).Values.OfType<GuiElementStaticText>(),
+                text => text.Text == "Native 3D Pip omitted");
+            foreach (var key in page.SettingKeys)
+            {
+                var control = wizard.SingleComposer[key];
+                Assert.Equal(167, control.Bounds.fixedX);
+                Assert.Equal(546, control.Bounds.fixedWidth);
+                Assert.InRange(control.Bounds.renderX, 0, host.Canvas.Width);
+                Assert.InRange(control.Bounds.renderX + control.Bounds.OuterWidth, 0, host.Canvas.Width);
+            }
+            host.SetMouse(-1, -1);
+            host.RenderGuiDialog(wizard, 0);
+        }
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void FeaturePicturesStayFocusedOnAppearanceWhenOnlyAccessOrLimitsChange(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        foreach (var key in new[] { "EnableTypingIndicator", "EnableCharacterSheets", "EnableAdminNotes",
+            "EnableStructuredAdminNotes", "EnableAdminNoteLedger", "EnablePlayerNotes", "EnableChatHistory", "PlayerStatSystem" })
+            draft.Set(key, "1");
+        draft.Set("DisableRPChat", "0");
+        draft.Set("OverheadChatBubbleMode", "RpText");
+        draft.Set("TypingIndicatorMaxRange", "32");
+        using var wizard = CreateWizard(host, draft);
+        wizard.TryOpen();
+        var cases = new[]
+        {
+            (Page: "appearance.bubbles", Key: "SpeechBubbleMinimumDisplayMilliseconds", Before: "5000", After: "9000"),
+            (Page: "appearance.typing", Key: "TypingIndicatorTimeoutSeconds", Before: "5", After: "10"),
+            (Page: "appearance.nametagcolors", Key: "ChangeNametagColorPermission", Before: "chat", After: "controlserver"),
+            (Page: "characters.sheets", Key: "CharacterSheetAutoOpenOnCharacterScreen", Before: "0", After: "1"),
+            (Page: "server.history", Key: "ChatHistoryPermission", Before: "chat", After: "controlserver"),
+            (Page: "server.history", Key: "ChatHistoryManagePermission", Before: "chat", After: "controlserver"),
+            (Page: "server.staffnotes", Key: "AdminNotesPermission", Before: "chat", After: "controlserver"),
+            (Page: "server.staffnotes", Key: "MaxAdminNotesPerTarget", Before: "20", After: "50"),
+            (Page: "server.personalnotes", Key: "PlayerNotesPermission", Before: "chat", After: "controlserver"),
+            (Page: "server.personalnotes", Key: "MaxPlayerNotesPerAuthor", Before: "20", After: "50"),
+            (Page: "server.stats", Key: "PlayerStatClearPermission", Before: "chat", After: "controlserver")
+        };
+        foreach (var example in cases)
+        {
+            draft.Set(example.Key, example.Before);
+            wizard.ShowPage(example.Page);
+            host.SetMouse(-1, -1);
+            host.RenderGuiDialog(wizard, 0);
+            var before = DiagramPixels(host, wizard);
+            draft.Set(example.Key, example.After);
+            wizard.ShowPage(example.Page);
+            host.RenderGuiDialog(wizard, 0);
+            Assert.True(before.SequenceEqual(DiagramPixels(host, wizard)),
+                $"The {example.Page} picture must not repeat the {example.Key} control's value.");
+        }
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void MapSampleUsesTheSameLandscapeAndSelfMarkerAcrossVisibilityChoices(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        draft.Set("ManageMapPlayerVisibility", "0");
+        draft.Set("MapHideOtherPlayers", "0");
+        draft.Set("MapPlayerRenderDistance", "1000");
+        using var wizard = CreateWizard(host, draft);
+        wizard.TryOpen();
+        byte[] RenderMap()
+        {
+            wizard.ShowPage("map.visibility");
+            host.SetMouse(-1, -1);
+            host.RenderGuiDialog(wizard, 0);
+            return DiagramPixels(host, wizard);
+        }
+        var unmanaged = RenderMap();
+        var diagram = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]);
+        Assert.Equal(310, diagram.Bounds.fixedWidth);
+        Assert.Equal(270, diagram.Bounds.fixedHeight);
+        var selfMarker = DiagramRegionPixels(host, wizard, 147, 127, 16, 16);
+        Assert.True(Enumerable.Range(0, selfMarker.Length / 4).Any(index =>
+            selfMarker[index * 4] > 245 && selfMarker[index * 4 + 1] > 245 && selfMarker[index * 4 + 2] > 245),
+            "The native self marker should retain its white fill.");
+        Assert.True(Enumerable.Range(0, selfMarker.Length / 4).Any(index =>
+            selfMarker[index * 4] < 10 && selfMarker[index * 4 + 1] < 10 && selfMarker[index * 4 + 2] < 10),
+            "The native self marker should retain its black outline.");
+        var self = DiagramRegionPixels(host, wizard, 152, 132, 6, 6);
+
+        draft.Set("MapHideOtherPlayers", "1");
+        draft.Set("MapPlayerRenderDistance", "0");
+        Assert.True(unmanaged.SequenceEqual(RenderMap()), "Unmanaged maps must ignore the disabled hide and range drafts.");
+
+        draft.Set("ManageMapPlayerVisibility", "1");
+        var hidden = RenderMap();
+        Assert.False(unmanaged.SequenceEqual(hidden));
+        Assert.True(self.SequenceEqual(DiagramRegionPixels(host, wizard, 152, 132, 6, 6)));
+        draft.Set("MapHideOtherPlayers", "0");
+        Assert.True(hidden.SequenceEqual(RenderMap()), "A zero range and hiding others should both leave only the self marker.");
+        draft.Set("MapPlayerRenderDistance", "30");
+        var nearby = RenderMap();
+        Assert.False(hidden.SequenceEqual(nearby));
+        Assert.True(self.SequenceEqual(DiagramRegionPixels(host, wizard, 152, 132, 6, 6)));
+        draft.Set("MapPlayerRenderDistance", "80");
+        Assert.False(nearby.SequenceEqual(RenderMap()));
+        draft.Set("MapPlayerRenderDistance", "-1");
+        Assert.True(unmanaged.SequenceEqual(RenderMap()), "An unlimited managed map should show all sample markers.");
+        Assert.True(self.SequenceEqual(DiagramRegionPixels(host, wizard, 152, 132, 6, 6)));
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void MapMarkerToggleDisablesDependentControlsWithoutLosingDraftValues(double scale)
+    {
+        using var host = CreateHost(scale);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        draft.Set("ManageMapPlayerVisibility", "1");
+        draft.Set("MapHideOtherPlayers", "0");
+        draft.Set("MapPlayerRenderDistance", "1200");
+        using var wizard = CreateWizard(host, draft);
+        wizard.ShowPage("map.visibility");
+        wizard.TryOpen();
+        host.RenderGuiDialog(wizard, 0);
+
+        var composer = wizard.SingleComposer;
+        var toggle = Assert.IsType<GuiElementToggleButton>(composer["ManageMapPlayerVisibility"]);
+        Assert.True(toggle.Toggleable);
+        Assert.True(toggle.On);
+        Assert.Equal("On", toggle.Text);
+        AssertMapControlState(wizard, true, true);
+
+        ClickElement(host, wizard, toggle);
+        Assert.Same(composer, wizard.SingleComposer);
+        Assert.False(toggle.On);
+        Assert.Equal("Off", toggle.Text);
+        Assert.Equal("0", draft.Get("ManageMapPlayerVisibility"));
+        AssertMapControlState(wizard, false, false);
+        var hide = composer.GetDropDown("MapHideOtherPlayers");
+        var range = composer.GetTextInput("MapPlayerRenderDistance");
+        ClickElement(host, wizard, hide);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.End });
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
+        Assert.False(hide.listMenu.IsOpened);
+        Assert.False(hide.HasFocus);
+        ClickElement(host, wizard, range);
+        wizard.OnKeyPress(new KeyEvent { KeyChar = '9', KeyCode = (int)GlKeys.Number9 });
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.BackSpace });
+        Assert.False(range.HasFocus);
+        Assert.Equal("1200", range.GetText());
+        Assert.Equal("0", draft.Get("MapHideOtherPlayers"));
+        Assert.Equal("1200", draft.Get("MapPlayerRenderDistance"));
+        SaveMapControlScreenshot(host, wizard, scale, "off");
+
+        ClickElement(host, wizard, toggle);
+        Assert.True(toggle.On);
+        Assert.Equal("On", toggle.Text);
+        AssertMapControlState(wizard, true, true);
+        Assert.Equal("0", hide.SelectedValue);
+        Assert.Equal("1200", range.GetText());
+        SaveMapControlScreenshot(host, wizard, scale, "on");
+
+        ClickElement(host, wizard, hide);
+        Assert.True(hide.listMenu.IsOpened);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.End });
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
+        Assert.Equal("1", draft.Get("MapHideOtherPlayers"));
+        AssertMapControlState(wizard, true, false);
+        ClickElement(host, wizard, range);
+        wizard.OnKeyPress(new KeyEvent { KeyChar = '9', KeyCode = (int)GlKeys.Number9 });
+        Assert.Equal("1200", draft.Get("MapPlayerRenderDistance"));
+        SaveMapControlScreenshot(host, wizard, scale, "hidden");
+
+        ClickElement(host, wizard, toggle);
+        AssertMapControlState(wizard, false, false);
+        ClickElement(host, wizard, toggle);
+        AssertMapControlState(wizard, true, false);
+        Assert.Equal("1", hide.SelectedValue);
+        Assert.Equal("1200", range.GetText());
+
+        ClickElement(host, wizard, hide);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Home });
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
+        AssertMapControlState(wizard, true, true);
+        ClickElement(host, wizard, range);
+        Assert.True(range.HasFocus);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.End });
+        wizard.OnKeyPress(new KeyEvent { KeyChar = '0', KeyCode = (int)GlKeys.Number0 });
+        Assert.Equal("12000", range.GetText());
+        Assert.Equal("12000", draft.Get("MapPlayerRenderDistance"));
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    private static void AssertMapControlState(SetupWizardDialog wizard, bool hideEnabled, bool rangeEnabled)
+    {
+        foreach (var (key, enabled) in new[] { ("MapHideOtherPlayers", hideEnabled), ("MapPlayerRenderDistance", rangeEnabled) })
+        {
+            var control = Assert.IsAssignableFrom<GuiElementTextBase>(wizard.SingleComposer[key]);
+            Assert.Equal(enabled, control.Enabled);
+            Assert.Equal(enabled, control.Focusable);
+            Assert.Equal(enabled ? 1 : 0.35, control.Font.Color[3], 5);
+            var label = Assert.IsType<GuiElementStaticText>(wizard.SingleComposer["setting-label-" + key]);
+            Assert.Equal(enabled ? 1 : 0.35, label.Font.Color[3], 5);
+        }
+    }
+
+    private static void SaveMapControlScreenshot(PreviewHost host, SetupWizardDialog wizard, double scale, string state)
+    {
+        host.SetMouse(-1, -1);
+        wizard.OnMouseMove(new MouseEvent(-1, -1));
+        host.RenderGuiDialog(wizard, 0);
+        var output = Path.Combine(Environment.GetEnvironmentVariable("THEBASICS_GUI_OUTPUT") ??
+            Path.Combine(AppContext.BaseDirectory, "visual-artifacts"), "wizard-map");
+        Directory.CreateDirectory(output);
+        host.Canvas.SavePng(Path.Combine(output, state + "-" + scale.ToString("0.##", CultureInfo.InvariantCulture) + ".png"));
     }
 
     [VisualTheory]
@@ -692,6 +930,24 @@ public class SetupWizardChatPreviewTests
         var cropped = new byte[width * height * 4];
         for (var row = 0; row < height; row++)
             Buffer.BlockCopy(canvas, ((top + row) * host.Canvas.Width + left) * 4, cropped, row * width * 4, width * 4);
+        return cropped;
+    }
+
+    private static byte[] DiagramRegionPixels(PreviewHost host, SetupWizardDialog wizard,
+        double x, double y, double width, double height)
+    {
+        var bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        var left = (int)Math.Round(bounds.renderX + x * bounds.OuterWidth / bounds.fixedWidth);
+        var top = (int)Math.Round(bounds.renderY + y * bounds.OuterHeight / bounds.fixedHeight);
+        var pixelWidth = (int)Math.Ceiling(width * bounds.OuterWidth / bounds.fixedWidth);
+        var pixelHeight = (int)Math.Ceiling(height * bounds.OuterHeight / bounds.fixedHeight);
+        Assert.InRange(left, 0, host.Canvas.Width - pixelWidth);
+        Assert.InRange(top, 0, host.Canvas.Height - pixelHeight);
+        var canvas = host.Canvas.GetRgbaPixels();
+        var cropped = new byte[pixelWidth * pixelHeight * 4];
+        for (var row = 0; row < pixelHeight; row++)
+            Buffer.BlockCopy(canvas, ((top + row) * host.Canvas.Width + left) * 4,
+                cropped, row * pixelWidth * 4, pixelWidth * 4);
         return cropped;
     }
 

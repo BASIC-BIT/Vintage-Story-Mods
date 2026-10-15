@@ -91,6 +91,7 @@ public class ChatUiSystem : ModSystem
     private static Dictionary<string, string> _configAdminDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static Dictionary<string, string> _configAdminLoadedDraft = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static HashSet<string> _configAdminReviewedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private static IReadOnlyList<ConfigAdminPrivilegeSuggestion> _configAdminPrivilegeSuggestions = Array.Empty<ConfigAdminPrivilegeSuggestion>();
     private static string _configAdminStatusMessage;
     private static string _configAdminSelectedGroup;
     private static GuiDialogConfirm _configAdminUnsavedCloseConfirm;
@@ -1076,6 +1077,7 @@ public class ChatUiSystem : ModSystem
             ApplyReceivedConfig(message.Config);
         }
 
+        _configAdminPrivilegeSuggestions = message?.PrivilegeSuggestions ?? new();
         UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.StatusMessage);
         OpenConfigAdminDialog();
     }
@@ -1093,6 +1095,7 @@ public class ChatUiSystem : ModSystem
             _api.ShowChatMessage(message.Message);
         }
 
+        _configAdminPrivilegeSuggestions = message?.PrivilegeSuggestions ?? new();
         UpdateConfigAdminDraft(message?.Values, message?.ReviewedKeys, message?.Message);
         OpenConfigAdminDialog();
     }
@@ -1380,7 +1383,8 @@ public class ChatUiSystem : ModSystem
             focusFirstElement: false,
             HasConfigAdminUnsavedChanges,
             ConfirmConfigAdminDiscard,
-            OnConfigAdminDialogClosed);
+            OnConfigAdminDialogClosed,
+            _configAdminPrivilegeSuggestions);
         _configAdminDialog.TryOpen(withFocus: false);
         if (_configSearchTarget?.Destination == ConfigSearchDestination.Setting)
         {
@@ -2595,6 +2599,7 @@ public class ChatUiSystem : ModSystem
             _configAdminSelectedGroup = null;
             _configAdminOpenQueued = false;
             _configAdminStatusMessage = null;
+            _configAdminPrivilegeSuggestions = Array.Empty<ConfigAdminPrivilegeSuggestion>();
 
             // Clear static typing indicator state to prevent stale data on reconnect/world reload.
             _typingStatesByEntityId.Clear();
@@ -2793,7 +2798,8 @@ public class ChatUiSystem : ModSystem
             bool focusFirstElement,
             Func<bool> hasUnsavedChanges,
             Action<Action> confirmDiscard,
-            Action onClosed) : base(settings, capi, focusFirstElement)
+            Action onClosed,
+            IEnumerable<ConfigAdminPrivilegeSuggestion> privilegeSuggestions = null) : base(settings, capi, focusFirstElement, privilegeSuggestions)
         {
             _hasUnsavedChanges = hasUnsavedChanges;
             _confirmDiscard = confirmDiscard;

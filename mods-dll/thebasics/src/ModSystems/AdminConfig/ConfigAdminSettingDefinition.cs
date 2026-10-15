@@ -17,6 +17,7 @@ public sealed class ConfigAdminSettingDefinition
         Label = definition.Label;
         Description = definition.Description;
         Kind = definition.Kind;
+        IsPrivilege = definition.IsPrivilege;
         ReloadBehavior = definition.ReloadBehavior;
         _getValue = definition.GetValue;
         _setValue = definition.SetValue;
@@ -29,6 +30,7 @@ public sealed class ConfigAdminSettingDefinition
     public string Label { get; }
     public string Description { get; }
     public ConfigAdminSettingKind Kind { get; }
+    public bool IsPrivilege { get; }
     public ConfigAdminReloadBehavior ReloadBehavior { get; }
     public IReadOnlyList<string> Options { get; }
     public IReadOnlyList<string> OptionNames { get; }
@@ -86,6 +88,7 @@ public sealed class ConfigAdminSettingDefinitionOptions
     public string Label { get; set; }
     public string Description { get; set; }
     public ConfigAdminSettingKind Kind { get; set; }
+    public bool IsPrivilege { get; set; }
     public ConfigAdminReloadBehavior ReloadBehavior { get; set; }
     public Func<ModConfig, string> GetValue { get; set; }
     public Func<ModConfig, string, string> SetValue { get; set; }

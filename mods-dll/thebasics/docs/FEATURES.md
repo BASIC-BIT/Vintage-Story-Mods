@@ -74,7 +74,7 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 - `NametagRequiresLineOfSight=true`
 - `OverheadChatBubbleMode=RpText`
 
-## In-Game Admin Config
+## In-game admin config
 
 `/basic setup` opens a wizard with 40 focused pages across eight topics: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. All eight topics stay available in the top bar; switching returns to the last page visited in that topic. Each page has at most five controls. The wizard and advanced config panel use the same setting registry and validation.
 
@@ -87,6 +87,9 @@ Features:
 - New-setting discovery through persisted `ReviewedConfigSettingKeys`.
 - Wizard choices stay in a draft until saved. Review the changed settings and restart requirements before saving.
 - The shared registry now exposes existing character-sheet enablement, editing-command permissions, nearby viewing rules, and the required-fields check.
+- Permission fields in both editors offer searchable privilege codes from the server, including codes registered by other mods. They also accept typed strings and preserve configured values outside the suggestions. These fields choose a required privilege; they do not assign player roles or grants.
+- Map visibility uses a square sample with the game's parchment colors and player icons. Its On/Off management button disables and greys the dependent choices when Off, retaining their values. Hiding other players also disables the range field. The sample does not read or change the live world map.
+- Pages about sheet access, nickname policy, scene-marker availability, history retention and note lengths center their controls without an illustration. Other previews show visible outcomes without repeating permission codes, limits or instructions from the controls.
 
 ```mermaid
 flowchart LR

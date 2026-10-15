@@ -40,6 +40,8 @@ public sealed class SetupWizardDialog : GuiDialog
     private int _lastBeat = -1;
     private readonly Dictionary<string, string> _topicPages = SetupWizardCatalog.Topics
         .ToDictionary(topic => topic.Id, topic => topic.EntryPageId, StringComparer.Ordinal);
+    private IReadOnlyList<ConfigAdminPrivilegeSuggestion> _privilegeSuggestions = Array.Empty<ConfigAdminPrivilegeSuggestion>();
+    private readonly List<GuiElementPrivilegePicker> _privilegePickers = new();
 
     public SetupWizardDialog(ICoreClientAPI api, SetupWizardDraft draft, string runId, bool isDedicated,
         Action onSave, Action<string, string, string> onTrack, Action onClose, Action onAdvanced = null,
@@ -119,6 +121,7 @@ public sealed class SetupWizardDialog : GuiDialog
         RunId = result.RunId;
         _isDedicated = result.IsDedicated;
         Draft.RefreshValues(result.Values);
+        RefreshPrivilegeSuggestions(result.PrivilegeSuggestions);
         _restartKeys = result.RestartRequiredKeys?.ToArray() ?? Array.Empty<string>();
         _runtimeApplyFailed = result.RuntimeApplyFailed;
         ComposeDialog();
@@ -127,6 +130,7 @@ public sealed class SetupWizardDialog : GuiDialog
     public void SetResult(TheBasicsSetupWizardResultMessage result)
     {
         if (!Draft.MergeSaveResult(result)) return;
+        RefreshPrivilegeSuggestions(result.PrivilegeSuggestions);
         _pending = false;
         _isDedicated = result.IsDedicated;
         _message = result.Message;
@@ -165,6 +169,7 @@ public sealed class SetupWizardDialog : GuiDialog
     private void ComposeDialog()
     {
         SingleComposer?.Dispose();
+        _privilegePickers.Clear();
         _diagram = null;
         _sample = null;
         _sleepCount = null;
@@ -203,6 +208,7 @@ public sealed class SetupWizardDialog : GuiDialog
             0, StatusY, CurrentStepId == "hub" ? 640 : Width, CompactLayout ? 30 : 42);
         Button(composer, "Close", () => TryClose(), Width - 110, FooterY, 110);
         composer.EndChildElements().Compose(focusFirstElement: false);
+        if (CurrentStepId == "map.visibility") RefreshMapControls(composer);
         _sample = SingleComposer.GetRichtext("preview-text");
         _sleepCount = SingleComposer.GetRichtext("preview-sleep-count");
     }
@@ -309,15 +315,32 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         if (!ConfigAdminSettingRegistry.TryGet(key, out var definition)) return;
         var label = SettingLabel(definition);
-        Text(composer, label, 334, y, 546, 21);
-        var bounds = ElementBounds.Fixed(334, y + 23, 546, 28);
+        if (key is "MapHideOtherPlayers" or "MapPlayerRenderDistance")
+            composer.AddStaticText(label, CairoFont.WhiteSmallText().WithFontSize(14),
+                ElementBounds.Fixed(SettingsX, y, 546, 21), "setting-label-" + key);
+        else Text(composer, label, SettingsX, y, 546, 21);
+        var bounds = ElementBounds.Fixed(SettingsX, y + 23, 546, 28);
         var value = Draft.Get(key);
-        if (definition.Kind == ConfigAdminSettingKind.Boolean)
+        if (key == "ManageMapPlayerVisibility")
+        {
+            bounds.fixedWidth = 92;
+            composer.AddToggleButton(Bool(key) ? "On" : "Off", CairoFont.WhiteSmallText(), on =>
+            {
+                Changed(key, on ? "1" : "0", on ? "on" : "off", false);
+                RefreshMapControls(composer);
+            }, bounds, key);
+            composer.GetToggleButton(key).SetValue(Bool(key));
+        }
+        else if (definition.Kind == ConfigAdminSettingKind.Boolean)
         {
             var inverted = key == "DisableRPChat";
             var selected = Bool(key) != inverted ? 1 : 0;
             composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "0", "1" }, new[] { "Off", "On" }, selected,
-                (choice, _) => Changed(key, inverted ? (choice == "1" ? "0" : "1") : choice, choice == "1" ? "on" : "off", true),
+                (choice, _) =>
+                {
+                    Changed(key, inverted ? (choice == "1" ? "0" : "1") : choice, choice == "1" ? "on" : "off", key != "MapHideOtherPlayers");
+                    if (key == "MapHideOtherPlayers") RefreshMapControls(composer);
+                },
                 bounds, CairoFont.WhiteSmallText(), false), key);
         }
         else if (definition.Kind == ConfigAdminSettingKind.Select)
@@ -336,6 +359,13 @@ public sealed class SetupWizardDialog : GuiDialog
                 composer.AddInteractiveElement(new GuiElementDropDown(capi, options,
                     options.Select((option, index) => SettingOptionName(key, option, definition.OptionNames[index])).ToArray(), selected,
                     (choice, _) => Changed(key, choice, "option" + Array.IndexOf(options, choice), false), bounds, CairoFont.WhiteSmallText(), false), key);
+        }
+        else if (definition.IsPrivilege)
+        {
+            var picker = new GuiElementPrivilegePicker(capi, bounds, value, _privilegeSuggestions,
+                choice => Changed(key, choice, "edited", false), CairoFont.TextInput());
+            _privilegePickers.Add(picker);
+            composer.AddInteractiveElement(picker, key);
         }
         else
         {
@@ -364,6 +394,31 @@ public sealed class SetupWizardDialog : GuiDialog
         }
         y += CurrentStepId == "chat.basics" ? (CompactLayout ? 50 : 61) : CompactLayout ? 54 : 65;
     }
+
+    private void RefreshMapControls(GuiComposer composer)
+    {
+        var managed = Bool("ManageMapPlayerVisibility");
+        var toggle = composer.GetToggleButton("ManageMapPlayerVisibility");
+        toggle.Text = managed ? "On" : "Off";
+        toggle.SetValue(managed);
+        foreach (var key in new[] { "MapHideOtherPlayers", "MapPlayerRenderDistance" })
+        {
+            var enabled = managed && (key != "MapPlayerRenderDistance" || !Bool("MapHideOtherPlayers"));
+            var control = (GuiElementTextBase)composer.GetElement(key);
+            if (!enabled) control.OnFocusLost();
+            control.Enabled = enabled;
+            control.Font.Color[3] = enabled ? 1 : 0.35;
+            var label = (GuiElementStaticText)composer.GetElement("setting-label-" + key);
+            label.Font.Color[3] = enabled ? 1 : 0.35;
+        }
+        // Refresh native textures in place so the active callback keeps its composer.
+        composer.ReCompose();
+    }
+
+    private void RefreshPrivilegeSuggestions(IEnumerable<ConfigAdminPrivilegeSuggestion> suggestions) =>
+        _privilegeSuggestions = ConfigAdminPrivilegeSuggestions.ForClient(suggestions, Draft.Values
+            .Where(value => ConfigAdminSettingRegistry.TryGet(value.Key, out var definition) && definition.IsPrivilege)
+            .Select(value => value.Value));
 
     private void AddAnnouncement(GuiComposer composer, ref double y)
     {
@@ -451,12 +506,13 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void AddPreview(GuiComposer composer)
     {
+        if (SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId)) return;
         if (SetupWizardFeaturePreview.Supports(CurrentStepId))
         {
             var appearance = CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal);
             _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 174, 310,
-                appearance ? 64 : 220),
-                (context, surface, bounds) => SetupWizardFeaturePreview.Draw(context, surface, bounds, CurrentStepId, Draft), true);
+                appearance ? 64 : FeaturePreviewHeight),
+                (context, surface, bounds) => SetupWizardFeaturePreview.Draw(context, surface, bounds, CurrentStepId, Draft, capi), true);
             composer.AddInteractiveElement(_diagram, "preview-diagram");
             if (appearance)
             {
@@ -600,18 +656,21 @@ public sealed class SetupWizardDialog : GuiDialog
     private string SleepCountText() => $"{Sleepers} of 4 players are asleep.";
     private bool NeedsRestart => _runtimeApplyFailed || _restartKeys.Count > 0;
     private bool CompactLayout => capi.Render.FrameHeight / Math.Max(RuntimeEnv.GUIScale, 0.1f) < 660;
+    private double SettingsX => SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? (Width - 546) / 2 : 334;
+    private double FeaturePreviewHeight => CurrentStepId == "map.visibility" ? 270 : 220;
     private double BodyHeight
     {
         get
         {
             if (CurrentStepId == "hub") return CompactLayout ? 488 : 546;
             var height = CompactLayout ? 528 : 608;
-            if (!SetupWizardFeaturePreview.Supports(CurrentStepId) || CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal))
+            var settingsOnly = SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId);
+            if ((!SetupWizardFeaturePreview.Supports(CurrentStepId) && !settingsOnly) || CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal))
                 return height;
             SetupWizardCatalog.TryGetPage(CurrentStepId, out var page);
             var controls = page.SettingKeys.Count(SettingVisible);
             var editorBottom = 178 + Math.Max(0, controls - 1) * (CompactLayout ? 54 : 65) + 51;
-            var contentBottom = Math.Max(174 + 220, editorBottom);
+            var contentBottom = settingsOnly ? editorBottom : Math.Max(174 + FeaturePreviewHeight, editorBottom);
             return Math.Min(height, contentBottom + (CompactLayout ? 84 : 104));
         }
     }
@@ -757,6 +816,46 @@ public sealed class SetupWizardDialog : GuiDialog
             RefreshPreview();
         }
         base.OnRenderGUI(deltaTime);
+    }
+
+    private GuiElementPrivilegePicker OpenPrivilegePicker() => _privilegePickers.FirstOrDefault(picker => picker.IsSuggestionsOpen);
+
+    public override bool OnEscapePressed()
+    {
+        var picker = OpenPrivilegePicker();
+        if (picker == null) return base.OnEscapePressed();
+        picker.CloseSuggestions();
+        return true;
+    }
+
+    public override void OnMouseDown(MouseEvent args)
+    {
+        if (CurrentStepId == "map.visibility")
+            foreach (var key in new[] { "MapHideOtherPlayers", "MapPlayerRenderDistance" })
+            {
+                var control = SingleComposer.GetElement(key);
+                if (control is GuiElementControl { Enabled: false } && control.IsPositionInside(args.X, args.Y))
+                {
+                    // Native text inputs can select text on mouse-down even when disabled.
+                    SingleComposer.UnfocusOwnElements();
+                    args.Handled = true;
+                    return;
+                }
+            }
+        OpenPrivilegePicker()?.OnMouseDown(capi, args);
+        if (!args.Handled) base.OnMouseDown(args);
+    }
+
+    public override void OnMouseMove(MouseEvent args)
+    {
+        OpenPrivilegePicker()?.OnMouseMove(capi, args);
+        if (!args.Handled) base.OnMouseMove(args);
+    }
+
+    public override void OnMouseWheel(MouseWheelEventArgs args)
+    {
+        OpenPrivilegePicker()?.OnMouseWheel(capi, args);
+        if (!args.IsHandled) base.OnMouseWheel(args);
     }
 
     private void Track(string action, string choice = null) => _onTrack?.Invoke(CurrentStepId, action, choice);

@@ -5,6 +5,29 @@ Scope: hierarchical configuration, invitation, restart guidance, native Pip prev
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Map preview and privilege suggestions, October 15
+
+The map page should look like the game's minimap and make the management switch clear. Its replacement uses a square sample landscape, the game's parchment palette, and the native player-icon painter. It does not open the live world map or change its cache. A native On/Off toggle controls BASICs map management; Off greys and disables the dependent choices while retaining their draft values. Hiding players also disables their range setting.
+
+Illustrations now focus on visible outcomes. Permission labels, numerical limits and repeated instructions are removed from the images. Pages about sheet access, nickname policies, retention, note lengths and scene-marker availability omit the unrelated illustration and center the controls instead.
+
+All 22 permission fields now offer searchable privilege suggestions in setup and the full config editor. Suggestions include server registrations, custom role grants and current configured codes. Typed strings retain their exact spelling and case. `commandplayer` is a privilege rather than a role. Suggestions do not impose an allowlist or grant anyone a privilege.
+
+```mermaid
+flowchart LR
+    Setup["/basic setup"] --> Map[Map visibility]
+    Map --> Toggle{Manage markers?}
+    Toggle -->|Off| World[World settings; choices disabled]
+    Toggle -->|On| Choices[Choose hidden players and range]
+    Setup --> Access[Permission field]
+    Access -->|Choose suggestion or type a code| Draft[Shared draft]
+    Choices --> Draft
+    World --> Draft
+    Draft --> Review[Review and save]
+```
+
+All 1,406 tests passed. The 26 scenes rendered at scales 1 and 1.25, then all 26 were captured in Profile2 with the packaged DLL and source identity verified. Independent source and image review found no remaining blocker. The disposable server and Profile2 have the matching package; all 11 other local mods are unchanged. Profile2 remains connected after the normal `/basic setup` command, with automation disabled. The remaining owner checks cover the toggle's feel, choosing or typing a privilege, and real gameplay behavior. See the [October 15 evidence appendix](#october-15-evidence-appendix).
+
 ## Direct category tabs, October 13
 
 The owner asked to switch between any of the eight categories from the top bar. All eight category tabs now stay visible between Topics and Review. Each category returns to its last visited page, and hub cards use the same remembered page. Draft edits remain shared across categories. The tab labels keep their full English titles with slightly smaller type and tighter spacing.
@@ -249,23 +272,58 @@ flowchart LR
     - Watch for: dead description areas, wrong branch titles, lost drafts, skipped pages, clipped five-control pages or footer overlap.
 
 11. **Overhead speech, typing and nametags** (P1)
-    - Do: compare all overhead bubble choices, then toggle typing and switch Icon, Text and Both. Edit its text, range and recent-typing window. On Names above players, toggle nickname and account name separately. Try nametag colors. Do not save.
-    - Expect: the relevant speech box, typing label or nameplate updates above clothed Pip. Off and zero range have the documented effect in the example. Switching pages preserves the draft. Normal dragging and flicking still turn Pip.
-    - Watch for: Pascal-case mode labels, missing or clipped Pip, stale labels/colors or diagram state interpreting `0` as On.
+    - Do: compare all overhead bubble choices and change the minimum display time. Toggle typing and switch Icon, Text and Both. Edit its text, range and recent-typing window. On Names above players, toggle nickname and account name separately. Try nametag colors. Do not save.
+    - Expect: bubble mode, typing mode and text, and name/color choices update the relevant example above clothed Pip. Off and zero range hide the applicable element. Timing values remain in their controls without extra labels in the picture. Switching pages preserves the draft. Normal dragging and flicking still turn Pip.
+    - Watch for: Pascal-case mode labels, missing or clipped Pip, stale labels/colors, repeated control values in the picture or diagram state interpreting `0` as On.
 
-12. **Maps and character settings** (P1)
-    - Do: toggle BASICs map management, hidden players and distance; inspect nearby and distant markers. Compare character sheets Off/On, C-menu behavior and multiple-character slots. Leave sheet enablement changed from its original value. On Viewing and editing sheets, change Sheet editing command permission to a temporary distinct value, then open Review without saving. Discard afterward.
-    - Expect: unmanaged maps defer to world-map settings; managed maps depict the selected range or hidden players. The character panel reflects sheets and slots. Review identifies sheet enablement and command-permission changes as requiring restart; nearby viewing controls are live.
-    - Watch for: same-group visibility being presented as safe, a false claim of map filtering when management is Off, wrong restart requirements or a sample that changes the live player's character.
+12. **Map markers and disabled choices** (P1)
+    - Do: open Map visibility. With Manage player map markers On and Hide other map players Off, compare ranges 30, 80 and -1. Turn Hide other map players On, then turn management Off. Try clicking both disabled controls and typing into the range. Turn management On again, then turn hiding Off. Repeat at GUI scales 1 and 1.25. Discard the draft.
+    - Expect: a square terrain sample uses the game's map colors and player icons. Increasing the range reveals more sample players; -1 shows all of them. The self marker remains visible. Hiding other players removes their markers and greys the range field. Management Off greys both dependent labels and controls, blocks edits and retains their values. Its sample shows an unmanaged vanilla view, independent of those disabled draft values. Re-enabling management restores the retained choices. The live map stays unchanged throughout this draft check.
+    - Watch for: a grid or legend unlike the game map, lost self marker, disabled controls accepting edits, lost retained values, a range field enabled while hiding players or same-group visibility being presented as safe.
 
 13. **Roleplay tools** (P1)
     - Do: compare dice and sound choices, scene markers, spectator protections, player nickname changes and nickname limits. Use the branch selector to revisit the same pages. Discard the draft.
-    - Expect: the feature-specific samples update and the controls retain edits. Descriptions distinguish public/private roll delivery, existing scene-marker text, invisible spectators and saved nicknames from command registration.
-    - Watch for: a preview claiming settings erase existing markers or names, public rolls shown as server-wide, or disabled nickname commands still shown as available.
+    - Expect: the dice example changes when dice rolling is enabled or disabled, and the spectator example follows its visible choices. Sound choices stay in their controls; the preview does not play a live roll. Scene markers, Player nickname choices and Nickname rules have centered controls without an unrelated picture. All controls retain edits. Descriptions explain public/private roll delivery, retained scene-marker text, invisible spectators and saved nicknames.
+    - Watch for: an unrelated scene-marker or nickname picture, a claim that disabling commands erases saved markers or names, public rolls described as server-wide or lost edits after revisiting a page.
 
 14. **History, notes and stats** (P1)
     - Do: toggle chat history and capture of other chat, inspect retention limits, staff notes, personal notes and their length limits. Compare activity tracking Off/On and inspect Review without saving.
-    - Expect: each page shows only its relevant example, with readable label/value columns. History capture changes the Other chat sample. Staff and personal notes stay clearly distinct. Overall stat tracking requires restart; individual counters are not presented here.
-    - Watch for: merged labels/counts, permission examples contradicting controls, notes being described as public, or a draft preview actually storing messages or notes.
+    - Expect: history, notes and stats show readable examples of their visible choices. History capture changes the Other chat sample. Staff and personal notes stay clearly distinct. History limits and Note length limits have centered controls without a picture. Permissions and limits remain in the controls, without duplicate labels in the examples. Overall stat tracking requires restart; individual counters are not presented here.
+    - Watch for: merged labels/counts, permission codes or limits repeated in pictures, notes described as public or a draft preview storing live messages or notes.
 
-All five cards are pending owner observations. Real saves, permission checks and gameplay delivery should be batched by configuration state using the existing human-QA workflow after these draft checks.
+15. **Privilege suggestions and custom values** (P1)
+    - Config: draft only. If an installed mod registers a known custom privilege, note its exact code for comparison with the suggestions.
+    - Do: open Server tools, Chat history. In Chat history privilege, open the suggestions and choose `commandplayer` with the mouse. Reopen, search for `chat`, and choose it with the keyboard. Clear the field and type `qa.custom-access`; leave the field, switch categories, return and inspect Review. Without saving, close and discard. In `/basic config`, find Chat history privilege and repeat the suggestion and custom-value edits, then close without saving.
+    - Expect: suggestions show privilege codes with descriptions where available, including the server's known custom-mod registration if present. `commandplayer` appears as a privilege code. Choosing a suggestion writes its exact code. Typed custom values remain editable, survive page changes and appear unchanged in Review even when no suggestion matches. Both editors behave consistently; the history picture does not display the privilege string.
+    - Watch for: a role name replacing a code, missing known custom-mod privileges, typing forced back to a listed suggestion, clipped or unselectable suggestions, changed capitalization, lost custom text or a permission value appearing in the picture.
+
+16. **Character sheets and access controls** (P1)
+    - Do: compare Character sheets Off/On, the C-menu choice and multiple-character slots. Leave sheet enablement changed from its original value. On Viewing and editing sheets, change Sheet editing command permission to `qa.sheet-edit`, nearby viewing range to 8 and the line-of-sight choice. Open Review without saving. Discard afterward.
+    - Expect: the sheet example changes when sheets are enabled or disabled, and the slot example follows the slot choices. The C-menu preference stays in its control. Viewing and editing sheets has centered controls without a picture. Review identifies sheet enablement and editing-command permission as requiring restart; nearby viewing controls are live. The live player's character and inventory stay unchanged.
+    - Watch for: a permission or range label repeated in the sheet picture, wrong restart requirements, lost draft values or a sample that changes the live player's character.
+
+Cards 10 through 16 are pending owner observations. Real saves, permission checks and gameplay delivery should be batched by configuration state using the existing human-QA workflow after these draft checks.
+
+## October 15 evidence appendix
+
+The retained run is `.tmp/wizard-map-permissions-20261015/` in this worktree. Generated artifacts remain ignored.
+
+| Evidence | Result or retained file |
+| --- | --- |
+| Full suite | `full.trx`: 1,406 passed, zero failed or skipped |
+| Rendering | `renders-final/`: all 26 scenes at scales 1 and 1.25 |
+| Workflow checks | `tooling.log` passed; `.tmp/map-privilege-fixtures-visual-workflow-20261015-host/` passed all 48 mock assertions |
+| Canonical package | BASICs 5.9.1, zero build errors and 183 analyzer warnings; `build.json` |
+| GUI source SHA-256 | `8aed37986eecd291c71ebf7323a732507e87fec6b841a6b2718fd46bee98f3f5` |
+| Package SHA-256 | `035df973218a21ebbe892b90e90984b732930a05a742b500f415d598be53df57` |
+| Loaded DLL SHA-256 | `53787d4bb05f2ca3bd6161070b259b59369ba4602ff91362fb1978c73d4b5ec7` |
+| Staging | `stage/stage-receipt.json`: matching server readback and Profile2 package; QA RunGame at 16:23:58 UTC on October 15 |
+| Client ownership | `stop-before-stage/launch-receipt.json` and `launch/launch-receipt.json`: only verified Profile2 was stopped and relaunched; Profile3 was untouched |
+| Other mods | `profile2-inventory-check.json`: 12 local mods before and after, all 11 non-BASICs hashes unchanged |
+| Native appearance | `native/captures.json` and `native-validation-summary.json`: 26 source-verified native scenes, zero source or DLL mismatches, 1908x1260 at original scale 1.125 |
+| Client log | `client-main.after.log` and `client-log-check.json`: zero errors or exceptions |
+| Handoff | `handoff-open.json` completed `/basic setup`; `controller-shutdown.json` confirms automation disabled |
+
+Validation caught and fixed privilege-list scrolling, disabled map-field focus, and the advanced editor's unauthorized snapshot response. The denial now returns no configuration or privilege registry, covered by a regression test. The standalone renderer also gained the game DLL dependency needed for the native map palette.
+
+Native review covered the map states, open privilege picker and history preview. The map samples resemble the live parchment minimap and use native player icons; they remain illustrations rather than the live world map. A hover tooltip overlaps part of the range label in the map captures. It does not obscure the input or indicate a product failure. Native images do not establish actual map filtering, permission enforcement, save/restart behavior or human acceptance. No baseline, merge or release was approved.

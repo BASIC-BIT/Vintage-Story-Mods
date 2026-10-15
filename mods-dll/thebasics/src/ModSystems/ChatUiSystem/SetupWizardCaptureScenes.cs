@@ -17,8 +17,8 @@ public static class SetupWizardCaptureScenes
         "wizard-hub", "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
         "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited", "wizard-notifications-sleep",
         "wizard-review", "wizard-error", "wizard-restart-dedicated", "wizard-restart-integrated",
-        "wizard-appearance-bubbles", "wizard-appearance-names", "wizard-map-visibility", "wizard-characters-sheets",
-        "wizard-roleplay-dice", "wizard-server-history", "wizard-server-stats"
+        "wizard-appearance-bubbles", "wizard-appearance-names", "wizard-map-visibility", "wizard-map-managed", "wizard-map-hidden", "wizard-characters-sheets",
+        "wizard-roleplay-dice", "wizard-server-history", "wizard-server-stats", "wizard-privileges"
     ];
 
     public static List<ConfigAdminSettingValue> DefaultValues()
@@ -56,6 +56,12 @@ public static class SetupWizardCaptureScenes
             draft.Set("ServerSaveAnnouncementAsNotification", "0");
             draft.Set("SendServerSaveFinishedAnnouncement", "0");
         }
+        if (scenario is "wizard-map-managed" or "wizard-map-hidden")
+        {
+            draft.Set("ManageMapPlayerVisibility", "1");
+            draft.Set("MapHideOtherPlayers", scenario == "wizard-map-hidden" ? "1" : "0");
+            draft.Set("MapPlayerRenderDistance", "80");
+        }
     }
 
     public static void Show(SetupWizardDialog dialog, string scenario, double previewTime)
@@ -73,10 +79,10 @@ public static class SetupWizardCaptureScenes
             "wizard-notifications-sleep" => "notifications.sleep",
             "wizard-appearance-bubbles" => "appearance.bubbles",
             "wizard-appearance-names" => "appearance.names",
-            "wizard-map-visibility" => "map.visibility",
+            "wizard-map-visibility" or "wizard-map-managed" or "wizard-map-hidden" => "map.visibility",
             "wizard-characters-sheets" => "characters.sheets",
             "wizard-roleplay-dice" => "roleplay.dice",
-            "wizard-server-history" => "server.history",
+            "wizard-server-history" or "wizard-privileges" => "server.history",
             "wizard-server-stats" => "server.stats",
             "wizard-review" => "review",
             _ => "chat.basics"
@@ -100,6 +106,14 @@ public static class SetupWizardCaptureScenes
             var bounds = dialog.SingleComposer.GetElement("ProximityChatPresentationMode").Bounds;
             var x = (int)(bounds.renderX + bounds.OuterWidth / 2);
             var y = (int)(bounds.renderY + bounds.OuterHeight / 2);
+            dialog.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+            dialog.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
+        }
+        if (scenario == "wizard-privileges")
+        {
+            var bounds = dialog.SingleComposer.GetElement("ChatHistoryPermission").Bounds;
+            var x = (int)(bounds.renderX + bounds.InnerWidth - GuiElement.scaled(12));
+            var y = (int)(bounds.renderY + bounds.InnerHeight / 2);
             dialog.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
             dialog.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         }
