@@ -33,6 +33,7 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
     private LoadedTexture focusTexture;
     private bool pressed;
     private bool disposed;
+    private bool fontsReady;
 
     public GuiElementSetupTopicCard(ICoreClientAPI api, string title, string description,
         SetupTopicCardIcon icon, ActionConsumable onClick, ElementBounds bounds)
@@ -49,6 +50,8 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
     }
 
     public override bool Focusable => Visible && Enabled;
+    internal double DescriptionDrawBottom { get; private set; }
+    internal double DescriptionFontSize => descriptionFont.UnscaledFontsize;
 
     public override void BeforeCalcBounds()
     {
@@ -105,14 +108,28 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
         context.LineWidth = 1.7;
         context.LineJoin = LineJoin.Round;
         context.LineCap = LineCap.Round;
-        DrawIcon(context);
+        DrawIcon(context, icon);
         context.Restore();
 
-        titleFont.SetupContext(context);
-        textUtil.DrawTextLine(context, titleFont, Text, scaled(54), scaled(22));
+        var cardTitleFont = titleFont.WithFontSize(17);
+        cardTitleFont.SetupContext(context);
+        var titleWidth = Math.Max(1, width - scaled(66));
+        var textWidth = context.TextExtents(Text).XAdvance;
+        if (textWidth > titleWidth)
+            cardTitleFont.WithFontSize((float)Math.Max(14, 17 * titleWidth / textWidth));
+        cardTitleFont.SetupContext(context);
+        textUtil.DrawTextLine(context, cardTitleFont, Text, scaled(54), scaled(22 + (17 - cardTitleFont.UnscaledFontsize) / 2));
         var descriptionWidth = Math.Max(1, width - scaled(32));
-        textUtil.AutobreakAndDrawMultilineTextAt(context, descriptionFont, description,
+        var descriptionHeight = Math.Max(1, height - scaled(67));
+        descriptionFont.WithFontSize(14);
+        while (descriptionFont.UnscaledFontsize > 12 &&
+               textUtil.GetMultilineTextHeight(descriptionFont, description, descriptionWidth, EnumLinebreakBehavior.AfterWord) > descriptionHeight)
+            descriptionFont.WithFontSize((float)Math.Max(12, descriptionFont.UnscaledFontsize - 0.25));
+        var drawnHeight = textUtil.AutobreakAndDrawMultilineTextAt(context, descriptionFont, description,
             scaled(16), scaled(58), descriptionWidth);
+        // Include the pressed state's one-pixel shift in the reported bound.
+        DescriptionDrawBottom = scaled(59) + drawnHeight;
+        fontsReady = true;
         context.Restore();
 
         if (disabled)
@@ -124,8 +141,9 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
         generateTexture(surface, ref texture);
     }
 
-    private void DrawIcon(Context context)
+    internal static void DrawIcon(Context context, SetupTopicCardIcon icon)
     {
+        context.NewPath();
         switch (icon)
         {
             case SetupTopicCardIcon.Chat:
@@ -236,6 +254,7 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
                 context.Stroke();
                 break;
         }
+        context.NewPath();
     }
 
     public override void RenderInteractiveElements(float deltaTime)
@@ -293,6 +312,11 @@ public sealed class GuiElementSetupTopicCard : GuiElementTextButton
         pressedTexture.Dispose();
         disabledTexture.Dispose();
         focusTexture.Dispose();
+        if (fontsReady)
+        {
+            titleFont.Dispose();
+            descriptionFont.Dispose();
+        }
         base.Dispose();
     }
 }

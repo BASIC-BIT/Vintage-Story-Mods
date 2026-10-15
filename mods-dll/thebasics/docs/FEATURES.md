@@ -76,7 +76,7 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 
 ## In-game admin config
 
-`/basic setup` opens a wizard with 40 focused pages across eight topics: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. All eight topics stay available in the top bar; switching returns to the last page visited in that topic. Each page has at most five controls. The wizard and advanced config panel use the same setting registry and validation.
+`/basic setup` opens a wizard with 40 focused pages across eight topics: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. An expandable sidebar keeps all eight category headers visible and lists the selected category's pages. Selecting a category returns to its last visited page. Long page lists scroll independently, and the selected page stays visible. Each page has at most five controls. The wizard and advanced config panel use the same setting registry and validation.
 
 Features:
 
@@ -85,15 +85,22 @@ Features:
 - Shared server config object so live-safe changes update existing systems without replacing stale references.
 - Client config resync after successful saves or disk reloads.
 - New-setting discovery through persisted `ReviewedConfigSettingKeys`.
-- Wizard choices stay in a draft until saved. Review the changed settings and restart requirements before saving.
+- Wizard choices stay in a shared draft while switching pages, categories, Overview and Review. Small dots mark edited pages and categories. Review the changed settings and restart requirements before saving.
+- Overview keeps eight topic cards. All settings, Close and Review changes share the footer on ordinary pages; Review replaces its action with Save settings. The sidebar supports mouse, wheel, scrollbar and keyboard navigation.
 - The shared registry now exposes existing character-sheet enablement, editing-command permissions, nearby viewing rules, and the required-fields check.
 - Permission fields in both editors offer searchable privilege codes from the server, including codes registered by other mods. They also accept typed strings and preserve configured values outside the suggestions. These fields choose a required privilege; they do not assign player roles or grants.
 - Map visibility uses a square sample with the game's parchment colors and player icons. Its On/Off management button disables and greys the dependent choices when Off, retaining their values. Hiding other players also disables the range field. The sample does not read or change the live world map.
 - Pages about sheet access, nickname policy, scene-marker availability, history retention and note lengths center their controls without an illustration. Other previews show visible outcomes without repeating permission codes, limits or instructions from the controls.
 
 ```mermaid
-flowchart LR
-    Setup["/basic setup"] --> Topics[Choose a topic] --> Draft[Edit draft] --> Review[Review changes] --> Save[Save]
+flowchart TD
+    Setup["/basic setup"] --> Overview
+    Overview -->|Card or sidebar category| Page[Choose a sidebar page]
+    Page -->|Edit or switch page| Draft[Shared draft]
+    Draft --> Page
+    Draft -->|Footer| Review[Review changes]
+    Review -->|Sidebar| Page
+    Review --> Save[Save settings]
     Config["/basic config"] --> Advanced[Advanced settings] --> Save
     Dedicated["Language and sheet-field commands"] --> Editors[Separate editors] --> Save
     Save --> Live[Apply live changes]

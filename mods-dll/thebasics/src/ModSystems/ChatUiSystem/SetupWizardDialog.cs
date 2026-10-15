@@ -15,7 +15,11 @@ namespace thebasics.ModSystems.ChatUiSystem;
 
 public sealed class SetupWizardDialog : GuiDialog
 {
-    private const double Width = 880;
+    private const double SidebarWidth = 236;
+    private const double ContentOffset = SidebarWidth + 24;
+    private double Width => Math.Min(880, Math.Max(640,
+        capi.Render.FrameWidth / Math.Max(RuntimeEnv.GUIScale, 0.1f) - ContentOffset - 2 * GuiStyle.ElementToDialogPadding - 24));
+    private double DialogWidth => ContentOffset + Width;
     private readonly Action _onSave;
     private readonly Action<string, string, string> _onTrack;
     private readonly Action _onClose;
@@ -42,6 +46,13 @@ public sealed class SetupWizardDialog : GuiDialog
         .ToDictionary(topic => topic.Id, topic => topic.EntryPageId, StringComparer.Ordinal);
     private IReadOnlyList<ConfigAdminPrivilegeSuggestion> _privilegeSuggestions = Array.Empty<ConfigAdminPrivilegeSuggestion>();
     private readonly List<GuiElementPrivilegePicker> _privilegePickers = new();
+    private GuiElementSetupSidebar _sidebar;
+    private GuiElementRichtext _draftStatus;
+    private string _activeTopicId = "chat";
+    private Action _pendingNavigation;
+    private bool _focusSidebarAfterNavigation;
+    private double _composedWidth;
+    private double _composedHeight;
 
     public SetupWizardDialog(ICoreClientAPI api, SetupWizardDraft draft, string runId, bool isDedicated,
         Action onSave, Action<string, string, string> onTrack, Action onClose, Action onAdvanced = null,
@@ -89,7 +100,11 @@ public sealed class SetupWizardDialog : GuiDialog
         if (stepId != "hub" && stepId != "review" && stepId != "finish" && !SetupWizardCatalog.TryGetPage(stepId, out _))
             throw new ArgumentException("Unknown setup page.", nameof(stepId));
         CurrentStepId = stepId;
-        if (SetupWizardCatalog.TryGetPage(stepId, out var topicPage)) _topicPages[topicPage.TopicId] = topicPage.Id;
+        if (SetupWizardCatalog.TryGetPage(stepId, out var topicPage))
+        {
+            _topicPages[topicPage.TopicId] = topicPage.Id;
+            _activeTopicId = topicPage.TopicId;
+        }
         _preview?.EndDrag(false);
         _chatPreviewTab = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || Bool("UseGeneralChannelAsProximityChat") || CurrentStepId == "chat.tabs" && !Bool("ProximityChatAsDefault") ? 0 : 1;
         _reviewOffset = 0;
@@ -159,6 +174,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public void Suspend()
     {
+        _pendingNavigation = null;
         (SingleComposer?.GetElement("pip") as PreviewActorElement)?.CancelDrag();
         _closeConfirm?.TryClose();
         _forceClose = true;
@@ -173,25 +189,25 @@ public sealed class SetupWizardDialog : GuiDialog
         _diagram = null;
         _sample = null;
         _sleepCount = null;
-        var body = ElementBounds.Fixed(0, 0, Width, BodyHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
+        _draftStatus = null;
+        _composedWidth = Width;
+        _composedHeight = BodyHeight;
+        var body = ElementBounds.Fixed(0, 0, DialogWidth, BodyHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         SingleComposer = capi.Gui.CreateCompo("thebasics-setup-wizard", ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle));
         var composer = SingleComposer
             .AddShadedDialogBG(body)
             .AddDialogTitleBar(IsCaptureOnly ? "The BASICs setup (QA preview, save disabled)" : "The BASICs setup", () => TryClose())
             .BeginChildElements(body);
-        var destinations = new[] { "hub" }.Concat(SetupWizardCatalog.Topics.Select(topic => _topicPages[topic.Id]))
-            .Append("review").ToArray();
-        var tabs = new[] { "Topics" }.Concat(SetupWizardCatalog.Topics.Select(topic => topic.Title)).Append("Review")
-            .Select((name, index) => new GuiTab { Name = name, DataInt = index }).ToArray();
-        composer.AddHorizontalTabs(tabs, ElementBounds.Fixed(0, 40, Width, 32), index => ShowPage(destinations[index]),
-            CairoFont.WhiteSmallText().WithFontSize(15), CairoFont.WhiteSmallText().WithFontSize(15).WithColor(GuiStyle.ActiveButtonTextColor), "topic-tabs");
-        var navigation = composer.GetHorizontalTabs("topic-tabs");
-        navigation.unscaledTabPadding = 3;
-        navigation.unscaledTabSpacing = 3;
-        var selectedTopic = CurrentStepId == "hub" ? 0 : CurrentStepId is "review" or "finish" ? tabs.Length - 1
-            : Array.FindIndex(destinations, page => page == CurrentStepId);
-        navigation.SetValue(selectedTopic, false);
-        composer.AddStaticElement(new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, FooterY - 14, Width, 1),
+        _sidebar = new GuiElementSetupSidebar(capi, ElementBounds.Fixed(0, 42, SidebarWidth, FooterY - 68),
+            destination =>
+            {
+                var page = destination.StartsWith("topic:", StringComparison.Ordinal)
+                    ? _topicPages[destination[6..]] : destination;
+                QueueNavigation(() => ShowPage(page), true);
+            });
+        _sidebar.SetState(CurrentStepId, _activeTopicId, Draft.ChangedKeys);
+        composer.AddInteractiveElement(_sidebar, "setup-sidebar");
+        composer.AddStaticElement(new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, FooterY - 14, DialogWidth, 1),
             (context, _, bounds) =>
             {
                 context.SetSourceRGBA(0.82, 0.73, 0.59, 0.3);
@@ -199,48 +215,104 @@ public sealed class SetupWizardDialog : GuiDialog
                 context.Fill();
             }), "footer-rule");
 
+        composer.BeginChildElements(ElementBounds.Fixed(ContentOffset, 0, Width, BodyHeight));
         if (CurrentStepId == "hub") ComposeHub(composer);
         else if (CurrentStepId == "review") ComposeReview(composer);
         else if (CurrentStepId == "finish") ComposeFinish(composer);
         else ComposePage(composer);
-
-        Text(composer, _message ?? (_pending ? "Saving settings..." : Draft.IsDirty && CurrentStepId != "hub" ? "Your changes aren't saved yet." : ""),
-            0, StatusY, CurrentStepId == "hub" ? 640 : Width, CompactLayout ? 30 : 42);
-        Button(composer, "Close", () => TryClose(), Width - 110, FooterY, 110);
+        composer.EndChildElements();
+        Text(composer, _message ?? (_pending ? "Saving settings..." : ""),
+            ContentOffset, StatusY, Width, CompactLayout ? 30 : 42);
+        ComposeFooter(composer);
         composer.EndChildElements().Compose(focusFirstElement: false);
         if (CurrentStepId == "map.visibility") RefreshMapControls(composer);
         _sample = SingleComposer.GetRichtext("preview-text");
         _sleepCount = SingleComposer.GetRichtext("preview-sleep-count");
+        _draftStatus = SingleComposer.GetRichtext("footer-draft-count");
+        if (_focusSidebarAfterNavigation)
+        {
+            SingleComposer.FocusElement(_sidebar.TabIndex);
+            _focusSidebarAfterNavigation = false;
+        }
+    }
+
+    private void ComposeFooter(GuiComposer composer)
+    {
+        composer.AddSmallButton("All settings", () =>
+        {
+            if (_onAdvanced == null) return false;
+            QueueNavigation(() => { Track("advanced"); Suspend(); _onAdvanced(); });
+            return true;
+        }, ElementBounds.Fixed(0, FooterY, 140, 30), key: "all-settings");
+        composer.GetButton("all-settings").Enabled = _onAdvanced != null && !_pending;
+        composer.AddRichtext(DraftStatusText(), CairoFont.WhiteSmallText().WithFontSize(14),
+            ElementBounds.Fixed(156, FooterY + 6, DialogWidth - 480, 24), "footer-draft-count");
+        composer.AddSmallButton(CurrentStepId == "finish" ? NeedsRestart ? "Later" : "Done" : "Close",
+            () => { QueueNavigation(() => TryClose()); return true; },
+            ElementBounds.Fixed(DialogWidth - 300, FooterY, 110, 30), key: "close");
+        var save = CurrentStepId == "review" && !IsCaptureOnly;
+        composer.AddSmallButton(CurrentStepId == "finish" ? "Back to setup" : save ? _pending ? "Saving..." : "Save settings" : "Review changes", () =>
+        {
+            QueueNavigation(() =>
+            {
+                if (CurrentStepId == "finish") ShowPage("hub");
+                else if (!save) ShowPage("review");
+                else if (!_pending)
+                {
+                    _pending = true;
+                    _message = "Saving settings...";
+                    ComposeDialog();
+                    _onSave?.Invoke();
+                }
+            });
+            return true;
+        }, ElementBounds.Fixed(DialogWidth - 180, FooterY, 180, 30), key: "review");
+        composer.GetButton("review").Enabled = !_pending && !(CurrentStepId == "review" && IsCaptureOnly);
+    }
+
+    private string DraftStatusText() => Draft.ChangedKeys.Count switch
+    {
+        0 => "",
+        1 => "1 unsaved change",
+        var count => $"{count} unsaved changes"
+    };
+
+    private void RefreshNavigation()
+    {
+        _sidebar?.SetState(CurrentStepId, _activeTopicId, Draft.ChangedKeys);
+        _draftStatus?.SetNewText(DraftStatusText(), CairoFont.WhiteSmallText().WithFontSize(14));
+    }
+
+    private void QueueNavigation(Action action, bool sidebar = false)
+    {
+        if (_disposing || _closing) return;
+        _pendingNavigation = action;
+        _focusSidebarAfterNavigation = sidebar;
+    }
+
+    private void FlushNavigation()
+    {
+        var action = _pendingNavigation;
+        _pendingNavigation = null;
+        if (!_disposing && !_closing) action?.Invoke();
     }
 
     private void ComposeHub(GuiComposer composer)
     {
-        Text(composer, "Set up your server", 0, 92, Width, 30, true);
-        Text(composer, "Choose a topic to get started.", 0, 129, Width, 48);
+        Text(composer, "Set up your server", 0, 52, Width - 150, 30, true);
+        Text(composer, "Choose a topic to get started.", 0, 89, Width - 150, 48);
+        var cardWidth = (Width - 48) / 4;
         for (var index = 0; index < SetupWizardCatalog.Topics.Count; index++)
         {
             var topic = SetupWizardCatalog.Topics[index];
-            var x = index % 4 * 224;
-            var y = (CompactLayout ? 160 : 169) + index / 4 * (CompactLayout ? 122 : 140);
+            var x = index % 4 * (cardWidth + 16);
+            var y = (CompactLayout ? 120 : 129) + index / 4 * (CompactLayout ? 122 : 140);
             composer.AddInteractiveElement(new GuiElementSetupTopicCard(capi, topic.Title, topic.Description, TopicIcon(topic.Id),
-                () => { ShowPage(_topicPages[topic.Id]); return true; }, ElementBounds.Fixed(x, y, 208, CompactLayout ? 110 : 124)), "topic-" + topic.Id);
+                () => { QueueNavigation(() => ShowPage(_topicPages[topic.Id])); return true; }, ElementBounds.Fixed(x, y, cardWidth, CompactLayout ? 110 : 124)), "topic-" + topic.Id);
         }
-        var changes = Draft.ChangedKeys.Count;
-        if (changes > 0 && string.IsNullOrEmpty(_message) && !_pending)
-            Text(composer, changes == 1 ? "1 unsaved change" : $"{changes} unsaved changes", 0, StatusY, 640, 30);
-        var guideBounds = ElementBounds.Fixed(766, 76, 100, 84);
+        var guideBounds = ElementBounds.Fixed(Width - 114, 36, 100, 84);
         if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guideBounds.fixedX, guideBounds.fixedY, guideBounds.fixedWidth, guideBounds.fixedHeight);
         else composer.AddInteractiveElement(new PreviewActorElement(capi, guideBounds, this), "pip");
-        Button(composer, "Review changes", () => ShowPage("review"), 0, FooterY, 240);
-        composer.AddSmallButton("All settings", () =>
-        {
-            if (_onAdvanced == null) return false;
-            Track("advanced");
-            Suspend();
-            _onAdvanced();
-            return true;
-        }, ElementBounds.Fixed(260, FooterY, 240, 30), key: "hub-all-settings");
-        composer.GetButton("hub-all-settings").Enabled = _onAdvanced != null;
     }
 
     private static SetupTopicCardIcon TopicIcon(string id) => id switch
@@ -259,47 +331,17 @@ public sealed class SetupWizardDialog : GuiDialog
     private void ComposePage(GuiComposer composer)
     {
         SetupWizardCatalog.TryGetPage(CurrentStepId, out var page);
-        Text(composer, page.Title, 0, 88, Width, 27, true);
-        Text(composer, page.Description, 0, 120, Width, 44);
+        Text(composer, page.Title, 0, 48, Width, 27, true);
+        Text(composer, page.Description, 0, 80, Width, 44);
         AddPreview(composer);
-        var y = CompactLayout && CurrentStepId == "chat.basics" ? 170d : 178d;
+        var y = CompactLayout && CurrentStepId == "chat.basics" ? 130d : 138d;
         if (CurrentStepId == "notifications.savestart" || CurrentStepId == "notifications.savefinish")
             AddAnnouncement(composer, ref y);
         else
             foreach (var key in page.SettingKeys.Where(SettingVisible))
                 AddSetting(composer, key, ref y);
 
-        var pages = TopicPages(page.TopicId);
-        var index = pages.FindIndex(candidate => candidate.Id == page.Id);
-        if (index > 0) Button(composer, "< Back", () => { Track("back"); ShowPage(pages[index - 1].Id); }, 8, FooterY, 92);
-        else Button(composer, "< Back", () => { Track("back"); ShowPage("hub"); }, 8, FooterY, 92);
-        var next = index + 1 < pages.Count ? pages[index + 1].Id : "hub";
-        Button(composer, index + 1 < pages.Count ? "Next >" : "Topics", () => ShowPage(next), 108, FooterY, 100);
-        Button(composer, "All topics", () => { Track("skip"); ShowPage("hub"); }, 615, FooterY, 132);
-        var codes = pages.Select(candidate => candidate.Id).ToArray();
-        composer.AddInteractiveElement(new GuiElementDropDown(capi, codes, pages.Select((candidate, number) => $"{number + 1}/{pages.Count}  {candidate.Title}").ToArray(),
-            Math.Max(0, index), (value, _) => ShowPage(value), ElementBounds.Fixed(220, FooterY, 380, 30), CairoFont.WhiteSmallText(), false), "page-picker");
     }
-
-    private List<SetupWizardPage> TopicPages(string topic)
-    {
-        return SetupWizardCatalog.Pages.Where(page => page.TopicId == topic && PageVisible(page.Id)).ToList();
-    }
-
-    private bool PageVisible(string id) => id switch
-    {
-        "teleport.requests" or "teleport.requesttiming" => Bool("AllowPlayerTpa"),
-        "teleport.homes" => Bool("Teleportation.RegisterHomeCommands"),
-        "teleport.spawn" => Bool("Teleportation.RegisterSpawnCommands"),
-        "teleport.top" => Bool("Teleportation.RegisterTopCommand"),
-        "teleport.back" => Bool("Teleportation.RegisterBackCommand"),
-        "teleport.stuck" or "teleport.stuckpolicy" => Bool("Teleportation.RegisterStuckCommand"),
-        "teleport.warmup" => AnyTravelTool(),
-        _ => true
-    };
-
-    private bool AnyTravelTool() => Bool("AllowPlayerTpa") || Bool("Teleportation.RegisterHomeCommands") || Bool("Teleportation.RegisterSpawnCommands")
-        || Bool("Teleportation.RegisterTopCommand") || Bool("Teleportation.RegisterBackCommand") || Bool("Teleportation.RegisterStuckCommand");
 
     private bool SettingVisible(string key)
     {
@@ -317,9 +359,9 @@ public sealed class SetupWizardDialog : GuiDialog
         var label = SettingLabel(definition);
         if (key is "MapHideOtherPlayers" or "MapPlayerRenderDistance")
             composer.AddStaticText(label, CairoFont.WhiteSmallText().WithFontSize(14),
-                ElementBounds.Fixed(SettingsX, y, 546, 21), "setting-label-" + key);
-        else Text(composer, label, SettingsX, y, 546, 21);
-        var bounds = ElementBounds.Fixed(SettingsX, y + 23, 546, 28);
+                ElementBounds.Fixed(SettingsX, y, SettingsWidth, 21), "setting-label-" + key);
+        else Text(composer, label, SettingsX, y, SettingsWidth, 21);
+        var bounds = ElementBounds.Fixed(SettingsX, y + 23, SettingsWidth, 28);
         var value = Draft.Get(key);
         if (key == "ManageMapPlayerVisibility")
         {
@@ -426,15 +468,16 @@ public sealed class SetupWizardDialog : GuiDialog
         var enabled = started ? "SendServerSaveAnnouncement" : "SendServerSaveFinishedAnnouncement";
         var popup = started ? "ServerSaveAnnouncementAsNotification" : "ServerSaveFinishedAsNotification";
         var text = started ? "TEXT_ServerSaveAnnouncement" : "TEXT_ServerSaveFinished";
-        Text(composer, "Announcement", 334, y, 546, 21);
+        Text(composer, "Announcement", SettingsX, y, SettingsWidth, 21);
         composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "off", "chat", "popup" }, new[] { "Off", "Chat", "Chat notification" },
             !Bool(enabled) ? 0 : Bool(popup) ? 2 : 1, (choice, _) =>
             {
                 Draft.Set(enabled, choice == "off" ? "0" : "1");
                 if (choice != "off") Draft.Set(popup, choice == "popup" ? "1" : "0");
                 Track("choice", choice);
+                RefreshNavigation();
                 RefreshPreview();
-            }, ElementBounds.Fixed(334, y + 23, 546, 28), CairoFont.WhiteSmallText(), false), "announcement-mode");
+            }, ElementBounds.Fixed(SettingsX, y + 23, SettingsWidth, 28), CairoFont.WhiteSmallText(), false), "announcement-mode");
         y += CompactLayout ? 54 : 65;
         AddSetting(composer, text, ref y);
     }
@@ -446,6 +489,7 @@ public sealed class SetupWizardDialog : GuiDialog
         if (CurrentStepId == "chat.tabs")
             _chatPreviewTab = Bool("UseGeneralChannelAsProximityChat") || !Bool("ProximityChatAsDefault") ? 0 : 1;
         Track("choice", choice);
+        RefreshNavigation();
         RefreshPreview();
         if (recompose)
         {
@@ -457,10 +501,10 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void ComposeReview(GuiComposer composer)
     {
-        Text(composer, "Review changes", 0, 90, Width, 28, true);
-        Text(composer, "Check the changes below, then save. Anything marked After restart will take effect when the server restarts.", 0, 125, Width, 42);
+        Text(composer, "Review changes", 0, 50, Width, 28, true);
+        Text(composer, "Check the changes below, then save. Anything marked After restart will take effect when the server restarts.", 0, 85, Width, 42);
         var keys = Draft.ChangedKeys;
-        var y = 180d;
+        var y = 140d;
         foreach (var key in keys.Skip(_reviewOffset).Take(5))
         {
             ConfigAdminSettingRegistry.TryGet(key, out var definition);
@@ -471,33 +515,22 @@ public sealed class SetupWizardDialog : GuiDialog
         if (keys.Count == 0) Text(composer, NeedsRestart ? "No new changes. Restart the server to apply your saved settings." : "No changes to save.", 0, y, Width, 60);
         if (keys.Count > 5)
             Button(composer, $"More changes ({_reviewOffset + 1}-{Math.Min(_reviewOffset + 5, keys.Count)} of {keys.Count})", () =>
-            { _reviewOffset = _reviewOffset + 5 < keys.Count ? _reviewOffset + 5 : 0; ComposeDialog(); }, 335, FooterY, 420);
-        Button(composer, "Back to topics", () => { Track("back"); ShowPage("hub"); }, 0, FooterY, 150);
-        if (!IsCaptureOnly)
-            Button(composer, _pending ? "Saving..." : "Save settings", () =>
-            {
-                if (_pending) return;
-                _pending = true;
-                _message = "Saving settings...";
-                ComposeDialog();
-                _onSave?.Invoke();
-            }, 160, FooterY, 160);
+            { QueueNavigation(() => { _reviewOffset = _reviewOffset + 5 < keys.Count ? _reviewOffset + 5 : 0; ComposeDialog(); }); },
+                0, y + 8, Math.Min(420, Width));
     }
 
     private void ComposeFinish(GuiComposer composer)
     {
-        Text(composer, IsCaptureOnly ? "QA example: saved settings" : "Settings saved", 0, 90, Width, 28, true);
+        Text(composer, IsCaptureOnly ? "QA example: saved settings" : "Settings saved", 0, 50, Width, 28, true);
         if (!NeedsRestart)
-            Text(composer, "Your settings are now in use.", 0, 145, Width, 80);
+            Text(composer, "Your settings are now in use.", 0, 105, Width, 80);
         else
         {
-            Text(composer, "Restart needed", 0, 143, Width, 27, true);
+            Text(composer, "Restart needed", 0, 103, Width, 27, true);
             var names = _restartKeys.Select(key => ConfigAdminSettingRegistry.TryGet(key, out var setting) ? SettingLabel(setting) : key);
-            Text(composer, _runtimeApplyFailed ? "Restart the server to apply the saved settings.\n" + string.Join(", ", names) : string.Join(", ", names), 0, 179, Width, 126);
-            Text(composer, RestartInstructions(), 0, 330, Width, 90);
+            Text(composer, _runtimeApplyFailed ? "Restart the server to apply the saved settings.\n" + string.Join(", ", names) : string.Join(", ", names), 0, 139, Width, 126);
+            Text(composer, RestartInstructions(), 0, 290, Width, 90);
         }
-        Button(composer, "Back to setup", () => ShowPage("hub"), 0, FooterY, 180);
-        Button(composer, NeedsRestart ? "Later" : "Done", () => TryClose(), 195, FooterY, 150);
     }
 
     private string RestartInstructions() => _isDedicated
@@ -510,13 +543,13 @@ public sealed class SetupWizardDialog : GuiDialog
         if (SetupWizardFeaturePreview.Supports(CurrentStepId))
         {
             var appearance = CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal);
-            _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 174, 310,
+            _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 134, 310,
                 appearance ? 64 : FeaturePreviewHeight),
                 (context, surface, bounds) => SetupWizardFeaturePreview.Draw(context, surface, bounds, CurrentStepId, Draft, capi), true);
             composer.AddInteractiveElement(_diagram, "preview-diagram");
             if (appearance)
             {
-                var guide = ElementBounds.Fixed(0, 242, 310, CompactLayout ? 190 : 240);
+                var guide = ElementBounds.Fixed(0, 202, 310, CompactLayout ? 190 : 240);
                 if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guide.fixedX, guide.fixedY, guide.fixedWidth, guide.fixedHeight);
                 else composer.AddInteractiveElement(new PreviewActorElement(capi, guide, this), "pip");
             }
@@ -524,22 +557,22 @@ public sealed class SetupWizardDialog : GuiDialog
         }
         if (CurrentStepId is "chat.basics" or "chat.language" or "chat.languageaccess" or "chat.signlanguage" or "chat.tabs" or "notifications.savestart" or "notifications.savefinish")
         {
-            AddChatPreview(composer, CompactLayout ? 204 : 212, CompactLayout ? 184 : 230);
+            AddChatPreview(composer, CompactLayout ? 164 : 172, CompactLayout ? 184 : 230);
             return;
         }
         var hearing = CurrentStepId is "chat.ranges" or "chat.obfuscation";
         var sleep = CurrentStepId == "notifications.sleep";
         var pictureHeight = hearing ? CompactLayout ? 274 : 330 : sleep ? CompactLayout ? 112 : 140 : CompactLayout ? 146 : 168;
-        _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 174, 310, pictureHeight), DrawDiagram, true);
+        _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 134, 310, pictureHeight), DrawDiagram, true);
         composer.AddInteractiveElement(_diagram, "preview-diagram");
         if (sleep)
         {
             composer.AddRichtext(SleepCountText(), CairoFont.WhiteSmallText().WithFontSize(14),
-                ElementBounds.Fixed(0, CompactLayout ? 289 : 317, 310, 20), "preview-sleep-count");
-            AddChatPreview(composer, CompactLayout ? 314 : 347, CompactLayout ? 72 : 92);
+                ElementBounds.Fixed(0, CompactLayout ? 249 : 277, 310, 20), "preview-sleep-count");
+            AddChatPreview(composer, CompactLayout ? 274 : 307, CompactLayout ? 72 : 92);
         }
         else if (!hearing)
-            composer.AddRichtext(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(10, CompactLayout ? 338 : 366, 289, CompactLayout ? 103 : 129), "preview-text");
+            composer.AddRichtext(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(10, CompactLayout ? 298 : 326, 289, CompactLayout ? 103 : 129), "preview-text");
     }
 
     private void AddChatPreview(GuiComposer composer, double y, double historyHeight)
@@ -656,26 +689,12 @@ public sealed class SetupWizardDialog : GuiDialog
     private string SleepCountText() => $"{Sleepers} of 4 players are asleep.";
     private bool NeedsRestart => _runtimeApplyFailed || _restartKeys.Count > 0;
     private bool CompactLayout => capi.Render.FrameHeight / Math.Max(RuntimeEnv.GUIScale, 0.1f) < 660;
-    private double SettingsX => SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? (Width - 546) / 2 : 334;
+    private double SettingsWidth => SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? Math.Min(546, Width - 32) : Math.Min(546, Width - 334);
+    private double SettingsX => SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? (Width - SettingsWidth) / 2 : 334;
     private double FeaturePreviewHeight => CurrentStepId == "map.visibility" ? 270 : 220;
-    private double BodyHeight
-    {
-        get
-        {
-            if (CurrentStepId == "hub") return CompactLayout ? 488 : 546;
-            var height = CompactLayout ? 528 : 608;
-            var settingsOnly = SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId);
-            if ((!SetupWizardFeaturePreview.Supports(CurrentStepId) && !settingsOnly) || CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal))
-                return height;
-            SetupWizardCatalog.TryGetPage(CurrentStepId, out var page);
-            var controls = page.SettingKeys.Count(SettingVisible);
-            var editorBottom = 178 + Math.Max(0, controls - 1) * (CompactLayout ? 54 : 65) + 51;
-            var contentBottom = settingsOnly ? editorBottom : Math.Max(174 + FeaturePreviewHeight, editorBottom);
-            return Math.Min(height, contentBottom + (CompactLayout ? 84 : 104));
-        }
-    }
+    private double BodyHeight => CompactLayout ? 528 : 608;
     private double FooterY => BodyHeight - 38;
-    private double StatusY => FooterY - (CurrentStepId == "hub" ? CompactLayout ? 48 : 64 : CompactLayout ? 36 : 56);
+    private double StatusY => FooterY - (CompactLayout ? 42 : 54);
     private string AnimationCode() => CurrentStepId == "hub" ? "wave" : CurrentStepId == "finish" ? "cheer" : "idle";
 
     private static string PresentationName(string mode) => ProximityChatPresentationModes.Normalize(mode) switch
@@ -808,6 +827,8 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public override void OnRenderGUI(float deltaTime)
     {
+        if (Math.Abs(Width - _composedWidth) > 0.1 || Math.Abs(BodyHeight - _composedHeight) > 0.1)
+            ComposeDialog();
         _elapsed += deltaTime;
         var beat = (int)(Time / (CurrentStepId == "notifications.sleep" ? 2 : 1.5));
         if (beat != _lastBeat)
@@ -855,6 +876,18 @@ public sealed class SetupWizardDialog : GuiDialog
         if (!args.Handled) base.OnMouseMove(args);
     }
 
+    public override void OnMouseUp(MouseEvent args)
+    {
+        base.OnMouseUp(args);
+        FlushNavigation();
+    }
+
+    public override void OnKeyDown(KeyEvent args)
+    {
+        base.OnKeyDown(args);
+        FlushNavigation();
+    }
+
     public override void OnMouseWheel(MouseWheelEventArgs args)
     {
         OpenPrivilegePicker()?.OnMouseWheel(capi, args);
@@ -873,6 +906,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public override bool TryClose()
     {
+        _pendingNavigation = null;
         (SingleComposer?.GetElement("pip") as PreviewActorElement)?.CancelDrag();
         if (!_forceClose && !_disposing && Draft.IsDirty && !IsCaptureOnly)
         {

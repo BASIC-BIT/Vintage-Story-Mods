@@ -5,6 +5,42 @@ Scope: hierarchical configuration, invitation, restart guidance, native Pip prev
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Expandable sidebar, October 15
+
+The owner approved prototype B. This revision replaces the top category tabs, Previous/Next buttons and page dropdown with one expandable sidebar. All eight category headers remain visible. Selecting a category opens its last visited page and reveals its subpages. The selected page is highlighted; long branches scroll within their own list, while short branches stay compact. Pages and categories with unsaved edits show a small dot.
+
+Overview keeps its eight topic cards. Its cards and the sidebar share each category's remembered page. The shared footer contains All settings, Close and Review changes, with the unsaved count shown separately. Review uses the same position for Save settings. The dialog keeps a stable height as pages change; narrow clients reduce the editor width. Existing previews, custom privilege entry, draft review, discard confirmation and restart guidance remain part of the same setup flow.
+
+```mermaid
+flowchart TD
+    Command["/basic setup"] --> Overview
+    Invitation[Administrator invitation] --> Overview
+    Invitation -->|Not now| Reminder["Chat reminder with /basic setup"]
+    Overview -->|Card or sidebar category| Pages[Choose a named sidebar page]
+    Pages -->|Edit or switch page| Pages
+    Pages -->|Overview| Overview
+    Pages -->|Footer: Review changes| Review[Review shared draft]
+    Overview -->|Footer: Review changes| Review
+    Review -->|Sidebar category| Pages
+    Review -->|Save and server acknowledgement| Saved[Saved settings]
+    Saved -->|Restart required| Restart[Host restart guidance]
+    Saved -->|Done| Game[Return to game]
+    Restart -->|Later or reconnect| Game
+    Reminder --> Game
+    Pages -->|Footer: All settings| Editor[Full config editor]
+    Overview -->|Footer: All settings| Editor
+```
+
+The full implementation suite passed 1,427 tests with zero failures or skips. Visual review then found two narrow topic-card descriptions wrapping below their cards. Native text-height measurement now reduces description size only when necessary; all 25 targeted checks passed after that correction, including four new cases checking all eight cards' actual drawn text bounds. Navigation checks cover all 40 pages at 1600x1000 and 1280x720, at scales 1 and 1.25, plus remembered pages, keyboard focus, shared-key dirty dots, editing without replacing the focused field, inner scrolling, and a live GUI-scale change.
+
+All 26 standalone scenes rendered at both window sizes and scales, 104 captures. The four hub captures were regenerated after the final text-fit correction. Independent review inspected hub, Chat, long Teleportation, Map, privilege suggestions, Review, errors and restart guidance, and found no outstanding source or visual issue. These use the native GUI composer; standalone composition omits native Pip and world rendering. The canonical local-only package built with zero errors and 196 warnings.
+
+Profile2's stopped client is staged with the final 5.9.1 package. The compiled source stamp and zip hash match the canonical receipt; its other 11 local mods are unchanged. The previous BASICs zip is backed up. Profile3 and the server were not changed. A fresh in-game capture is deferred because Profile3 is running: the installed 1.22.7 client forwards command-line connection requests through a global pipe, and the retained launcher rejects this case. No client was launched or stopped for this revision. The next native check must wait until Profile3 is closed, then use the retained Profile2 launch/capture workflow.
+
+Evidence is in `.tmp/wizard-sidebar-native-20261015/`: `tests/sidebar-full.trx`, `tests/sidebar-card-fit-final.trx`, `renders-wide/`, `renders-compact/`, `hub-final-wide/`, `hub-final-compact/`, `build-final.json`, `client-stage.json`, `profile2-mods-before.json`, `profile2-mods-after.json` and `backup/`. Initial failed test runs and superseded package receipts remain separate. Card 10 and the existing gameplay/save/restart cards still need owner observations. Browser approval, automated rendering and code review do not establish native acceptance, a screenshot baseline, merge or release approval.
+
+The dated checkpoints below retain evidence for earlier builds. Their navigation descriptions and deployment receipts are historical where superseded by this sidebar revision. The owner cards later in this packet describe the current checks.
+
 ## Privilege picker cursor, October 15
 
 The editable body keeps the text cursor. The dropdown arrow and suggestions now use the game's normal pointer, including when the list overlaps another text field. Both setup and the full config editor update the cursor during rendering, so it stays correct when a list opens without mouse movement.
@@ -36,7 +72,7 @@ flowchart LR
 
 All 1,406 tests passed. The 26 scenes rendered at scales 1 and 1.25, then all 26 were captured in Profile2 with the packaged DLL and source identity verified. Independent source and image review found no remaining blocker. The disposable server and Profile2 have the matching package; all 11 other local mods are unchanged. Profile2 remains connected after the normal `/basic setup` command, with automation disabled. The remaining owner checks cover the toggle's feel, choosing or typing a privilege, and real gameplay behavior. See the [October 15 evidence appendix](#october-15-evidence-appendix).
 
-## Direct category tabs, October 13
+## Direct category tabs, October 13 (historical)
 
 The owner asked to switch between any of the eight categories from the top bar. All eight category tabs now stay visible between Topics and Review. Each category returns to its last visited page, and hub cards use the same remembered page. Draft edits remain shared across categories. The tab labels keep their full English titles with slightly smaller type and tighter spacing.
 
@@ -46,7 +82,7 @@ Evidence: `.tmp/wizard-all-tabs-20261013/`, including the TRX, measured widths, 
 
 Four source-verified native captures cover the hub, Chat, Player display and Server tools at 1908x1260, scale 1.125. The inspected hub and stats page show the full top bar without clipping. Profile2's client log has no errors or exceptions. `controller-shutdown.json` confirms automation was disabled, leaving Profile2 connected for `/basic setup`; `profile3-launch.json` records Profile3's launch to its menu. Card 10 remains pending owner observation; no merge, release or screenshot-baseline approval occurred.
 
-## Hierarchy expansion, October 13
+## Hierarchy expansion, October 13 (historical)
 
 The goal is to make every BASICs setting accessible through a hierarchy with useful explanations and previews. This revision expands the existing setup rather than treating its original three topics as the final scope.
 
@@ -274,10 +310,10 @@ flowchart LR
 
 ## Expanded hierarchy: draft-only checks
 
-10. **Eight categories and branch navigation** (P1)
-    - Do: open `/basic setup`, click each card's description area, and visit its first and last pages with Next, Back and the page selector. Switch directly between all eight category tabs. Return with Topics or All topics, then reselect a category. Change one setting in three different categories and open Review.
-    - Expect: every category is available in the top bar and its tab returns to its last visited page. Hub cards return to that same page. Review includes all three changes. The full top bar fits without scrolling, as do the two rows of cards, unsaved count and footer at scales 1 and 1.25. Short feature pages have a shorter dialog. Close and discard afterward.
-    - Watch for: dead description areas, wrong branch titles, lost drafts, skipped pages, clipped five-control pages or footer overlap.
+10. **Sidebar navigation and shared draft** (P1)
+    - Do: open `/basic setup` and click each Overview card's description area. Use the sidebar to visit the first and last pages in every category. In Teleportation, scroll its subpage list to Interrupted travel and confirm all eight category headers stay visible. Select Map visibility, then return to Teleportation through its header and its Overview card. Use Tab to focus the sidebar, move with arrow keys, then select with Enter or Space. Change one setting in three categories and open Review changes. Return to an edited page, inspect the draft, then close and discard. Repeat at 1600x1000 and 1280x720, at GUI scales 1 and 1.25.
+    - Expect: the selected leaf is highlighted and visible. Category headers and Overview cards restore that category's last visited page. Only the expanded subpage list scrolls; short lists stay compact. Arrow keys move focus without navigating until Enter or Space, and focus remains on the sidebar after selection. Small dots identify pages and categories with edits; Review contains all three changes. All settings, Close and Review changes share the footer, and Review shows Save settings in the same position. The dialog height stays steady, and cards, controls and footer fit without overlap.
+    - Watch for: category headers scrolling away, a restored page hidden in the list, lost keyboard focus, edits changing when scrolling the sidebar, lost drafts, unlisted travel pages when commands are off, clipped five-control pages or footer overlap.
 
 11. **Overhead speech, typing and nametags** (P1)
     - Do: compare all overhead bubble choices and change the minimum display time. Toggle typing and switch Icon, Text and Both. Edit its text, range and recent-typing window. On Names above players, toggle nickname and account name separately. Try nametag colors. Do not save.
@@ -290,7 +326,7 @@ flowchart LR
     - Watch for: a grid or legend unlike the game map, lost self marker, disabled controls accepting edits, lost retained values, a range field enabled while hiding players or same-group visibility being presented as safe.
 
 13. **Roleplay tools** (P1)
-    - Do: compare dice and sound choices, scene markers, spectator protections, player nickname changes and nickname limits. Use the branch selector to revisit the same pages. Discard the draft.
+    - Do: compare dice and sound choices, scene markers, spectator protections, player nickname changes and nickname limits. Use the sidebar to revisit the same pages. Discard the draft.
     - Expect: the dice example changes when dice rolling is enabled or disabled, and the spectator example follows its visible choices. Sound choices stay in their controls; the preview does not play a live roll. Scene markers, Player nickname choices and Nickname rules have centered controls without an unrelated picture. All controls retain edits. Descriptions explain public/private roll delivery, retained scene-marker text, invisible spectators and saved nicknames.
     - Watch for: an unrelated scene-marker or nickname picture, a claim that disabling commands erases saved markers or names, public rolls described as server-wide or lost edits after revisiting a page.
 
@@ -341,3 +377,7 @@ Native review covered the map states, open privilege picker and history preview.
 Profile2 source SHA-256: `40ed04667a25efb8d6f39b32df66e2a1a095a527ff1818b7a917b448d5965f9f`.
 Profile2 package SHA-256: `b1842d32ce341c563ea4c209c40ef3129482cfc8cbeb13422414777ce7a9e887`.
 The server retains the map/privilege package recorded in the table above. Neither the server nor Profile3 was restarted for the cursor follow-up.
+
+## Sidebar build identity, October 15
+
+Final source identity: `d4f496f67ef8eaee8dfe9a5e9d845d87d28d2c826efd7dc9e462e6f40eeb1935`. Package SHA-256: `7f0c235342ad0cc473b241d49c461c62b649cf89b47f0cf7a25d622bdf19292b`. Version: `5.9.1`. The matching receipt is `.tmp/wizard-sidebar-native-20261015/build-final.json`. This is staged on Profile2 only; the previous server package remains deployed. No native capture was taken for this source identity.
