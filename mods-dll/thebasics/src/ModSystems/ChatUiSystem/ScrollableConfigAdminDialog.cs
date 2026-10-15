@@ -149,6 +149,14 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
         }
     }
 
+    public override void OnRenderGUI(float deltaTime)
+    {
+        base.OnRenderGUI(deltaTime);
+        var picker = OpenPrivilegePicker();
+        if (picker?.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY) == true)
+            MouseOverCursor = picker.MouseOverCursor;
+    }
+
     public override bool OnEscapePressed()
     {
         var picker = OpenPrivilegePicker();

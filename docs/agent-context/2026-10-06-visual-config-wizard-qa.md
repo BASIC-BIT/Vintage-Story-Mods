@@ -5,6 +5,14 @@ Scope: hierarchical configuration, invitation, restart guidance, native Pip prev
 Game: 1.22.7. Source and package SHA-256 are recorded beside the staged build in ignored `.tmp`.
 Retire this packet after the first release completes these cards and moves remaining findings to tracked work.
 
+## Privilege picker cursor, October 15
+
+The editable body keeps the text cursor. The dropdown arrow and suggestions now use the game's normal pointer, including when the list overlaps another text field. Both setup and the full config editor update the cursor during rendering, so it stays correct when a list opens without mouse movement.
+
+All 20 focused picker checks passed, including cursor assertions through both rendered dialogs at scales 1 and 1.25. Profile2 has the client-only update, with its other 11 mod hashes unchanged. A source-verified native picker capture confirms the new build loaded; the client log has no errors or exceptions. The server remains on the preceding package because the change only affects client GUI code. Profile2 is connected after `/basic setup`, with automation disabled. Human cursor observation remains part of card 15.
+
+Evidence is in `.tmp/wizard-picker-cursor-20261015/`: `cursor-final.trx`, `build.json`, `client-stage.json`, launch receipts, `native/captures.json`, `handoff-open.json`, and `controller-shutdown.json`. The cursor-follow-up build identifiers are at the end of this packet.
+
 ## Map preview and privilege suggestions, October 15
 
 The map page should look like the game's minimap and make the management switch clear. Its replacement uses a square sample landscape, the game's parchment palette, and the native player-icon painter. It does not open the live world map or change its cache. A native On/Off toggle controls BASICs map management; Off greys and disables the dependent choices while retaining their draft values. Hiding players also disables their range setting.
@@ -327,3 +335,9 @@ The retained run is `.tmp/wizard-map-permissions-20261015/` in this worktree. Ge
 Validation caught and fixed privilege-list scrolling, disabled map-field focus, and the advanced editor's unauthorized snapshot response. The denial now returns no configuration or privilege registry, covered by a regression test. The standalone renderer also gained the game DLL dependency needed for the native map palette.
 
 Native review covered the map states, open privilege picker and history preview. The map samples resemble the live parchment minimap and use native player icons; they remain illustrations rather than the live world map. A hover tooltip overlaps part of the range label in the map captures. It does not obscure the input or indicate a product failure. Native images do not establish actual map filtering, permission enforcement, save/restart behavior or human acceptance. No baseline, merge or release was approved.
+
+### Cursor follow-up build
+
+Profile2 source SHA-256: `40ed04667a25efb8d6f39b32df66e2a1a095a527ff1818b7a917b448d5965f9f`.
+Profile2 package SHA-256: `b1842d32ce341c563ea4c209c40ef3129482cfc8cbeb13422414777ce7a9e887`.
+The server retains the map/privilege package recorded in the table above. Neither the server nor Profile3 was restarted for the cursor follow-up.

@@ -94,14 +94,21 @@ public class GuiElementPrivilegePickerTests
         Assert.True(picker.IsSuggestionsOpen);
         Assert.Equal(4, Menu(picker).Values.Length);
         Render(host, composer);
+        Assert.Equal("normal", composer.MouseOverCursor);
 
         var menu = Menu(picker);
         var popup = Field<ElementBounds>(menu, "visibleBounds");
+        host.SetMouse((int)(popup.renderX + 30 * scale), (int)(popup.renderY + 43 * scale));
+        Render(host, composer);
+        Assert.Equal("normal", composer.MouseOverCursor);
         Click(host, composer, (int)(popup.renderX + 30 * scale), (int)(popup.renderY + 43 * scale));
         Assert.Equal("chat", picker.Value);
         Assert.Equal(new[] { "chat" }, changes);
         Assert.False(picker.IsSuggestionsOpen);
         Assert.True(picker.HasFocus);
+        host.SetMouse((int)(picker.Bounds.renderX + 30 * scale), (int)(picker.Bounds.renderY + picker.Bounds.InnerHeight / 2));
+        Render(host, composer);
+        Assert.Equal("textselect", composer.MouseOverCursor);
         Assert.Empty(host.UnsupportedCalls);
     }
 

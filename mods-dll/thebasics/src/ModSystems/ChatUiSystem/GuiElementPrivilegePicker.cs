@@ -151,6 +151,10 @@ public sealed class GuiElementPrivilegePicker : GuiElementControl
     /// <summary>Renders the input and arrow. Scroll containers can render the menu after removing their clip.</summary>
     public void RenderControl(float deltaTime)
     {
+        var overText = base.IsPositionInside(api.Input.MouseX, api.Input.MouseY) &&
+            api.Input.MouseX < Bounds.renderX + Bounds.InnerWidth - arrowReleased.Width;
+        MouseOverCursor = overText ? "textselect" : "normal";
+        if (!enabled) MouseOverCursor = null;
         input.RenderInteractiveElements(deltaTime);
         if (api.Render.ScissorStack.Count > 0) api.Render.GlScissorFlag(true);
         var arrow = menu.IsOpened ? arrowPressed : arrowReleased;

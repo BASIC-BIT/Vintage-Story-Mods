@@ -816,6 +816,9 @@ public sealed class SetupWizardDialog : GuiDialog
             RefreshPreview();
         }
         base.OnRenderGUI(deltaTime);
+        var picker = OpenPrivilegePicker();
+        if (picker?.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY) == true)
+            MouseOverCursor = picker.MouseOverCursor;
     }
 
     private GuiElementPrivilegePicker OpenPrivilegePicker() => _privilegePickers.FirstOrDefault(picker => picker.IsSuggestionsOpen);

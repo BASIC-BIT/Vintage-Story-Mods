@@ -51,6 +51,9 @@ public class ConfigAdminPrivilegePickerTests
         Assert.True(draft.IsDirty);
         Assert.Contains(Suggestions(picker), entry => entry.Code == "newly.registered" && entry.Description == "A new server privilege");
         Assert.Contains(Suggestions(picker), entry => entry.Code == "Custom.Typed by hand");
+        Assert.True(wizard.SingleComposer.FocusElement(picker.TabIndex));
+        Press(wizard.SingleComposer, GlKeys.Down);
+        AssertPickerCursors(host, wizard, picker, scale);
         host.RenderGuiDialog(wizard, 0);
         Assert.Empty(host.UnsupportedCalls);
     }
@@ -82,6 +85,7 @@ public class ConfigAdminPrivilegePickerTests
         host.SetMouse(x, y);
         dialog.SingleComposer.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         Assert.True(history.IsSuggestionsOpen);
+        AssertPickerCursors(host, dialog, history, scale);
         Press(dialog.SingleComposer, GlKeys.Home);
         Press(dialog.SingleComposer, GlKeys.Enter);
 
@@ -120,6 +124,24 @@ public class ConfigAdminPrivilegePickerTests
         Assert.Empty(changes);
         host.RenderGuiDialog(dialog, 0);
         Assert.Empty(host.UnsupportedCalls);
+    }
+
+    private static void AssertPickerCursors(PreviewHost host, GuiDialog dialog, GuiElementPrivilegePicker picker, double scale)
+    {
+        var middleY = (int)(picker.Bounds.renderY + picker.Bounds.InnerHeight / 2);
+        host.SetMouse((int)(picker.Bounds.renderX + picker.Bounds.InnerWidth - 8 * scale), middleY);
+        host.RenderGuiDialog(dialog, 0);
+        Assert.Equal("normal", dialog.MouseOverCursor);
+        host.SetMouse((int)(picker.Bounds.renderX + 30 * scale), middleY);
+        host.RenderGuiDialog(dialog, 0);
+        Assert.Equal("textselect", dialog.MouseOverCursor);
+        var menu = (GuiElementListMenu)typeof(GuiElementPrivilegePicker)
+            .GetField("menu", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(picker)!;
+        var popup = (ElementBounds)typeof(GuiElementListMenu)
+            .GetField("visibleBounds", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(menu)!;
+        host.SetMouse((int)(popup.renderX + 30 * scale), (int)(popup.renderY + 30 * scale));
+        host.RenderGuiDialog(dialog, 0);
+        Assert.Equal("normal", dialog.MouseOverCursor);
     }
 
     private static PreviewHost CreateHost(double scale) => new(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
