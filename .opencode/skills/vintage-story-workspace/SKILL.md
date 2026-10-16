@@ -3,8 +3,8 @@ name: vintage-story-workspace
 description: Organize the local Vintage Story modding workspace, refresh decompiled Vintage Story source, and keep first-party work, external mods, and official game source separated.
 compatibility: opencode
 metadata:
-  audience: maintainers
-  domain: workspace
+    audience: maintainers
+    domain: workspace
 ---
 
 ## Goal
@@ -69,3 +69,7 @@ The script reads `https://api.vintagestory.at/stable.json`, downloads the `windo
 - Put unpacked third-party packages in `external-mods\extracted`.
 - Put cloned third-party source repositories in `external-mods\source-repos`.
 - Keep external mod experiments out of the main `Vintage-Story-Mods` repository unless intentionally vendoring code.
+
+## Reviewer configuration changes
+
+Repository reviewer policy is `.github/claude-review.json` with trusted `REVIEW.md`. Follow `docs/claude-pr-review.md` for migration, acceptance and rollback. Inert PR-head navigation remains available; do not use build-and-package (which uploads) as a reviewer-only check. Run `scripts/check-agent-tooling.ps1` for source-skill changes.

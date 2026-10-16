@@ -26,3 +26,5 @@ Public-facing infrastructure for The BASICs lives under `infra/`. The analytics 
 ## Acknowledgments
 
 Special thanks to the Vintage Story community and the servers that have helped test and improve this mod.
+
+See [shared Claude review](docs/claude-pr-review.md) for repository policy, review evidence and gated activation.
