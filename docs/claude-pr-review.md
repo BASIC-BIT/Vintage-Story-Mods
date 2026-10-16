@@ -46,26 +46,14 @@ PR code, hooks, project commands and head-owned instructions never execute.
 
 ## Cutover and rollback
 
-1. Obtain exact target, App/access, infrastructure and inference/publication
-   approval. Establish trusted policy on the real default branch through an
-   approved baseline procedure while legacy remains the sole publisher.
-2. Prove App reads, COMMENT/inline/sticky/check publication, actual thread
-   permissions and finite shadow behavior. Record exact engine/runtime,
-   repository/install, head/base/policy and coverage identities. Missing proof
-   remains UNKNOWN. Keep service execution/publication durably paused.
-3. For the approved target, stop/drain App work, disable the recorded legacy
-   workflows, cancel queued/in-flight legacy jobs and verify terminal status.
-   Only then enable App publication and prove one inference owner/publisher.
-4. Verify new push, labels, skip/unskip, draft/ready, retarget, close/reopen,
-   base invalidation, authorized rerun, publication failure and revocation on
-   the approved disposable acceptance PR. Preserve branch protection and
-   required product checks; workflow removal is not review evidence.
-
-Rollback pauses App execution/publication and stops its in-flight attempts,
-restores the recorded prior workflows, then proves only the legacy owner is
-active. Never enable both publishers. Engine rollback alone does not restore
-retired workflows. Private exact source identities and live evidence belong in
-the basic-infra migration inventory.
+Follow the shared [single-publisher handoff](https://github.com/BASIC-BIT/basic-pr-reviewer/blob/main/docs/operations.md#single-publisher-handoff)
+with this repository's policy and retired paths below. Read-only checks and
+finite shadow precede approved legacy terminal shutdown; target write proof
+follows that shutdown and publication approval. Keep the production ledger and
+durable pause until pending intents are explicitly approved or cancelled.
+Preserve the local review and required-check gates. The private infrastructure
+migration inventory owns exact source identities and target acceptance evidence;
+missing live proof remains UNKNOWN.
 
 ## Delivery and verification
 
