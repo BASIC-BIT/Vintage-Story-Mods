@@ -617,7 +617,26 @@ public sealed class SetupWizardDialog : GuiDialog
         {
             // Widget callbacks must finish before their composer is replaced.
             var page = CurrentStepId;
-            capi.Event.RegisterCallback(_ => { if (!_disposing && CurrentStepId == page) ComposeDialog(); }, 0);
+            capi.Event.RegisterCallback(_ =>
+            {
+                if (_disposing || CurrentStepId != page) return;
+                var restoreFocus = SingleComposer.GetElement(key)?.HasFocus == true;
+                ComposeDialog();
+                if (restoreFocus) RestoreSettingFocus(key);
+            }, 0);
+        }
+    }
+
+    private void RestoreSettingFocus(string key)
+    {
+        if (!SetupWizardCatalog.TryGetPage(CurrentStepId, out var page)) return;
+        var keys = page.SettingKeys.ToArray();
+        var editedIndex = Array.IndexOf(keys, key);
+        foreach (var candidate in keys.Select((settingKey, index) => (settingKey, index)).OrderBy(candidate => Math.Abs(candidate.index - editedIndex)))
+        {
+            if (SingleComposer.GetElement(candidate.settingKey) is not GuiElementControl { Enabled: true, Focusable: true } control) continue;
+            SingleComposer.FocusElement(control.TabIndex);
+            return;
         }
     }
 

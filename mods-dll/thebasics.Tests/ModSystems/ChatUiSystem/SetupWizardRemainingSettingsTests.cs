@@ -1,5 +1,6 @@
 using TheBasics.GuiPreview;
 using System.Reflection;
+using NSubstitute;
 using thebasics.Configs;
 using Vintagestory.API.Common;
 using thebasics.ModSystems.AdminConfig;
@@ -50,6 +51,76 @@ public class SetupWizardRemainingSettingsTests
         Assert.True(new SetupWizardState(config).TryValidatePatch(config, request, out _, out _, out _, out var errors), string.Join("; ", errors));
         Assert.Contains(request.Values, item => item.Key == key && item.Value == value);
         Assert.Contains(request.OriginalValues, item => item.Key == key && item.Value == original);
+    }
+
+    [VisualTheory]
+    [InlineData(1d)]
+    [InlineData(1.25d)]
+    public void EditingLowerToggleRetainsKeyboardFocusAcrossQueuedRebuild(double scale)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
+            Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
+        var callbacks = new Queue<Action<float>>();
+        var events = Substitute.For<IClientEventAPI>();
+        events.RegisterCallback(Arg.Do<Action<float>>(callback => callbacks.Enqueue(callback)), 0);
+        var api = DispatchProxy.Create<ICoreClientAPI, CallbackClientApi>();
+        var proxy = (CallbackClientApi)api;
+        proxy.Inner = host.Api;
+        proxy.Events = events;
+        using var wizard = new SetupWizardDialog(api, new(SetupWizardCaptureScenes.DefaultValues()), "keyboard", true,
+            () => { }, (_, _, _) => { }, () => { }, layoutOnly: true);
+        wizard.TryOpen();
+        wizard.ShowPage("server.stats");
+        const string key = "PlayerStatToggles.NpcKills";
+        var toggle = (GuiElementSetupToggle)wizard.SingleComposer[key];
+        wizard.SingleComposer.FocusElement(toggle.TabIndex);
+        Assert.True(toggle.HasFocus);
+        var original = wizard.Draft.Get(key);
+        void SpaceAndRebuild()
+        {
+            wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Space });
+            Assert.Single(callbacks);
+            callbacks.Dequeue()(0);
+            host.RenderGuiDialog(wizard, 0);
+        }
+        SpaceAndRebuild();
+        Assert.NotEqual(original, wizard.Draft.Get(key));
+        var replacement = (GuiElementSetupToggle)wizard.SingleComposer[key];
+        Assert.NotSame(toggle, replacement);
+        Assert.True(replacement.HasFocus);
+        Assert.True(SetupWizardViewportClip.FullyInside(replacement.Bounds, replacement.InsideClipBounds));
+        var scroll = wizard.SingleComposer.GetScrollbar("settings-scroll").CurrentYPosition;
+        Assert.True(scroll > 0);
+        SpaceAndRebuild();
+        Assert.Equal(original, wizard.Draft.Get(key));
+        Assert.True(wizard.SingleComposer[key].HasFocus);
+        Assert.Equal(scroll, wizard.SingleComposer.GetScrollbar("settings-scroll").CurrentYPosition);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Tab });
+        Assert.True(wizard.SingleComposer["PlayerStatToggles.PlayerKills"].HasFocus);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Space });
+        wizard.Draft.Set("PlayerStatSystem", "0");
+        Assert.Single(callbacks);
+        callbacks.Dequeue()(0);
+        Assert.True(wizard.SingleComposer["PlayerStatClearPermission"].HasFocus);
+        Assert.False(((GuiElementControl)wizard.SingleComposer["PlayerStatToggles.PlayerKills"]).Enabled);
+        wizard.Draft.Set("PlayerStatSystem", "1");
+        wizard.ShowPage("server.stats");
+        wizard.SingleComposer.FocusElement(wizard.SingleComposer[key].TabIndex);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Space });
+        wizard.ShowPage("server.history");
+        var navigated = wizard.SingleComposer;
+        callbacks.Dequeue()(0);
+        Assert.Same(navigated, wizard.SingleComposer);
+        Assert.Equal("server.history", wizard.CurrentStepId);
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    public class CallbackClientApi : DispatchProxy
+    {
+        public ICoreClientAPI Inner { get; set; } = null!;
+        public IClientEventAPI Events { get; set; } = null!;
+        protected override object? Invoke(MethodInfo? method, object?[]? args) =>
+            method!.Name == "get_Event" ? Events : method.Invoke(Inner, args);
     }
 
     [VisualTheory]
