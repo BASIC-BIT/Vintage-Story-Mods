@@ -12,6 +12,54 @@ public class SetupWizardSearchRenderTests
 {
     [VisualTheory]
     [InlineData(1.25d)]
+    public void EveryPageCanEnterSearchWithoutRefreshingHiddenControls(double scale)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
+        var config = new ModConfig(); config.InitializeDefaultsIfNeeded();
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues(), LanguageConfigAdmin.BuildEntries(config), CharacterSheetFieldConfigAdmin.BuildEntries(config));
+        using var wizard = new SetupWizardDialog(host.Api, draft, "page-search", true, () => { }, (_, _, _) => { }, () => { }, layoutOnly: true, captureOnly: true, actorFactory: host.CreateGuide);
+        foreach (var page in SetupWizardCatalog.Pages.Select(page => page.Id).Concat(new[] { "hub", "review", "finish" }))
+        {
+            wizard.ShowPage(page);
+            wizard.ShowSearch("DebugMode");
+            Assert.NotNull(wizard.SingleComposer.GetElement("search-result-0"));
+            Assert.True(wizard.SingleComposer.GetButton("review").Enabled, page);
+        }
+        Assert.Empty(host.RecordedEffects);
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1d)]
+    [InlineData(1.25d)]
+    public void SearchFromMapAndReturnFromMapResultUseSearchContent(double scale)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
+        var saves = 0;
+        using var wizard = new SetupWizardDialog(host.Api, new(SetupWizardCaptureScenes.DefaultValues()), "map-search", true, () => saves++, (_, _, _) => { }, () => { }, layoutOnly: true);
+        wizard.TryOpen(); wizard.ShowPage("map.visibility");
+        wizard.ShowSearch("ManageMapPlayerVisibility");
+        Assert.NotNull(wizard.SingleComposer.GetElement("search-result-0"));
+        Assert.Null(wizard.SingleComposer.GetElement("ManageMapPlayerVisibility"));
+        Assert.True(wizard.FocusSearchResult(Assert.Single(wizard.SearchPanel.Results)));
+        Assert.Equal("map.visibility", wizard.CurrentStepId);
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Escape });
+        Assert.NotNull(wizard.SingleComposer.GetElement("search-result-0"));
+        Assert.Null(wizard.SingleComposer.GetElement("ManageMapPlayerVisibility"));
+        wizard.ShowPage("review"); wizard.ShowSearch("DebugMode");
+        var button = wizard.SingleComposer.GetButton("review");
+        var x = (int)(button.Bounds.renderX + button.Bounds.InnerWidth / 2);
+        var y = (int)(button.Bounds.renderY + button.Bounds.InnerHeight / 2);
+        wizard.OnMouseDown(new MouseEvent(x, y, Vintagestory.API.Common.EnumMouseButton.Left, 0));
+        wizard.OnMouseUp(new MouseEvent(x, y, Vintagestory.API.Common.EnumMouseButton.Left, 0));
+        Assert.Equal(0, saves);
+        Assert.Null(wizard.SingleComposer.GetElement("search-result-0"));
+        Assert.Equal("review", wizard.CurrentStepId);
+        Assert.Empty(host.UnsupportedCalls);
+    }
+
+    [VisualTheory]
+    [InlineData(1.25d)]
     public void EveryScalarSearchResultReachesAControl(double scale)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);

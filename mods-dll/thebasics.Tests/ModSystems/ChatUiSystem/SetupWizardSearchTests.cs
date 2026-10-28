@@ -6,6 +6,31 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 public class SetupWizardSearchTests
 {
     public SetupWizardSearchTests() => LangTestHelper.EnsureEnglish();
+    [Theory]
+    [InlineData("placement")]
+    [InlineData("move")]
+    [InlineData("remove")]
+    public void SearchSelectedIdenticalSheetRecordsMutateByReference(string operation)
+    {
+        var config = new ModConfig(); config.InitializeDefaultsIfNeeded();
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues(), fields: CharacterSheetFieldConfigAdmin.BuildEntries(config));
+        var first = draft.SheetFields[0];
+        draft.SheetFields.Clear(); draft.SheetFields.Add(first);
+        var selected = first with { }; draft.SheetFields.Add(selected);
+        var panel = new SetupWizardSearchPanel();
+        var result = panel.Index(draft).Last(item => item.Destination == ConfigSearchDestination.CharacterField && item.Key == "LayoutSection");
+        using var editor = new SetupWizardSheetEditor(null, draft, null, null);
+        editor.SelectSearchField(panel.ResolveField(draft, result.EntryId), result.Key);
+        Assert.Same(selected, editor.Selected);
+        if (operation == "placement") editor.SetPlacement(first.LayoutSection == "body" ? "header-side" : "body");
+        else if (operation == "move") { Assert.True(editor.CanMove(-1)); editor.MoveSelected(-1); }
+        else Assert.True(editor.RemoveSelected(true));
+        Assert.Single(draft.SheetFields, item => ReferenceEquals(item, first));
+        Assert.Equal(operation == "remove" ? 0 : 1, draft.SheetFields.Count(item => ReferenceEquals(item, selected)));
+        if (operation == "move") Assert.Same(selected, draft.SheetFields[0]);
+        if (operation == "placement") Assert.NotEqual(first.LayoutSection, selected.LayoutSection);
+    }
+
     [Fact]
     public void CurrentDraftEntriesKeepIdentityAcrossRenameReorderAndDuplicateLabels()
     {

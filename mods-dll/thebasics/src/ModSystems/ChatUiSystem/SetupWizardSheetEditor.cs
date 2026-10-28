@@ -442,7 +442,7 @@ internal sealed class SetupWizardSheetEditor : IDisposable
     {
         if (!CanEdit || Selected == null) return false;
         var section = _draft.SheetFields.Where(f => f.LayoutSection == Selected.LayoutSection).ToList();
-        var target = section.IndexOf(Selected) + offset;
+        var target = section.FindIndex(candidate => ReferenceEquals(candidate, Selected)) + offset;
         return target >= 0 && target < section.Count;
     }
     internal void MoveSelected(int offset)
@@ -450,21 +450,21 @@ internal sealed class SetupWizardSheetEditor : IDisposable
         if (!CanMove(offset)) return;
         var fields = _draft.SheetFields; var selected = Selected;
         var section = fields.Where(f => f.LayoutSection == selected.LayoutSection).ToList();
-        var neighbor = section[section.IndexOf(selected) + offset];
-        fields.Remove(selected); fields.Insert(fields.IndexOf(neighbor) + (offset > 0 ? 1 : 0), selected);
+        var neighbor = section[section.FindIndex(candidate => ReferenceEquals(candidate, selected)) + offset];
+        fields.RemoveAt(fields.FindIndex(candidate => ReferenceEquals(candidate, selected))); fields.Insert(fields.FindIndex(candidate => ReferenceEquals(candidate, neighbor)) + (offset > 0 ? 1 : 0), selected);
         Changed(); Track("sheet_move");
     }
     internal void SetPlacement(string section)
     {
         if (!CanEdit || Selected == null || section is not ("header-side" or "body") || Selected.LayoutSection == section) return;
-        var field = Selected; var fields = _draft.SheetFields; fields.Remove(field); field.LayoutSection = section;
+        var field = Selected; var fields = _draft.SheetFields; fields.RemoveAt(fields.FindIndex(candidate => ReferenceEquals(candidate, field))); field.LayoutSection = section;
         var last = fields.FindLastIndex(f => f.LayoutSection == section); fields.Insert(last < 0 ? fields.Count : last + 1, field);
         Changed(); Track("sheet_move");
     }
     internal bool RemoveSelected(bool confirmed)
     {
         if (!CanEdit || !confirmed || Selected == null || _draft.SheetFields.Count <= 1) return false;
-        _draft.SheetFields.Remove(Selected); SelectedId = null; _inspecting = false; _scrollSelectionPending = false; _inspectorScroll = 0; Changed(); Track("sheet_remove"); return true;
+        _draft.SheetFields.RemoveAt(_draft.SheetFields.FindIndex(candidate => ReferenceEquals(candidate, Selected))); _searchSelected = null; SelectedId = null; _inspecting = false; _scrollSelectionPending = false; _inspectorScroll = 0; Changed(); Track("sheet_remove"); return true;
     }
     private void ConfirmRemove() => Confirm(SetupWizardSheetReview.RemovalWarning, () => RemoveSelected(true));
     private void ConfirmReset()

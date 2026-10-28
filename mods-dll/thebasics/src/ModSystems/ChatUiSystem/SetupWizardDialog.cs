@@ -369,7 +369,7 @@ public sealed class SetupWizardDialog : GuiDialog
             ElementBounds.Fixed(ContentOffset, StatusY, Width, CompactLayout ? 30 : 42), "setup-message");
         ComposeFooter(composer);
         composer.EndChildElements().Compose(focusFirstElement: false);
-        if (CurrentStepId == "map.visibility") RefreshMapControls(composer);
+        if (!_searching && CurrentStepId == "map.visibility") RefreshMapControls(composer);
         _sample = SingleComposer.GetRichtext("preview-text");
         _sleepCount = SingleComposer.GetRichtext("preview-sleep-count");
         _draftStatus = SingleComposer.GetRichtext("footer-draft-count");
@@ -385,6 +385,8 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void ComposeFooter(GuiComposer composer)
     {
+        var finished = !_searching && CurrentStepId == "finish";
+        var reviewing = !_searching && CurrentStepId == "review";
         composer.AddSmallButton("All settings", () =>
         {
             if (_onAdvanced == null) return false;
@@ -394,15 +396,15 @@ public sealed class SetupWizardDialog : GuiDialog
         composer.GetButton("all-settings").Enabled = _onAdvanced != null && !_pending;
         composer.AddRichtext(DraftStatusText(), CairoFont.WhiteSmallText().WithFontSize(14),
             ElementBounds.Fixed(156, FooterY + 6, DialogWidth - 480, 24), "footer-draft-count");
-        composer.AddSmallButton(CurrentStepId == "finish" ? NeedsRestart ? "Later" : "Done" : "Close",
+        composer.AddSmallButton(finished ? NeedsRestart ? "Later" : "Done" : "Close",
             () => { QueueNavigation(() => TryClose()); return true; },
             ElementBounds.Fixed(DialogWidth - 300, FooterY, 110, 30), key: "close");
-        var save = CurrentStepId == "review" && !IsCaptureOnly;
-        composer.AddSmallButton(CurrentStepId == "finish" ? "Back to setup" : save ? _pending ? "Saving..." : "Save settings" : "Review changes", () =>
+        var save = reviewing && !IsCaptureOnly;
+        composer.AddSmallButton(finished ? "Back to setup" : save ? _pending ? "Saving..." : "Save settings" : "Review changes", () =>
         {
             QueueNavigation(() =>
             {
-                if (CurrentStepId == "finish") ShowPage("hub");
+                if (finished) ShowPage("hub");
                 else if (!save) ShowPage("review");
                 else if (!_pending)
                 {
@@ -414,7 +416,7 @@ public sealed class SetupWizardDialog : GuiDialog
             });
             return true;
         }, ElementBounds.Fixed(DialogWidth - 180, FooterY, 180, 30), key: "review");
-        composer.GetButton("review").Enabled = !_pending && !(CurrentStepId == "review" && IsCaptureOnly) &&
+        composer.GetButton("review").Enabled = !_pending && !(reviewing && IsCaptureOnly) &&
             !(save && (Draft.HasUnconfirmedSave || Draft.LanguagesChanged && LanguageConfigAdmin.ValidateEntries(Draft.Languages, out _).Count > 0 ||
                 Draft.SheetFieldsChanged && (!Draft.CanEditSheetFields || SetupWizardState.ValidateSheetSnapshots(Draft.SheetFields, Draft.OriginalSheetFields).Count > 0 ||
                     CharacterSheetFieldConfigAdmin.ValidateEntries(SetupWizardState.NormalizeSheetDraft(Draft.SheetFields), out _).Count > 0 || SetupWizardState.ValidateSheetChoices(Draft.SheetFields).Count > 0)));
