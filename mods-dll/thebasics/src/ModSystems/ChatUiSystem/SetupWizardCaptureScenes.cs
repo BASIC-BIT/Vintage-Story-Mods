@@ -15,6 +15,7 @@ public static class SetupWizardCaptureScenes
     public static readonly string[] Names =
     [
         "wizard-sheet-builder", "wizard-sheet-builder-unselected", "wizard-sheet-builder-selected", "wizard-sheet-builder-choice", "wizard-sheet-builder-hidden", "wizard-sheet-builder-empty", "wizard-sheet-builder-inspector", "wizard-sheet-builder-invalid", "wizard-sheet-builder-review", "wizard-sheet-builder-add", "wizard-sheet-builder-browse", "wizard-sheet-builder-layout",
+        "wizard-voices", "wizard-voices-bottom", "wizard-voices-off", "wizard-voices-invalid", "wizard-tts", "wizard-tts-bottom", "wizard-tts-custom", "wizard-tts-invalid",
         "wizard-textappearance-invalid", "wizard-occlusion-invalid", "wizard-occlusion-conflict", "wizard-occlusion-unlimited", "wizard-textappearance", "wizard-textappearance-bottom", "wizard-textappearance-custom", "wizard-occlusion", "wizard-occlusion-bottom", "wizard-occlusion-custom",
         "wizard-wording", "wizard-wording-bottom", "wizard-wording-custom", "wizard-shortcuts", "wizard-shortcuts-bottom", "wizard-shortcuts-custom",
         "wizard-hub", "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
@@ -258,6 +259,12 @@ public static class SetupWizardCaptureScenes
             _ => "chat.basics"
         };
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) page = "characters.builder";
+        if (scenario.StartsWith("wizard-voices", StringComparison.Ordinal)) page = "chat.voices";
+        if (scenario.StartsWith("wizard-tts", StringComparison.Ordinal)) page = "chat.tts";
+        if (scenario == "wizard-voices-off") { dialog.Draft.Set("EnableChatter", "0"); dialog.Draft.Set("ChatterModePitch.Normal", "0.71234567"); }
+        if (scenario == "wizard-voices-invalid") dialog.Draft.Set("ChatterModePitch.Normal", "0");
+        if (scenario == "wizard-tts-invalid") dialog.Draft.Set("RPTTS_ModeFalloff.Normal", "not a number");
+        if (scenario == "wizard-tts-custom") { dialog.Draft.Set("RPTTS_ModeGain.Normal", "3.123456"); dialog.Draft.Set("RPTTS_ModeFalloff.Normal", "9.123456"); }
         if (scenario.StartsWith("wizard-textappearance", StringComparison.Ordinal)) page = "chat.textappearance";
         if (scenario.StartsWith("wizard-occlusion", StringComparison.Ordinal)) page = "chat.occlusion";
         if (scenario == "wizard-textappearance-invalid") dialog.Draft.Set("ProximityChatDefaultFontSize.Normal", "129");
@@ -305,6 +312,7 @@ public static class SetupWizardCaptureScenes
         dialog.ShowPage(page);
         if (scenario is "wizard-wording-bottom" or "wizard-shortcuts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
         if (scenario is "wizard-textappearance-bottom" or "wizard-occlusion-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
+        if (scenario is "wizard-voices-bottom" or "wizard-tts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
         if (scenario == "wizard-server-stats-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) ShowSheetBuilder(dialog, scenario);
         if (scenario == "wizard-language-grants") dialog.SingleComposer.GetScrollbar("language-editor-scroll").ScrollToBottom();

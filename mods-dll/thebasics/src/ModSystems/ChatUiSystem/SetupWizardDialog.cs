@@ -427,6 +427,8 @@ public sealed class SetupWizardDialog : GuiDialog
                 });
             }
         }
+        if (CurrentStepId == "server.integrations")
+            composer.AddRichtext("Relay availability: not checked on the server.", CairoFont.WhiteSmallText().WithFontSize(15), ElementBounds.Fixed(SettingsX, 218, SettingsWidth, 55), "integration-availability");
         if (CurrentStepId == "server.stats")
             SetStatsControlsEnabled(composer);
 
@@ -731,6 +733,12 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void AddPreview(GuiComposer composer)
     {
+        if (SetupWizardVoicePreview.Supports(CurrentStepId))
+        {
+            composer.AddRichtext(SetupWizardVoicePreview.Text(Draft, CurrentStepId, IsCaptureOnly ? null : capi.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI")),
+                CairoFont.WhiteSmallText().WithFontSize(15), ElementBounds.Fixed(0, 138, 310, CompactLayout ? 286 : 360), "preview-audio");
+            return;
+        }
         if (SetupWizardChatTextEditor.Supports(CurrentStepId))
         {
             AddChatPreview(composer, 138, CompactLayout ? 250 : 300);
@@ -983,6 +991,7 @@ public sealed class SetupWizardDialog : GuiDialog
         if (CurrentStepId == "chat.languageeditor") _languageEditor.RefreshPreview();
         SingleComposer.GetRichtext("preview-sight")?.SetNewText(SetupWizardTextAppearancePreview.Sight(Draft), CairoFont.WhiteSmallText().WithFontSize(11));
         SingleComposer.GetRichtext("preview-validation")?.SetNewText(SetupWizardTextAppearancePreview.Feedback(Draft, "chat.textappearance"), CairoFont.WhiteSmallText().WithFontSize(12));
+        if (SetupWizardVoicePreview.Supports(CurrentStepId)) SingleComposer.GetRichtext("preview-audio")?.SetNewText(SetupWizardVoicePreview.Text(Draft, CurrentStepId, IsCaptureOnly ? null : capi.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI")), CairoFont.WhiteSmallText().WithFontSize(15));
         _diagram?.Redraw();
         if (CurrentStepId == "chat.textappearance") _sample?.SetNewText(SetupWizardTextAppearancePreview.Components(capi, Draft));
         else _sample?.SetNewText(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
@@ -1096,7 +1105,7 @@ public sealed class SetupWizardDialog : GuiDialog
         ProximityChatPresentationModes.Prose => "Mix actions and dialogue in one message.",
         _ => "Adds a speech verb, such as \"says\", before the dialogue."
     };
-    private static string SettingLabel(ConfigAdminSettingDefinition definition) => definition.Key switch
+    private static string SettingLabel(ConfigAdminSettingDefinition definition) => SetupWizardVoicePreview.Label(definition.Key) ?? (definition.Key switch
     {
         "DisableRPChat" => "Roleplay features",
         "EnableDistanceFontSizeSystem" => "Resize speech with distance",
@@ -1131,7 +1140,7 @@ public sealed class SetupWizardDialog : GuiDialog
         "PlayerStatDistanceTravelledTimer" => "Sample movement every (milliseconds)",
         "MaxEnvironmentPlacementDistance" => "Maximum placement distance (blocks)",
         _ => definition.Label
-    };
+    });
     private static string DisplayValue(ConfigAdminSettingDefinition definition, string value)
     {
         if (definition.Key == "ProximityChatPresentationMode") return PresentationName(value);

@@ -7,22 +7,7 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class SetupWizardCoverageTests
 {
     // Remove a key only when its destination is implemented and verified.
-    private static readonly string[] PendingMigrationKeys =
-    [
-        "RPTTS_ModeFalloff.Normal",
-        "RPTTS_ModeFalloff.Whisper",
-        "RPTTS_ModeFalloff.Yell",
-        "RPTTS_ModeGain.Normal",
-        "RPTTS_ModeGain.Whisper",
-        "RPTTS_ModeGain.Yell",
-        "ChatterModePitch.Normal",
-        "ChatterModePitch.Whisper",
-        "ChatterModePitch.Yell",
-        "ChatterModeVolume.Normal",
-        "ChatterModeVolume.Whisper",
-        "ChatterModeVolume.Yell",
-        "ChatterSelfVolumeMultiplier",
-    ];
+    private static readonly string[] PendingMigrationKeys = [];
 
     private static string[] RegisteredKeys => ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key).ToArray();
     private static string[] CoveredKeys => SetupWizardCatalog.Pages.SelectMany(page => page.SettingKeys).ToArray();
@@ -31,8 +16,8 @@ public class SetupWizardCoverageTests
     public void CatalogAndPendingInventoryPartitionTheScalarRegistry()
     {
         RegisteredKeys.Should().HaveCount(210).And.OnlyHaveUniqueItems();
-        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(197);
-        PendingMigrationKeys.Should().HaveCount(13).And.OnlyHaveUniqueItems();
+        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(210);
+        PendingMigrationKeys.Should().BeEmpty();
         CoverageErrors(RegisteredKeys, CoveredKeys, PendingMigrationKeys).Should().BeEmpty();
         foreach (var key in PendingMigrationKeys)
             SetupWizardCatalog.IsSettingKey(key).Should().BeFalse($"{key} has no implemented wizard destination yet");
@@ -55,8 +40,8 @@ public class SetupWizardCoverageTests
     [Fact]
     public void CoverageRejectsAPendingKeyClaimedAsComplete()
     {
-        var pending = PendingMigrationKeys[0];
-        CoverageErrors(RegisteredKeys, CoveredKeys.Append(pending), PendingMigrationKeys)
+        const string pending = "SyntheticPending";
+        CoverageErrors(RegisteredKeys.Append(pending), CoveredKeys.Append(pending), new[] { pending })
             .Should().Contain($"Still pending: {pending}");
     }
 
@@ -92,4 +77,3 @@ public class SetupWizardCoverageTests
             .Concat(coveredKeys.Intersect(pendingKeys).Select(key => $"Still pending: {key}"));
     }
 }
-
