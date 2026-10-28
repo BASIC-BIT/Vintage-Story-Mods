@@ -9,21 +9,6 @@ public class SetupWizardCoverageTests
     // Remove a key only when its destination is implemented and verified.
     private static readonly string[] PendingMigrationKeys =
     [
-        "RequireClearSoundPathForSpeech.Normal",
-        "RequireClearSoundPathForSpeech.Whisper",
-        "RequireClearSoundPathForSpeech.Yell",
-        "SightBlockingBlockCodePatterns",
-        "SightPassThroughBlockCodePatterns",
-        "SpeechOcclusionWallPenaltyBlocks",
-        "ApplyColorsToNicknames",
-        "ApplyColorsToPlayerNames",
-        "BoldNicknames",
-        "EnableDistanceFontSizeSystem",
-        "IsolateChatMessageFormatting",
-        "ProximityChatClampFontSizes",
-        "ProximityChatDefaultFontSize.Normal",
-        "ProximityChatDefaultFontSize.Whisper",
-        "ProximityChatDefaultFontSize.Yell",
         "RPTTS_ModeFalloff.Normal",
         "RPTTS_ModeFalloff.Whisper",
         "RPTTS_ModeFalloff.Yell",
@@ -46,8 +31,8 @@ public class SetupWizardCoverageTests
     public void CatalogAndPendingInventoryPartitionTheScalarRegistry()
     {
         RegisteredKeys.Should().HaveCount(210).And.OnlyHaveUniqueItems();
-        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(182);
-        PendingMigrationKeys.Should().HaveCount(28).And.OnlyHaveUniqueItems();
+        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(197);
+        PendingMigrationKeys.Should().HaveCount(13).And.OnlyHaveUniqueItems();
         CoverageErrors(RegisteredKeys, CoveredKeys, PendingMigrationKeys).Should().BeEmpty();
         foreach (var key in PendingMigrationKeys)
             SetupWizardCatalog.IsSettingKey(key).Should().BeFalse($"{key} has no implemented wizard destination yet");

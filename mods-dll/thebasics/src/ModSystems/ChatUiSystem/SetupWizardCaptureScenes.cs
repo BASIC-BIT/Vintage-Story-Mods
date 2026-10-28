@@ -15,6 +15,7 @@ public static class SetupWizardCaptureScenes
     public static readonly string[] Names =
     [
         "wizard-sheet-builder", "wizard-sheet-builder-unselected", "wizard-sheet-builder-selected", "wizard-sheet-builder-choice", "wizard-sheet-builder-hidden", "wizard-sheet-builder-empty", "wizard-sheet-builder-inspector", "wizard-sheet-builder-invalid", "wizard-sheet-builder-review", "wizard-sheet-builder-add", "wizard-sheet-builder-browse", "wizard-sheet-builder-layout",
+        "wizard-textappearance", "wizard-textappearance-bottom", "wizard-textappearance-custom", "wizard-occlusion", "wizard-occlusion-bottom", "wizard-occlusion-custom",
         "wizard-wording", "wizard-wording-bottom", "wizard-wording-custom", "wizard-shortcuts", "wizard-shortcuts-bottom", "wizard-shortcuts-custom",
         "wizard-hub", "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
         "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited", "wizard-notifications-sleep",
@@ -80,7 +81,7 @@ public static class SetupWizardCaptureScenes
     public static double DefaultPreviewTime(string scenario) => scenario switch
     {
         "wizard-chat-obscured" or "wizard-chat-clear" or "wizard-chat-language-enabled" or "wizard-chat-language-disabled" => 5,
-        "wizard-chat-signing-visible" or "wizard-chat-signing-blocked" => 8.5,
+        "wizard-chat-signing-visible" or "wizard-chat-signing-blocked" or "wizard-occlusion" or "wizard-occlusion-bottom" or "wizard-occlusion-custom" => 8.5,
         "wizard-travel-damage-cancels" or "wizard-travel-damage-continues" => 7,
         "wizard-notifications-sleep" => 4.5,
         "wizard-appearance-bubbles-visible" or "wizard-appearance-names-targeted" => 0.5,
@@ -257,6 +258,23 @@ public static class SetupWizardCaptureScenes
             _ => "chat.basics"
         };
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) page = "characters.builder";
+        if (scenario.StartsWith("wizard-textappearance", StringComparison.Ordinal)) page = "chat.textappearance";
+        if (scenario.StartsWith("wizard-occlusion", StringComparison.Ordinal)) page = "chat.occlusion";
+        if (scenario == "wizard-textappearance-custom")
+        {
+            dialog.Draft.Set("BoldNicknames", "1");
+            dialog.Draft.Set("ApplyColorsToPlayerNames", "1");
+            dialog.Draft.Set("ProximityChatDefaultFontSize.Normal", "30");
+            dialog.Draft.Set("ProximityChatClampFontSizes", "30,24,18");
+            dialog.Draft.Set("IsolateChatMessageFormatting", "0");
+        }
+        if (scenario == "wizard-occlusion-custom")
+        {
+            dialog.Draft.Set("RequireClearSoundPathForSpeech.Normal", "1");
+            dialog.Draft.Set("SpeechOcclusionWallPenaltyBlocks", "12");
+            dialog.Draft.Set("SightBlockingBlockCodePatterns", "game:glass-*");
+            dialog.Draft.Set("SightPassThroughBlockCodePatterns", "game:stone-*");
+        }
         if (scenario.StartsWith("wizard-wording", StringComparison.Ordinal)) page = "chat.wording";
         if (scenario.StartsWith("wizard-shortcuts", StringComparison.Ordinal)) page = "chat.shortcuts";
         if (scenario == "wizard-wording-custom")
@@ -274,6 +292,7 @@ public static class SetupWizardCaptureScenes
         }
         dialog.ShowPage(page);
         if (scenario is "wizard-wording-bottom" or "wizard-shortcuts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
+        if (scenario is "wizard-textappearance-bottom" or "wizard-occlusion-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
         if (scenario == "wizard-server-stats-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) ShowSheetBuilder(dialog, scenario);
         if (scenario == "wizard-language-grants") dialog.SingleComposer.GetScrollbar("language-editor-scroll").ScrollToBottom();

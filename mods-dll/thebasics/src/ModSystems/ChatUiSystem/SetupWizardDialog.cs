@@ -810,7 +810,13 @@ public sealed class SetupWizardDialog : GuiDialog
                 SetupWizardSpeechPreview.HasScene(CurrentStepId)
                     ? SetupWizardSpeechPreview.Actors(CurrentStepId, Draft, Time, 310, sceneHeight)
                     : SetupWizardTravelPreview.Actors(CurrentStepId, Draft, Time, 310, sceneHeight));
-            AddChatPreview(composer, 146 + sceneHeight, CompactLayout ? 72 : 92);
+            if (CurrentStepId == "chat.occlusion")
+            {
+                composer.AddRichtext(SetupWizardTextAppearancePreview.Sight(Draft), CairoFont.WhiteSmallText().WithFontSize(12),
+                    ElementBounds.Fixed(0, 136 + sceneHeight, 310, 34), "preview-sight");
+                AddChatPreview(composer, 180 + sceneHeight, CompactLayout ? 38 : 58);
+            }
+            else AddChatPreview(composer, 146 + sceneHeight, CompactLayout ? 72 : 92);
             return;
         }
         if (SetupWizardFeaturePreview.Supports(CurrentStepId))
@@ -820,7 +826,7 @@ public sealed class SetupWizardDialog : GuiDialog
             composer.AddInteractiveElement(_diagram, "preview-diagram");
             return;
         }
-        if (CurrentStepId is "chat.basics" or "chat.language" or "chat.colors" or "chat.languageaccess" or "notifications.savestart" or "notifications.savefinish" or "notifications.deaths")
+        if (CurrentStepId is "chat.textappearance" or "chat.basics" or "chat.language" or "chat.colors" or "chat.languageaccess" or "notifications.savestart" or "notifications.savefinish" or "notifications.deaths")
         {
             AddChatPreview(composer, CompactLayout ? 164 : 172, CompactLayout ? 184 : 230);
             return;
@@ -962,8 +968,10 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         SingleComposer.GetRichtext("preview-placement-range")?.SetNewText(PlacementRangeText(), CairoFont.WhiteSmallText().WithFontSize(14));
         if (CurrentStepId == "chat.languageeditor") _languageEditor.RefreshPreview();
+        SingleComposer.GetRichtext("preview-sight")?.SetNewText(SetupWizardTextAppearancePreview.Sight(Draft), CairoFont.WhiteSmallText().WithFontSize(12));
         _diagram?.Redraw();
-        _sample?.SetNewText(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
+        if (CurrentStepId == "chat.textappearance") _sample?.SetNewText(SetupWizardTextAppearancePreview.Components(capi, Draft));
+        else _sample?.SetNewText(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
         _sleepCount?.SetNewText(SleepCountText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
         _chatFocus?.Refresh(Draft, Time, AutoSelectChat, AutoOpenChat, _manualChatTab);
         _previewStage?.SetNewText(ChatFocusState.StageText, CairoFont.WhiteSmallText().WithFontSize(14));
@@ -976,6 +984,8 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private string BuildPreviewText()
     {
+        if (CurrentStepId == "chat.textappearance") return string.Join("<br>", SetupWizardTextAppearancePreview.Messages(Draft));
+        if (CurrentStepId == "chat.occlusion") return SetupWizardSpeechPreview.Message(CurrentStepId, Draft, Time);
         if (SetupWizardChatTextEditor.Supports(CurrentStepId)) return SetupWizardChatTextEditor.Preview(CurrentStepId, Draft);
         if (CurrentStepId == "roleplay.descriptions") return "The old gate creaks in the wind.";
         if (CurrentStepId == "notifications.deaths") return Bool("EnableNearbyDeathMessagesInProximityChat") ? "PipPlayer died nearby." : "Nearby death messages are off.";
@@ -1075,6 +1085,18 @@ public sealed class SetupWizardDialog : GuiDialog
     private static string SettingLabel(ConfigAdminSettingDefinition definition) => definition.Key switch
     {
         "DisableRPChat" => "Roleplay features",
+        "EnableDistanceFontSizeSystem" => "Resize speech with distance",
+        "IsolateChatMessageFormatting" => "Keep each message's formatting separate",
+        "ProximityChatDefaultFontSize.Whisper" => "Whisper size near speaker",
+        "ProximityChatDefaultFontSize.Normal" => "Talk size near speaker",
+        "ProximityChatDefaultFontSize.Yell" => "Yell size near speaker",
+        "ProximityChatClampFontSizes" => "Allowed sizes (comma-separated)",
+        "RequireClearSoundPathForSpeech.Whisper" => "Whisper needs a clear sound path",
+        "RequireClearSoundPathForSpeech.Normal" => "Talk needs a clear sound path",
+        "RequireClearSoundPathForSpeech.Yell" => "Yell needs a clear sound path",
+        "SpeechOcclusionWallPenaltyBlocks" => "Extra distance per sound-blocking block",
+        "SightPassThroughBlockCodePatterns" => "See through blocks (domain:pattern, commas)",
+        "SightBlockingBlockCodePatterns" => "Sight-blocking blocks (domain:pattern, commas)",
         "SleepNotificationThreshold" => "Sleeping players needed (%)",
         "ProximityChatName" => "Proximity tab name",
         "ProximityChatTabPosition" => "Proximity tab position",

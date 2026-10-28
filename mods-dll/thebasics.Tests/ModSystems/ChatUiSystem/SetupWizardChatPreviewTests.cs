@@ -25,7 +25,7 @@ public class SetupWizardChatPreviewTests
         wizard.ShowPage("chat.basics");
         wizard.TryOpen();
 
-        var tabs = wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs");
+        var tabs = ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs");
         Assert.Equal(new[] { "General", "Proximity" }, tabs.tabs.Select(tab => tab.Name));
         Assert.Equal(1, tabs.activeElement);
         Assert.True(Sidebar(wizard).IsDestinationVisible("chat.basics"));
@@ -63,9 +63,21 @@ public class SetupWizardChatPreviewTests
 
         ClickTab(host, wizard, tabs, 1);
         Assert.Contains("Pip says \"Hello, traveler!\"", PreviewText(wizard));
+        foreach (var page in new[] { "chat.ranges", "chat.obfuscation", "chat.signlanguage" })
+        {
+            wizard.ShowPage(page);
+            tabs = ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs");
+            var received = PreviewText(wizard);
+            Assert.NotEmpty(received);
+            ClickTab(host, wizard, tabs, 0);
+            Assert.Contains("MaraPlayer: Anyone heading north?", PreviewText(wizard));
+            ClickTab(host, wizard, tabs, 1);
+            Assert.Equal(received, PreviewText(wizard));
+            AssertPreviewBounds(host, wizard);
+        }
         draft.Set("UseGeneralChannelAsProximityChat", "1");
         wizard.ShowPage("chat.basics");
-        tabs = wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs");
+        tabs = ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs");
         Assert.Equal("General", Assert.Single(tabs.tabs).Name);
         Assert.Equal(0, tabs.activeElement);
         Assert.Contains("Pip says \"Hello, traveler!\"", PreviewText(wizard));
@@ -83,13 +95,13 @@ public class SetupWizardChatPreviewTests
         draft.Set("UseGeneralChannelAsProximityChat", "0");
         draft.Set("ProximityChatAsDefault", "0");
         wizard.ShowPage("chat.tabs");
-        Assert.Equal(0, wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs").activeElement);
+        Assert.Equal(0, ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs").activeElement);
         draft.Set("ProximityChatAsDefault", "1");
         wizard.ShowPage("chat.tabs");
-        Assert.Equal(1, wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs").activeElement);
+        Assert.Equal(1, ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs").activeElement);
         draft.Set("UseGeneralChannelAsProximityChat", "1");
         wizard.ShowPage("chat.tabs");
-        Assert.Equal(0, wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs").activeElement);
+        Assert.Equal(0, ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs").activeElement);
         Assert.Empty(host.UnsupportedCalls);
         Assert.Same(wizard, Assert.Single(host.Api.Gui.LoadedGuis));
     }
@@ -332,7 +344,7 @@ public class SetupWizardChatPreviewTests
                     $"{key} must fit above the shared footer.");
             }
         }
-        Assert.Equal(40, SetupWizardCatalog.Pages.Count);
+        Assert.Equal(43, SetupWizardCatalog.Pages.Count);
         Assert.Empty(host.UnsupportedCalls);
     }
 
@@ -427,7 +439,7 @@ public class SetupWizardChatPreviewTests
         draft.Set("EnableChatter", draft.Get("EnableChatter") == "1" ? "0" : "1");
         var saveCalls = 0;
         using var wizard = new SetupWizardDialog(host.Api, draft, "hub-status", true,
-            () => saveCalls++, null!, null!, layoutOnly: true);
+            () => saveCalls++, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         wizard.TryOpen();
         host.RenderGuiDialog(wizard, 0);
 
@@ -480,7 +492,7 @@ public class SetupWizardChatPreviewTests
 
         Assert.Equal("hub", wizard.CurrentStepId);
         AssertPreviewElements(wizard, chat: false, diagram: false, layoutGuide: true);
-        Assert.Contains(Elements(wizard).Values.OfType<GuiElementStaticText>(), text => text.Text == "Native 3D Pip omitted");
+        Assert.NotNull(wizard.SingleComposer.GetElement("pip"));
         host.RenderGuiDialog(wizard, 0);
 
         foreach (var page in new[] { "chat.basics", "chat.language", "chat.tabs" })
@@ -491,11 +503,12 @@ public class SetupWizardChatPreviewTests
             host.RenderGuiDialog(wizard, 0);
         }
 
-        foreach (var page in new[] { "chat.ranges", "chat.obfuscation" }
+        foreach (var page in new[] { "chat.ranges", "chat.obfuscation", "chat.signlanguage" }
             .Concat(SetupWizardCatalog.Pages.Where(page => page.TopicId == "teleportation").Select(page => page.Id)))
         {
             wizard.ShowPage(page);
-            AssertPreviewElements(wizard, chat: false, diagram: true);
+            AssertPreviewElements(wizard, chat: true, diagram: true);
+            AssertDisabledInput(host, wizard);
             host.RenderGuiDialog(wizard, 0);
         }
 
@@ -504,16 +517,14 @@ public class SetupWizardChatPreviewTests
         {
             wizard.ShowPage(page.Id);
             var appearance = page.TopicId == "appearance";
-            AssertPreviewElements(wizard, chat: false, diagram: SetupWizardFeaturePreview.Supports(page.Id), layoutGuide: appearance);
-            if (appearance)
-                Assert.Contains(Elements(wizard).Values.OfType<GuiElementStaticText>(), text => text.Text == "Native 3D Pip omitted");
+            AssertPreviewElements(wizard, chat: false, diagram: appearance || SetupWizardFeaturePreview.Supports(page.Id));
             host.RenderGuiDialog(wizard, 0);
         }
 
         wizard.ShowPage("notifications.sleep");
         AssertPreviewElements(wizard, chat: true, diagram: true);
         AssertDisabledInput(host, wizard);
-        Assert.Equal("General", Assert.Single(wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs").tabs).Name);
+        Assert.Equal("General", Assert.Single(ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs").tabs).Name);
         host.RenderGuiDialog(wizard, 0);
         Assert.Empty(host.UnsupportedCalls);
         Assert.DoesNotContain(host.UsedCalls, call => call.Contains("SendChatMessage", StringComparison.Ordinal));
@@ -535,7 +546,6 @@ public class SetupWizardChatPreviewTests
         {
             (Page: "appearance.bubbles", Key: "OverheadChatBubbleMode", Before: "RpText", After: "Off"),
             (Page: "map.visibility", Key: "MapHideOtherPlayers", Before: "0", After: "1"),
-            (Page: "characters.slots", Key: "EnableRpCharacterSlots", Before: "0", After: "1"),
             (Page: "roleplay.dice", Key: "EnableDiceRolling", Before: "1", After: "0"),
             (Page: "server.history", Key: "EnableChatHistory", Before: "1", After: "0")
         };
@@ -566,7 +576,7 @@ public class SetupWizardChatPreviewTests
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
         using var wizard = CreateWizard(host, draft);
         wizard.TryOpen();
-        var pages = new[] { "characters.access", "roleplay.scenemarkers", "roleplay.nicknamechanges",
+        var pages = new[] { "characters.access", "roleplay.nicknamechanges",
             "roleplay.nicknamerules", "server.retention", "server.notelimits" };
         foreach (var pageId in pages)
         {
@@ -579,7 +589,7 @@ public class SetupWizardChatPreviewTests
             {
                 var control = wizard.SingleComposer[key];
                 Assert.Equal(167, control.Bounds.fixedX);
-                Assert.Equal(546, control.Bounds.fixedWidth);
+                Assert.Equal(control is GuiElementSetupToggle ? 112 : 546, control.Bounds.fixedWidth);
                 Assert.InRange(control.Bounds.renderX, 0, host.Canvas.Width);
                 Assert.InRange(control.Bounds.renderX + control.Bounds.OuterWidth, 0, host.Canvas.Width);
             }
@@ -606,10 +616,7 @@ public class SetupWizardChatPreviewTests
         wizard.TryOpen();
         var cases = new[]
         {
-            (Page: "appearance.bubbles", Key: "SpeechBubbleMinimumDisplayMilliseconds", Before: "5000", After: "9000"),
-            (Page: "appearance.typing", Key: "TypingIndicatorTimeoutSeconds", Before: "5", After: "10"),
             (Page: "appearance.nametagcolors", Key: "ChangeNametagColorPermission", Before: "chat", After: "controlserver"),
-            (Page: "characters.sheets", Key: "CharacterSheetAutoOpenOnCharacterScreen", Before: "0", After: "1"),
             (Page: "server.history", Key: "ChatHistoryPermission", Before: "chat", After: "controlserver"),
             (Page: "server.history", Key: "ChatHistoryManagePermission", Before: "chat", After: "controlserver"),
             (Page: "server.staffnotes", Key: "AdminNotesPermission", Before: "chat", After: "controlserver"),
@@ -654,7 +661,7 @@ public class SetupWizardChatPreviewTests
             return DiagramPixels(host, wizard);
         }
         var unmanaged = RenderMap();
-        var diagram = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]);
+        var diagram = Assert.IsType<GuiElementSetupPreviewDraw>(wizard.SingleComposer["preview-diagram"]);
         Assert.Equal(310, diagram.Bounds.fixedWidth);
         Assert.Equal(270, diagram.Bounds.fixedHeight);
         var selfMarker = DiagramRegionPixels(host, wizard, 147, 127, 16, 16);
@@ -704,24 +711,21 @@ public class SetupWizardChatPreviewTests
         host.RenderGuiDialog(wizard, 0);
 
         var composer = wizard.SingleComposer;
-        var toggle = Assert.IsType<GuiElementToggleButton>(composer["ManageMapPlayerVisibility"]);
-        Assert.True(toggle.Toggleable);
-        Assert.True(toggle.On);
-        Assert.Equal("On", toggle.Text);
+        var toggle = Assert.IsType<GuiElementSetupToggle>(composer["ManageMapPlayerVisibility"]);
+        Assert.True(toggle.Value);
         AssertMapControlState(wizard, true, true);
 
         ClickElement(host, wizard, toggle);
         Assert.Same(composer, wizard.SingleComposer);
-        Assert.False(toggle.On);
-        Assert.Equal("Off", toggle.Text);
+        Assert.False(toggle.Value);
         Assert.Equal("0", draft.Get("ManageMapPlayerVisibility"));
         AssertMapControlState(wizard, false, false);
-        var hide = composer.GetDropDown("MapHideOtherPlayers");
+        var hide = Assert.IsType<GuiElementSetupToggle>(composer["MapHideOtherPlayers"]);
         var range = composer.GetTextInput("MapPlayerRenderDistance");
         ClickElement(host, wizard, hide);
-        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.End });
+        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Space });
         wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
-        Assert.False(hide.listMenu.IsOpened);
+        Assert.False(hide.Value);
         Assert.False(hide.HasFocus);
         ClickElement(host, wizard, range);
         wizard.OnKeyPress(new KeyEvent { KeyChar = '9', KeyCode = (int)GlKeys.Number9 });
@@ -733,17 +737,14 @@ public class SetupWizardChatPreviewTests
         SaveMapControlScreenshot(host, wizard, scale, "off");
 
         ClickElement(host, wizard, toggle);
-        Assert.True(toggle.On);
-        Assert.Equal("On", toggle.Text);
+        Assert.True(toggle.Value);
         AssertMapControlState(wizard, true, true);
-        Assert.Equal("0", hide.SelectedValue);
+        Assert.False(hide.Value);
         Assert.Equal("1200", range.GetText());
         SaveMapControlScreenshot(host, wizard, scale, "on");
 
         ClickElement(host, wizard, hide);
-        Assert.True(hide.listMenu.IsOpened);
-        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.End });
-        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
+        Assert.True(hide.Value);
         Assert.Equal("1", draft.Get("MapHideOtherPlayers"));
         AssertMapControlState(wizard, true, false);
         ClickElement(host, wizard, range);
@@ -755,12 +756,11 @@ public class SetupWizardChatPreviewTests
         AssertMapControlState(wizard, false, false);
         ClickElement(host, wizard, toggle);
         AssertMapControlState(wizard, true, false);
-        Assert.Equal("1", hide.SelectedValue);
+        Assert.True(hide.Value);
         Assert.Equal("1200", range.GetText());
 
         ClickElement(host, wizard, hide);
-        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Home });
-        wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Enter });
+        Assert.False(hide.Value);
         AssertMapControlState(wizard, true, true);
         ClickElement(host, wizard, range);
         Assert.True(range.HasFocus);
@@ -775,10 +775,11 @@ public class SetupWizardChatPreviewTests
     {
         foreach (var (key, enabled) in new[] { ("MapHideOtherPlayers", hideEnabled), ("MapPlayerRenderDistance", rangeEnabled) })
         {
-            var control = Assert.IsAssignableFrom<GuiElementTextBase>(wizard.SingleComposer[key]);
+            var control = Assert.IsAssignableFrom<GuiElementControl>(wizard.SingleComposer[key]);
             Assert.Equal(enabled, control.Enabled);
             Assert.Equal(enabled, control.Focusable);
-            Assert.Equal(enabled ? 1 : 0.35, control.Font.Color[3], 5);
+            if (control is GuiElementTextBase text) Assert.Equal(enabled ? 1 : 0.35, text.Font.Color[3], 5);
+            else Assert.Equal(enabled ? "linkselect" : null, control.MouseOverCursor);
             var label = Assert.IsType<GuiElementStaticText>(wizard.SingleComposer["setting-label-" + key]);
             Assert.Equal(enabled ? 1 : 0.35, label.Font.Color[3], 5);
         }
@@ -812,7 +813,7 @@ public class SetupWizardChatPreviewTests
             var wording = start ? "TEXT_ServerSaveAnnouncement" : "TEXT_ServerSaveFinished";
             wizard.ShowPage(start ? "notifications.savestart" : "notifications.savefinish");
             AssertPreviewElements(wizard, chat: true, diagram: false);
-            var tabs = wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs");
+            var tabs = ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs");
             Assert.Equal("General", Assert.Single(tabs.tabs).Name);
             Assert.Equal(0, tabs.activeElement);
             AssertDisabledInput(host, wizard);
@@ -827,13 +828,13 @@ public class SetupWizardChatPreviewTests
             Assert.Equal("1", draft.Get(enabled));
             Assert.Equal("0", draft.Get(notification));
             Assert.Equal(draft.Get(wording), PreviewText(wizard));
-            var normal = wizard.SingleComposer.GetRichtext("preview-text").Components.OfType<RichTextComponent>().Single().Font.Color.ToArray();
+            var normal = ChatComposer(wizard).GetRichtext("preview-text").Components.OfType<RichTextComponent>().Single().Font.Color.ToArray();
 
             SelectAnnouncementMode(host, mode, 2);
             Assert.Equal("1", draft.Get(enabled));
             Assert.Equal("1", draft.Get(notification));
             Assert.Equal(draft.Get(wording), PreviewText(wizard));
-            var highlighted = wizard.SingleComposer.GetRichtext("preview-text").Components.OfType<RichTextComponent>().Single().Font.Color;
+            var highlighted = ChatComposer(wizard).GetRichtext("preview-text").Components.OfType<RichTextComponent>().Single().Font.Color;
             Assert.Equal(new[] { 224 / 255d, 207 / 255d, 187 / 255d, 204 / 255d }, highlighted);
             Assert.False(normal.SequenceEqual(highlighted));
 
@@ -865,7 +866,7 @@ public class SetupWizardChatPreviewTests
         Assert.DoesNotContain(labels, label => label.Contains("After restart", StringComparison.OrdinalIgnoreCase));
 
         wizard.ShowPage("review");
-        labels = Elements(wizard).Values.OfType<GuiElementStaticText>().Select(element => element.Text).ToArray();
+        labels = ReviewText(wizard);
         Assert.Contains("Use General as proximity chat | After restart", labels);
         Assert.Contains("Off  >  On", labels);
         Assert.Equal("Save settings", Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer["review"]).Text);
@@ -896,7 +897,7 @@ public class SetupWizardChatPreviewTests
 
         wizard.ShowPage("review");
         host.RenderGuiDialog(wizard, 0);
-        var reviewText = Elements(wizard).Values.OfType<GuiElementStaticText>().Select(text => text.Text).ToArray();
+        var reviewText = ReviewText(wizard);
         Assert.Contains(label, reviewText);
         Assert.Contains("50%  >  75%", reviewText);
         Assert.DoesNotContain(reviewText, text => text.Contains("0.5", StringComparison.Ordinal) || text.Contains("0.75", StringComparison.Ordinal));
@@ -918,17 +919,18 @@ public class SetupWizardChatPreviewTests
         wizard.TryOpen();
         host.SetMouse(-1, -1);
         host.RenderGuiDialog(wizard, 0);
-        Assert.Equal(0, Assert.IsType<GuiElementDropDown>(wizard.SingleComposer["EnableDistanceObfuscationSystem"]).listMenu.SelectedIndex);
+        Assert.False(Assert.IsType<GuiElementSetupToggle>(wizard.SingleComposer["EnableDistanceObfuscationSystem"]).Value);
         var before = host.Canvas.GetRgbaPixels();
-        var bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        var element = wizard.SingleComposer["preview-diagram"] ?? wizard.SingleComposer["preview-records"];
+        var bounds = Assert.IsAssignableFrom<GuiElement>(element).Bounds;
         var region = ((int)bounds.renderX, (int)bounds.renderY, bounds.OuterWidthInt, bounds.OuterHeightInt);
 
         draft.Set("EnableDistanceObfuscationSystem", "1");
         wizard.ShowPage("chat.obfuscation");
         host.RenderGuiDialog(wizard, 0);
-        Assert.Equal(1, Assert.IsType<GuiElementDropDown>(wizard.SingleComposer["EnableDistanceObfuscationSystem"]).listMenu.SelectedIndex);
+        Assert.True(Assert.IsType<GuiElementSetupToggle>(wizard.SingleComposer["EnableDistanceObfuscationSystem"]).Value);
         var after = host.Canvas.GetRgbaPixels();
-        bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        bounds = Assert.IsType<GuiElementSetupPreviewDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
         Assert.Equal(region, ((int)bounds.renderX, (int)bounds.renderY, bounds.OuterWidthInt, bounds.OuterHeightInt));
         var (left, top, width, height) = region;
         Assert.InRange(left, 0, host.Canvas.Width - 1);
@@ -1001,9 +1003,12 @@ public class SetupWizardChatPreviewTests
         Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, width, height, scale);
 
     private static SetupWizardDialog CreateWizard(PreviewHost host, SetupWizardDraft draft, Action? onAdvanced = null) =>
-        new(host.Api, draft, "chat-preview", true, null!, null!, null!, onAdvanced: onAdvanced!, layoutOnly: true);
+        new(host.Api, draft, "chat-preview", true, null!, null!, null!, onAdvanced: onAdvanced!, layoutOnly: true, actorFactory: host.CreateGuide);
 
-    private static string PreviewText(SetupWizardDialog wizard) => DisplayedText(wizard.SingleComposer.GetRichtext("preview-text"));
+    private static string PreviewText(SetupWizardDialog wizard) => DisplayedText(ChatComposer(wizard).GetRichtext("preview-text"));
+
+    private static GuiComposer ChatComposer(SetupWizardDialog wizard) =>
+        wizard.SingleComposer["preview-chat-focus"] is SetupWizardChatFocusElement sample ? sample.Composer : wizard.SingleComposer;
 
     private static GuiElementSetupSidebar Sidebar(SetupWizardDialog wizard) =>
         Assert.IsType<GuiElementSetupSidebar>(wizard.SingleComposer["setup-sidebar"]);
@@ -1076,7 +1081,8 @@ public class SetupWizardChatPreviewTests
 
     private static byte[] DiagramPixels(PreviewHost host, SetupWizardDialog wizard)
     {
-        var bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        var element = wizard.SingleComposer["preview-diagram"] ?? wizard.SingleComposer["preview-records"];
+        var bounds = Assert.IsAssignableFrom<GuiElement>(element).Bounds;
         var left = (int)bounds.renderX;
         var top = (int)bounds.renderY;
         var width = bounds.OuterWidthInt;
@@ -1095,7 +1101,7 @@ public class SetupWizardChatPreviewTests
     private static byte[] DiagramRegionPixels(PreviewHost host, SetupWizardDialog wizard,
         double x, double y, double width, double height)
     {
-        var bounds = Assert.IsType<GuiElementCustomDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
+        var bounds = Assert.IsType<GuiElementSetupPreviewDraw>(wizard.SingleComposer["preview-diagram"]).Bounds;
         var left = (int)Math.Round(bounds.renderX + x * bounds.OuterWidth / bounds.fixedWidth);
         var top = (int)Math.Round(bounds.renderY + y * bounds.OuterHeight / bounds.fixedHeight);
         var pixelWidth = (int)Math.Ceiling(width * bounds.OuterWidth / bounds.fixedWidth);
@@ -1112,6 +1118,12 @@ public class SetupWizardChatPreviewTests
 
     private static string DisplayedText(GuiElementRichtext text) =>
         string.Join(" ", text.Components.OfType<RichTextComponent>().Select(component => component.DisplayText));
+
+    private static string[] ReviewText(SetupWizardDialog wizard) =>
+        Elements(wizard).Values.OfType<GuiElementStaticText>().Select(text => text.Text)
+            .Concat(Elements(wizard).Values.OfType<GuiElementRichtext>().Select(text =>
+                string.Concat(text.Components.OfType<RichTextComponent>().Select(component => component.DisplayText))))
+            .ToArray();
 
     private static readonly string[] PresentationDescriptions =
     ["Adds a speech verb, such as \"says\", before the dialogue.", "Shows the speaker's name and speech in quotes.", "Shows the speaker's name and message without quotes.",
@@ -1133,14 +1145,15 @@ public class SetupWizardChatPreviewTests
     private static void AssertPreviewElements(SetupWizardDialog wizard, bool chat, bool diagram, bool layoutGuide = false)
     {
         var elements = Elements(wizard);
-        Assert.Equal(chat, elements.ContainsKey("preview-chat-tabs"));
-        Assert.Equal(chat, elements.ContainsKey("preview-chat-input"));
-        Assert.Equal(chat, elements.ContainsKey("preview-chat-scroll"));
+        var chatComposer = ChatComposer(wizard);
+        Assert.Equal(chat, chatComposer.GetElement("preview-chat-tabs") != null);
+        Assert.Equal(chat, chatComposer.GetElement("preview-chat-input") != null);
+        Assert.Equal(chat, chatComposer.GetElement("preview-chat-scroll") != null);
         Assert.Equal(diagram, elements.ContainsKey("preview-diagram"));
-        Assert.False(elements.ContainsKey("pip"));
+        Assert.Equal(layoutGuide || SetupWizardAppearancePreview.Supports(wizard.CurrentStepId), elements.ContainsKey("pip"));
         Assert.DoesNotContain(elements.Values.OfType<GuiElementStaticText>(), text =>
             text.Text.Contains("Drag Pip to turn", StringComparison.OrdinalIgnoreCase) ||
-            (!layoutGuide && text.Text.Contains("Native 3D Pip omitted", StringComparison.Ordinal)));
+            text.Text.Contains("omitted", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void SelectAnnouncementMode(PreviewHost host, GuiElementDropDown mode, int index)
@@ -1179,7 +1192,7 @@ public class SetupWizardChatPreviewTests
 
     private static void AssertDisabledInput(PreviewHost host, SetupWizardDialog wizard)
     {
-        var input = wizard.SingleComposer.GetChatInput("preview-chat-input");
+        var input = ChatComposer(wizard).GetChatInput("preview-chat-input");
         Assert.False(input.Enabled);
         Assert.False(input.Focusable);
         var before = input.GetText();
@@ -1198,15 +1211,16 @@ public class SetupWizardChatPreviewTests
 
     private static void AssertPreviewBounds(PreviewHost host, SetupWizardDialog wizard)
     {
-        var tabs = wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs");
-        var input = wizard.SingleComposer.GetChatInput("preview-chat-input");
-        var scroll = wizard.SingleComposer.GetCompactScrollbar("preview-chat-scroll");
-        var history = wizard.SingleComposer.GetRichtext("preview-text");
+        var tabs = ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs");
+        var input = ChatComposer(wizard).GetChatInput("preview-chat-input");
+        var scroll = ChatComposer(wizard).GetCompactScrollbar("preview-chat-scroll");
+        var history = ChatComposer(wizard).GetRichtext("preview-text");
         var viewport = Assert.IsAssignableFrom<ElementBounds>(history.InsideClipBounds);
         Assert.InRange(history.Bounds.absX - viewport.absX, -0.1, 0.1);
         Assert.InRange(history.Bounds.absY - viewport.absY, -0.1, 0.1);
         Assert.True(history.Bounds.OuterHeight <= viewport.InnerHeight, "All example chat lines must fit before scrolling.");
-        var settings = wizard.SingleComposer["DisableRPChat"].Bounds;
+        Assert.True(SetupWizardCatalog.TryGetPage(wizard.CurrentStepId, out var page));
+        var settings = wizard.SingleComposer[page.SettingKeys[0]].Bounds;
         var footer = Elements(wizard).Values.OfType<GuiElementTextButton>().Single(button => button.Text == "Close").Bounds;
         Assert.True(tabs.Bounds.absY + tabs.Bounds.OuterHeight <= viewport.absY);
         Assert.True(viewport.absY + viewport.OuterHeight <= input.Bounds.absY);
@@ -1223,8 +1237,8 @@ public class SetupWizardChatPreviewTests
 
     private static void AssertPixelChangesStayInChat(PreviewHost host, SetupWizardDialog wizard, byte[] before, byte[] after)
     {
-        var tabs = wizard.SingleComposer.GetHorizontalTabs("preview-chat-tabs").Bounds;
-        var input = wizard.SingleComposer.GetChatInput("preview-chat-input").Bounds;
+        var tabs = ChatComposer(wizard).GetHorizontalTabs("preview-chat-tabs").Bounds;
+        var input = ChatComposer(wizard).GetChatInput("preview-chat-input").Bounds;
         var changed = 0;
         for (var y = 0; y < host.Canvas.Height; y++)
             for (var x = 0; x < host.Canvas.Width; x++)
@@ -1237,5 +1251,17 @@ public class SetupWizardChatPreviewTests
                     $"Chat tab change drew outside the chat preview at ({x}, {y}).");
             }
         Assert.True(changed > 0);
+    }
+    [Fact]
+    public void NativeParsingContainsMalformedStyleOnlyWhenIsolationIsEnabled()
+    {
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, 1);
+        var api = host.Api;
+        var isolated = SetupWizardTextAppearancePreview.Components(api, draft).OfType<RichTextComponent>().Single(c => c.DisplayText.Contains("Mara:"));
+        Assert.Equal(Cairo.FontSlant.Normal, isolated.Font.Slant);
+        draft.Set("IsolateChatMessageFormatting", "0");
+        var joined = SetupWizardTextAppearancePreview.Components(api, draft).OfType<RichTextComponent>().Single(c => c.DisplayText.Contains("Mara:"));
+        Assert.Equal(Cairo.FontSlant.Italic, joined.Font.Slant);
     }
 }
