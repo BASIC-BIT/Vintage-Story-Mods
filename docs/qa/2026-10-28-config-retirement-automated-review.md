@@ -1,6 +1,8 @@
 # Configuration retirement automated review
 
-All five final-review findings have local fixes and focused regression coverage. The revised package and standalone captures are ready for scoped review. Default command switching, legacy-window removal and human acceptance remain pending. Profile2 remains unchanged; no game, provider or restart acceptance is claimed.
+All five final-review findings have local fixes and focused regression coverage. The scoped re-review passed for specification and quality, with all five findings addressed and no new actionable issues. The revised package and standalone captures are ready for an approved human QA batch. Default command switching, legacy-window removal and human acceptance remain pending. Profile2 remains unchanged; no game, provider or restart acceptance is claimed.
+
+The [final source review](C:/Users/steve/.codex/visualizations/2026/10/02/01a0fa70-8ca5-7321-ac1f-07fe824f5be2/config-retirement/final-reviewed-20261028/reviews/final-rereview.md) covers the combined fix at source commit `bb246fd995408c009b8fcaeca1d50a3ed8c28858`. Later handoff bookkeeping does not change the packaged source.
 
 ## Final-review corrections
 

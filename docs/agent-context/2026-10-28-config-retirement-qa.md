@@ -1,6 +1,6 @@
 # Configuration retirement QA handoff, October 28
 
-The sidebar editor has replacement controls, search and maintenance actions. This checkpoint prepares local evidence for owner review. It does not change the normal config routes or retire the old windows.
+The sidebar editor has replacement controls, search and maintenance actions. Final source re-review passed with all five findings addressed and no new actionable issues. The local package is ready for an approved human QA batch. Normal config routes and the old windows remain unchanged.
 
 Read the [automated review](../qa/2026-10-28-config-retirement-automated-review.md) for current validation and artifact identity, then the [pending human QA cards](../qa/2026-10-28-config-retirement-human-qa.md). All human observations remain pending. Profile2 must remain unchanged until the owner reviews standalone previews and requests in-game continuation.
 
