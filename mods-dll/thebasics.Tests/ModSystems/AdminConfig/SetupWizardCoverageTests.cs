@@ -15,24 +15,6 @@ public class SetupWizardCoverageTests
         "SightBlockingBlockCodePatterns",
         "SightPassThroughBlockCodePatterns",
         "SpeechOcclusionWallPenaltyBlocks",
-        "ChatDelimiters.Bold.End",
-        "ChatDelimiters.Bold.Start",
-        "ChatDelimiters.Emote.End",
-        "ChatDelimiters.Emote.Start",
-        "ChatDelimiters.Environmental.End",
-        "ChatDelimiters.Environmental.Start",
-        "ChatDelimiters.GlobalOOC.End",
-        "ChatDelimiters.GlobalOOC.Start",
-        "ChatDelimiters.Italic.End",
-        "ChatDelimiters.Italic.Start",
-        "ChatDelimiters.OOC.End",
-        "ChatDelimiters.OOC.Start",
-        "ChatDelimiters.PlacedEnvironmental.End",
-        "ChatDelimiters.PlacedEnvironmental.Start",
-        "ChatDelimiters.Quote.End",
-        "ChatDelimiters.Quote.Start",
-        "ChatDelimiters.SignLanguageQuote.End",
-        "ChatDelimiters.SignLanguageQuote.Start",
         "ApplyColorsToNicknames",
         "ApplyColorsToPlayerNames",
         "BoldNicknames",
@@ -55,19 +37,6 @@ public class SetupWizardCoverageTests
         "ChatterModeVolume.Whisper",
         "ChatterModeVolume.Yell",
         "ChatterSelfVolumeMultiplier",
-        "AttributeFreeformMessagesToPlayerName",
-        "ProseNicknameToken",
-        "ProximityChatModeBabbleVerb",
-        "ProximityChatModePunctuation.Normal",
-        "ProximityChatModePunctuation.Whisper",
-        "ProximityChatModePunctuation.Yell",
-        "ProximityChatModeQuestionVerbs.Normal",
-        "ProximityChatModeQuestionVerbs.Whisper",
-        "ProximityChatModeQuestionVerbs.Yell",
-        "ProximityChatModeVerbs.Normal",
-        "ProximityChatModeVerbs.Whisper",
-        "ProximityChatModeVerbs.Yell",
-        "RPTextTogglePermission",
     ];
 
     private static string[] RegisteredKeys => ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key).ToArray();
@@ -77,8 +46,8 @@ public class SetupWizardCoverageTests
     public void CatalogAndPendingInventoryPartitionTheScalarRegistry()
     {
         RegisteredKeys.Should().HaveCount(210).And.OnlyHaveUniqueItems();
-        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(151);
-        PendingMigrationKeys.Should().HaveCount(59).And.OnlyHaveUniqueItems();
+        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(182);
+        PendingMigrationKeys.Should().HaveCount(28).And.OnlyHaveUniqueItems();
         CoverageErrors(RegisteredKeys, CoveredKeys, PendingMigrationKeys).Should().BeEmpty();
         foreach (var key in PendingMigrationKeys)
             SetupWizardCatalog.IsSettingKey(key).Should().BeFalse($"{key} has no implemented wizard destination yet");

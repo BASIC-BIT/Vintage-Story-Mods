@@ -15,6 +15,7 @@ public static class SetupWizardCaptureScenes
     public static readonly string[] Names =
     [
         "wizard-sheet-builder", "wizard-sheet-builder-unselected", "wizard-sheet-builder-selected", "wizard-sheet-builder-choice", "wizard-sheet-builder-hidden", "wizard-sheet-builder-empty", "wizard-sheet-builder-inspector", "wizard-sheet-builder-invalid", "wizard-sheet-builder-review", "wizard-sheet-builder-add", "wizard-sheet-builder-browse", "wizard-sheet-builder-layout",
+        "wizard-wording", "wizard-wording-bottom", "wizard-wording-custom", "wizard-shortcuts", "wizard-shortcuts-bottom", "wizard-shortcuts-custom",
         "wizard-hub", "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
         "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited", "wizard-notifications-sleep",
         "wizard-review", "wizard-error", "wizard-restart-dedicated", "wizard-restart-integrated",
@@ -256,7 +257,23 @@ public static class SetupWizardCaptureScenes
             _ => "chat.basics"
         };
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) page = "characters.builder";
+        if (scenario.StartsWith("wizard-wording", StringComparison.Ordinal)) page = "chat.wording";
+        if (scenario.StartsWith("wizard-shortcuts", StringComparison.Ordinal)) page = "chat.shortcuts";
+        if (scenario == "wizard-wording-custom")
+        {
+            dialog.Draft.Set("ProximityChatModeVerbs.Normal", "murmurs");
+            dialog.Draft.Set("ProximityChatModeQuestionVerbs.Normal", "wonders");
+            dialog.Draft.Set("ProximityChatModePunctuation.Normal", "...");
+            dialog.Draft.Set("ProseNicknameToken", "@self");
+        }
+        if (scenario == "wizard-shortcuts-custom")
+        {
+            dialog.Draft.Set("ChatDelimiters.Bold.Start", "[b]");
+            dialog.Draft.Set("ChatDelimiters.Bold.End", "");
+            dialog.Draft.Set("ChatDelimiters.Italic.Start", "<literal>");
+        }
         dialog.ShowPage(page);
+        if (scenario is "wizard-wording-bottom" or "wizard-shortcuts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
         if (scenario == "wizard-server-stats-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) ShowSheetBuilder(dialog, scenario);
         if (scenario == "wizard-language-grants") dialog.SingleComposer.GetScrollbar("language-editor-scroll").ScrollToBottom();

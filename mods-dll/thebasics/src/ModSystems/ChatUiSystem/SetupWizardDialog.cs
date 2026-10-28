@@ -409,7 +409,14 @@ public sealed class SetupWizardDialog : GuiDialog
                 _inSettingsForm = true;
                 y = 0;
             }
-            foreach (var key in keys) AddSetting(composer, key, ref y);
+            if (SetupWizardChatTextEditor.Supports(CurrentStepId))
+            {
+                y = SetupWizardChatTextEditor.Add(composer, capi, Draft, CurrentStepId, SettingsWidth,
+                    (key, value) => Changed(key, value, "edited", false));
+                if (CurrentStepId == "chat.wording")
+                    foreach (var key in SetupWizardChatTextEditor.OtherWordingKeys) AddSetting(composer, key, ref y);
+            }
+            else foreach (var key in keys) AddSetting(composer, key, ref y);
             if (scroll)
             {
                 _inSettingsForm = false;
@@ -500,7 +507,7 @@ public sealed class SetupWizardDialog : GuiDialog
                 picker.SetValue(choice);
                 Changed(key, choice, "edited", false);
             }, CairoFont.TextInput());
-            input.SetMaxLength(definition.Kind == ConfigAdminSettingKind.Text ? 2048 : 32);
+            input.SetMaxLength(definition.Kind == ConfigAdminSettingKind.Text ? Math.Max(2048, value?.Length ?? 0) : 32);
             input.SetValue(value);
             _colorPickers.Add(picker);
             composer.AddInteractiveElement(picker, "color-picker-" + key);
@@ -522,7 +529,7 @@ public sealed class SetupWizardDialog : GuiDialog
                     requested = (percentage / 100).ToString(CultureInfo.InvariantCulture);
                 Changed(key, requested, "edited", false);
             }, CairoFont.TextInput());
-            input.SetMaxLength(definition.Kind == ConfigAdminSettingKind.Text ? 2048 : 32);
+            input.SetMaxLength(definition.Kind == ConfigAdminSettingKind.Text ? Math.Max(2048, value?.Length ?? 0) : 32);
             input.SetValue(key == "SleepNotificationThreshold" ? (Number(key) * 100).ToString(CultureInfo.InvariantCulture) : value);
             composer.AddInteractiveElement(input, key);
         }
@@ -724,6 +731,11 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void AddPreview(GuiComposer composer)
     {
+        if (SetupWizardChatTextEditor.Supports(CurrentStepId))
+        {
+            AddChatPreview(composer, 138, CompactLayout ? 250 : 300);
+            return;
+        }
         if (SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId)) return;
         if (AnimatedPreview) AddPlayback(composer);
         if (CurrentStepId == "roleplay.descriptions")
@@ -964,6 +976,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private string BuildPreviewText()
     {
+        if (SetupWizardChatTextEditor.Supports(CurrentStepId)) return SetupWizardChatTextEditor.Preview(CurrentStepId, Draft);
         if (CurrentStepId == "roleplay.descriptions") return "The old gate creaks in the wind.";
         if (CurrentStepId == "notifications.deaths") return Bool("EnableNearbyDeathMessagesInProximityChat") ? "PipPlayer died nearby." : "Nearby death messages are off.";
         if (CurrentStepId == "chat.colors")
