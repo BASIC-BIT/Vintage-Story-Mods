@@ -14,6 +14,13 @@ internal sealed class SetupWizardSearchPanel
 {
     private readonly Dictionary<object, string> _identities = new(ReferenceEqualityComparer.Instance);
     private readonly SetupWizardSettingsForm _form = new();
+    private bool _newOnly;
+    internal bool NewOnly
+    {
+        get => _newOnly;
+        set { if (_newOnly == value) return; _newOnly = value; Selection = 0; _form.Reset("search"); }
+    }
+    internal IReadOnlyCollection<string> ReviewedKeys { get; set; }
     internal string Query { get; private set; } = "";
     internal int Selection { get; private set; }
     internal IReadOnlyList<ConfigSearchResult> Results { get; private set; } = Array.Empty<ConfigSearchResult>();
@@ -36,7 +43,11 @@ internal sealed class SetupWizardSearchPanel
         var changed = Query != query;
         if (changed) { Selection = 0; _form.Reset("search"); }
         Query = query ?? "";
-        Results = ConfigAdminSearch.Find(Index(draft), Query);
+        var entries = Index(draft);
+        if (NewOnly)
+            entries = ReviewedKeys == null ? new() : entries.Where(entry => entry.Destination == ConfigSearchDestination.Setting &&
+                !ReviewedKeys.Contains(entry.Key, StringComparer.OrdinalIgnoreCase)).ToList();
+        Results = NewOnly && string.IsNullOrWhiteSpace(Query) ? entries : ConfigAdminSearch.Find(entries, Query);
         if (!changed && previous != null)
         {
             var index = Results.ToList().FindIndex(result => result.Destination == previous.Destination && result.EntryId == previous.EntryId && result.Key == previous.Key);
@@ -46,8 +57,8 @@ internal sealed class SetupWizardSearchPanel
     }
     internal void Add(GuiComposer composer, ICoreClientAPI api, double width, double bottom, Action<ConfigSearchResult> select)
     {
-        composer.AddStaticText("Search settings", CairoFont.WhiteSmallText().WithFontSize(20), ElementBounds.Fixed(0, 48, width, 28));
-        composer.AddStaticText(Results.Count == 0 ? string.IsNullOrWhiteSpace(Query) ? "Search names, config keys, help or draft values." : "No matching settings." : $"{Results.Count} matches",
+        composer.AddStaticText(NewOnly ? "New settings" : "Search settings", CairoFont.WhiteSmallText().WithFontSize(20), ElementBounds.Fixed(0, 48, width, 28));
+        composer.AddStaticText(Results.Count == 0 ? NewOnly ? "No new settings match." : string.IsNullOrWhiteSpace(Query) ? "Search names, config keys, help or draft values." : "No matching settings." : $"{Results.Count} matches",
             CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(0, 84, width, 26));
         _form.Begin(composer, "search", ElementBounds.Fixed(0, 120, width, bottom - 128));
         for (var i = 0; i < Results.Count; i++)

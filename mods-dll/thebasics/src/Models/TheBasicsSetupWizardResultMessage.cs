@@ -8,7 +8,9 @@ public enum SetupWizardResultKind
     Invitation,
     Open,
     SaveResult,
-    Denied
+    Denied,
+    MaintenanceResult,
+    RequestFailed
 }
 
 [ProtoContract]
@@ -25,4 +27,9 @@ public sealed class TheBasicsSetupWizardResultMessage
     [ProtoMember(9)] public List<string> ConflictKeys { get; set; } = new();
     [ProtoMember(10)] public bool RuntimeApplyFailed { get; set; }
     [ProtoMember(11)] public List<ConfigAdminPrivilegeSuggestion> PrivilegeSuggestions { get; set; } = new();
+    [ProtoMember(12)] public List<LanguageConfigEntryMessage> Languages { get; set; } = new();
+    [ProtoMember(13)] public List<CharacterSheetFieldConfigEntryMessage> SheetFields { get; set; } = new();
+    [ProtoMember(14)] public string Destination { get; set; }
+    [ProtoMember(15)] public List<string> ReviewedKeys { get; set; } = new();
+    [ProtoMember(16)] public bool SupportsMaintenance { get; set; }
 }

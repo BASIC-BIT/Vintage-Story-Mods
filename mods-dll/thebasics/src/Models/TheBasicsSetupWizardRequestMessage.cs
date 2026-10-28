@@ -10,7 +10,9 @@ public enum SetupWizardRequestKind
     InviteDismiss,
     Save,
     Track,
-    Closed
+    Closed,
+    MarkReviewed,
+    Reload
 }
 
 [ProtoContract]
@@ -25,4 +27,9 @@ public sealed class TheBasicsSetupWizardRequestMessage
     [ProtoMember(7)] public string ChoiceId { get; set; }
     [ProtoMember(8)] public string JourneyAction { get; set; }
     [ProtoMember(9)] public bool CaptureOnly { get; set; }
+    [ProtoMember(10)] public List<LanguageConfigEntryMessage> Languages { get; set; } = new();
+    [ProtoMember(11)] public List<LanguageConfigEntryMessage> OriginalLanguages { get; set; } = new();
+    [ProtoMember(12)] public List<CharacterSheetFieldConfigEntryMessage> SheetFields { get; set; } = new();
+    [ProtoMember(13)] public List<CharacterSheetFieldConfigEntryMessage> OriginalSheetFields { get; set; } = new();
+    [ProtoMember(14)] public string Destination { get; set; }
 }

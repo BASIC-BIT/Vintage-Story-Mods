@@ -3,6 +3,8 @@ using FluentAssertions;
 using NSubstitute;
 using TheBasics.GuiPreview;
 using thebasics.Models;
+using thebasics.Configs;
+using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatUiSystem;
 using thebasics.Tests.GuiPreview;
 using thebasics.Utilities.Network;
@@ -93,7 +95,7 @@ public class SetupWizardClientControllerTests
         failure.Should().BeNull();
         controller.CurrentDialog.Should().BeNull();
         controller.IsCaptureOnly.Should().BeFalse();
-        api.Received(1).ShowChatMessage("Could not open setup. Use /basic config to edit your settings.");
+        api.Received(1).ShowChatMessage("Could not open setup. Use /tb config advanced to edit your settings.");
         controller.OpenForCapture();
         channel.Received(2).SendPacket(Arg.Is<TheBasicsSetupWizardRequestMessage>(request => request.CaptureOnly));
     }
@@ -172,7 +174,7 @@ public class SetupWizardClientControllerTests
         var draft = new SetupWizardDraft([new() { Key = "EnableChatter", Value = "1" },
             new() { Key = "TpaCooldownInGameHours", Value = "0.5" }]);
         draft.Set("EnableChatter", "0");
-        var dialog = new SetupWizardDialog(host.Api, draft, "initial-run", true, null!, null!, null!, layoutOnly: true);
+        var dialog = new SetupWizardDialog(host.Api, draft, "initial-run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         typeof(SetupWizardClientController).GetProperty(nameof(SetupWizardClientController.CurrentDialog))!
             .SetValue(controller, dialog);
         if (savePending) draft.CreateSaveRequest(9, "initial-run");
@@ -199,4 +201,108 @@ public class SetupWizardClientControllerTests
         draft.GetOriginal("EnableChatter").Should().Be("1");
         draft.Get("TpaCooldownInGameHours").Should().Be("3");
     }
+
+    [VisualTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TimedOutLanguageSaveReadsBackBeforeRetryAndCanRecoverFromFailedReadback(bool readbackTimesOut)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
+            Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000);
+        var api = Substitute.For<ICoreClientAPI>();
+        var timeouts = new List<Action<float>>();
+        api.Event.RegisterCallback(Arg.Do<Action<float>>(callback => timeouts.Add(callback)), 30000);
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        var sent = new List<TheBasicsSetupWizardRequestMessage>();
+        channel.When(value => value.SendPacket(Arg.Any<TheBasicsSetupWizardRequestMessage>()))
+            .Do(call => sent.Add(call.Arg<TheBasicsSetupWizardRequestMessage>()));
+        using var safeChannel = new SafeClientNetworkChannel(channel, api, new() { EnableDebugLogging = false });
+        using var controller = new SetupWizardClientController(api, safeChannel);
+        var config = new ModConfig();
+        config.InitializeDefaultsIfNeeded();
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues(), LanguageConfigAdmin.BuildEntries(config), CharacterSheetFieldConfigAdmin.BuildEntries(config));
+        var dialog = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
+        typeof(SetupWizardClientController).GetProperty(nameof(SetupWizardClientController.CurrentDialog))!.SetValue(controller, dialog);
+        typeof(SetupWizardClientController).GetField("_runId", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(controller, "run");
+        var save = typeof(SetupWizardClientController).GetMethod("Save", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        draft.Languages[0].Name = "Coastal";
+        draft.SheetFields[0].Label = "Saved template";
+        dialog.ShowPage("review");
+        save.Invoke(controller, null);
+        var firstSave = sent.Single(request => request.Kind == SetupWizardRequestKind.Save);
+        for (var repeat = 0; repeat < 2; repeat++)
+        {
+            controller.Open("chat.languageeditor");
+            controller.HandleResult(new() { Kind = SetupWizardResultKind.Open, Success = true, RunId = "run", Destination = "characters.builder", Values = SetupWizardCaptureScenes.DefaultValues() });
+        }
+        dialog.CurrentStepId.Should().Be("characters.builder");
+        draft.IsSavePending.Should().BeTrue();
+        controller.CurrentDialog.Should().BeSameAs(dialog);
+        sent.Count(request => request.Kind == SetupWizardRequestKind.Open).Should().Be(0);
+        draft.Languages[0].Name = "Mountain";
+        draft.SheetFields[0].Label = "Later template edit";
+        timeouts[0](30);
+
+        draft.HasUnconfirmedSave.Should().BeTrue();
+        controller.HandleResult(new() { Kind = SetupWizardResultKind.Open, Success = true, RunId = "run", Destination = "chat.languageeditor", Values = SetupWizardCaptureScenes.DefaultValues() });
+        draft.HasUnconfirmedSave.Should().BeTrue();
+        dialog.ShowPage("review");
+        dialog.SingleComposer.GetButton("review").Enabled.Should().BeFalse();
+        save.Invoke(controller, null);
+        sent.Count(request => request.Kind == SetupWizardRequestKind.Save).Should().Be(1);
+        var open = sent.Last(request => request.Kind == SetupWizardRequestKind.Open);
+        if (readbackTimesOut)
+        {
+            timeouts[1](30);
+            draft.HasUnconfirmedSave.Should().BeTrue();
+            dialog.SingleComposer.GetButton("review").Enabled.Should().BeFalse();
+            controller.Open();
+            open = sent.Last(request => request.Kind == SetupWizardRequestKind.Open);
+        }
+        LanguageConfigAdmin.TryApplyEntries(config, firstSave.Languages, out _).Should().BeTrue();
+        CharacterSheetFieldConfigAdmin.TryApplyEntries(config, firstSave.SheetFields, out _).Should().BeTrue();
+
+        controller.HandleResult(new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open, RequestId = open.RequestId, RunId = "run", Success = true,
+            Values = SetupWizardCaptureScenes.DefaultValues(), Languages = LanguageConfigAdmin.BuildEntries(config), SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(config)
+        });
+
+        draft.HasUnconfirmedSave.Should().BeFalse();
+        draft.Languages[0].Name.Should().Be("Mountain");
+        draft.Languages[0].OriginalName.Should().Be("Coastal");
+        draft.SheetFields[0].Label.Should().Be("Later template edit");
+        draft.OriginalSheetFields[0].Label.Should().Be("Saved template");
+        dialog.SingleComposer.GetButton("review").Enabled.Should().BeTrue();
+        save.Invoke(controller, null);
+        sent.Count(request => request.Kind == SetupWizardRequestKind.Save).Should().Be(2);
+        sent.Last(request => request.Kind == SetupWizardRequestKind.Save).Languages[0].OriginalName.Should().Be("Coastal");
+    }
+    [VisualTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RepeatedTargetedCommandsDoNotConsumeDelayedSaveResult(bool success)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720);
+        var api = Substitute.For<ICoreClientAPI>(); var channel = Substitute.For<IClientNetworkChannel>(); channel.Connected.Returns(true);
+        var sent = new List<TheBasicsSetupWizardRequestMessage>();
+        channel.When(x => x.SendPacket(Arg.Any<TheBasicsSetupWizardRequestMessage>())).Do(call => sent.Add(call.Arg<TheBasicsSetupWizardRequestMessage>()));
+        using var safe = new SafeClientNetworkChannel(channel, api, new() { EnableDebugLogging = false });
+        using var controller = new SetupWizardClientController(api, safe);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues()); draft.Set("EnableChatter", "0");
+        var dialog = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
+        typeof(SetupWizardClientController).GetProperty(nameof(SetupWizardClientController.CurrentDialog))!.SetValue(controller, dialog);
+        typeof(SetupWizardClientController).GetField("_runId", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(controller, "run");
+        typeof(SetupWizardClientController).GetMethod("Save", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(controller, null);
+        var request = sent.Single(x => x.Kind == SetupWizardRequestKind.Save);
+        for (var i = 0; i < 3; i++)
+            controller.HandleResult(new() { Kind = SetupWizardResultKind.Open, Success = true, RunId = "run", Destination = "characters.builder", Values = SetupWizardCaptureScenes.DefaultValues() });
+        draft.IsSavePending.Should().BeTrue();
+        controller.HandleResult(new() { Kind = SetupWizardResultKind.SaveResult, RequestId = request.RequestId, RunId = "run", Success = success,
+            Values = [new() { Key = "EnableChatter", Value = success ? "0" : "1" }] });
+        draft.IsSavePending.Should().BeFalse(); draft.IsDirty.Should().Be(!success);
+        draft.Get("EnableChatter").Should().Be("0"); controller.CurrentDialog.Should().BeSameAs(dialog);
+    }
+
 }

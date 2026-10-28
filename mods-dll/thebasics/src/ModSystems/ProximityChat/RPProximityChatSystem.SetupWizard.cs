@@ -27,11 +27,13 @@ public partial class RPProximityChatSystem
         public TheBasicsSetupWizardResultMessage LastSaveResult { get; set; }
     }
 
-    private TextCommandResult HandleOpenSetupWizardCommand(TextCommandCallingArgs args)
+    private TextCommandResult HandleOpenSetupWizardCommand(TextCommandCallingArgs args) => OpenSetupWizardPage(args, null);
+
+    private TextCommandResult OpenSetupWizardPage(TextCommandCallingArgs args, string destination)
     {
         if (args.Caller.Player is not IServerPlayer player)
             return TextCommandResult.Error("This command can only be used by a player.");
-        OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open });
+        OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open, Destination = destination });
         return TextCommandResult.Success("Opening The BASICs setup.");
     }
 
@@ -58,8 +60,8 @@ public partial class RPProximityChatSystem
         var requestErrors = SetupWizardState.ValidateRequest(request);
         if (requestErrors.Count > 0)
         {
-            SendSetupWizardResult(player, SetupWizardResultKind.Denied, request?.RequestId ?? 0,
-                request?.RunId?.Length <= 64 ? request.RunId : null, false, "Invalid setup request.");
+            SendSetupWizardResult(player, SetupWizardResultKind.RequestFailed, request?.RequestId ?? 0,
+                request?.RunId?.Length <= 64 ? request.RunId : null, false, "This setup action is unavailable. Your edits are still here.");
             return;
         }
         if (request.Kind == SetupWizardRequestKind.Open)
@@ -74,7 +76,7 @@ public partial class RPProximityChatSystem
                 ? existingRun : new SetupWizardRun();
             _setupWizardRuns[player.PlayerUID] = newRun;
             player.SetModData(SetupWizardSeenKey, true);
-            SendSetupWizardResult(player, SetupWizardResultKind.Open, request.RequestId, newRun.Id, true);
+            SendSetupWizardResult(player, SetupWizardResultKind.Open, request.RequestId, newRun.Id, true, destination: request.Destination);
             TrackSetupWizard(player, newRun, "start", "opened");
             return;
         }
@@ -99,6 +101,10 @@ public partial class RPProximityChatSystem
                     player.SendMessage(GlobalConstants.GeneralChatGroup,
                         "You can configure The BASICs later with /basic setup.", EnumChatType.Notification);
                 break;
+            case SetupWizardRequestKind.MarkReviewed:
+            case SetupWizardRequestKind.Reload:
+                MaintainSetupWizard(player, request, run);
+                break;
             case SetupWizardRequestKind.Save:
                 SaveSetupWizard(player, request, run);
                 break;
@@ -112,6 +118,34 @@ public partial class RPProximityChatSystem
                 _setupWizardRuns.Remove(player.PlayerUID);
                 break;
         }
+    }
+
+    private void MaintainSetupWizard(IServerPlayer player, TheBasicsSetupWizardRequestMessage request, SetupWizardRun run)
+    {
+        var success = false;
+        string message;
+        if (request.Kind == SetupWizardRequestKind.MarkReviewed)
+        {
+            var draft = CloneConfig(Config);
+            ConfigAdminSaveWorkflow.MarkReviewedKeys(draft, ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key));
+            success = TryPersistConfigDraft(draft, out var error);
+            message = success ? "All new settings marked reviewed." : error;
+        }
+        else
+        {
+            try
+            {
+                success = TryReloadConfigAndGetChangedKeys(out _);
+                message = success ? "Settings reloaded from disk." : "Could not reload the config file. Your edits are still here.";
+            }
+            catch (Exception error)
+            {
+                _setupWizardRuntimeApplyFailed = true;
+                API.Logger?.Error("The BASICs: config reload live application failed ({0}).", error.GetType().Name);
+                message = "Reload could not finish. Your edits are still here. Restart the server before trying again.";
+            }
+        }
+        SendSetupWizardResult(player, SetupWizardResultKind.MaintenanceResult, request.RequestId, run.Id, success, message);
     }
 
     private void SaveSetupWizard(IServerPlayer player, TheBasicsSetupWizardRequestMessage request, SetupWizardRun run)
@@ -144,6 +178,13 @@ public partial class RPProximityChatSystem
         }
         try
         {
+            if (changedKeys.Contains(nameof(Config.Languages)))
+            {
+                var renameMap = LanguageConfigAdmin.BuildRenameMap(request.Languages);
+                TrackLanguageRenamesForJoiningPlayers(renameMap);
+                ReconcileOnlinePlayerLanguages(renameMap);
+                ReconcileStoredPlayerLanguages(renameMap);
+            }
             ApplyConfigChangeSideEffects(changedKeys.ToHashSet(StringComparer.OrdinalIgnoreCase));
             BroadcastClientConfigs();
         }
@@ -163,9 +204,10 @@ public partial class RPProximityChatSystem
     }
 
     private TheBasicsSetupWizardResultMessage SendSetupWizardResult(IServerPlayer player, SetupWizardResultKind kind,
-        long requestId, string runId, bool success, string message = null, List<string> conflicts = null)
+        long requestId, string runId, bool success, string message = null, List<string> conflicts = null, string destination = null)
     {
         var result = CreateSetupWizardResult(kind, requestId, runId, success, message, conflicts);
+        result.Destination = SetupWizardState.ValidDestination(destination);
         _serverConfigChannel?.SendPacket(result, player);
         return result;
     }
@@ -183,7 +225,11 @@ public partial class RPProximityChatSystem
             IsDedicated = API.Server?.IsDedicated == true,
             ConflictKeys = conflicts ?? [],
             RuntimeApplyFailed = includeSnapshot && _setupWizardRuntimeApplyFailed,
-            PrivilegeSuggestions = includeSnapshot ? ConfigAdminPrivilegeSuggestions.Snapshot(API, Config) : []
+            PrivilegeSuggestions = includeSnapshot ? ConfigAdminPrivilegeSuggestions.Snapshot(API, Config) : [],
+            Languages = includeSnapshot ? LanguageConfigAdmin.BuildEntries(Config) : [],
+            SheetFields = includeSnapshot ? CharacterSheetFieldConfigAdmin.BuildEntries(Config) : [],
+            ReviewedKeys = includeSnapshot ? (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList() : [],
+            SupportsMaintenance = includeSnapshot
         };
     }
 

@@ -24,6 +24,9 @@ public sealed class SetupWizardDialog : GuiDialog
     private readonly Action<string, string, string> _onTrack;
     private readonly Action _onClose;
     private readonly Action _onAdvanced;
+    private readonly Action<SetupWizardRequestKind> _onMaintenance;
+    private readonly Action _onHelp;
+    public bool SupportsMaintenance { get; private set; }
     private readonly ISetupGuidePreview _preview;
     private readonly System.Func<ICoreClientAPI, string, ISetupGuidePreview> _actorFactory;
     private readonly SetupWizardActorPool _actors;
@@ -79,7 +82,8 @@ public sealed class SetupWizardDialog : GuiDialog
     public SetupWizardDialog(ICoreClientAPI api, SetupWizardDraft draft, string runId, bool isDedicated,
         Action onSave, Action<string, string, string> onTrack, Action onClose, Action onAdvanced = null,
         bool layoutOnly = false, bool captureOnly = false,
-        System.Func<ICoreClientAPI, string, ISetupGuidePreview> actorFactory = null) : base(api)
+        System.Func<ICoreClientAPI, string, ISetupGuidePreview> actorFactory = null,
+        Action<SetupWizardRequestKind> onMaintenance = null, Action onHelp = null) : base(api)
     {
         Draft = draft;
         _languageEditor = new SetupWizardLanguageEditor(api, draft,
@@ -91,6 +95,8 @@ public sealed class SetupWizardDialog : GuiDialog
         _onTrack = onTrack;
         _onClose = onClose;
         _onAdvanced = onAdvanced;
+        _onMaintenance = onMaintenance;
+        _onHelp = onHelp;
         LayoutOnly = layoutOnly;
         IsCaptureOnly = captureOnly;
         _actorFactory = actorFactory ?? (layoutOnly ? null : (client, identity) => new SetupGuidePreview(client, identity));
@@ -251,10 +257,14 @@ public sealed class SetupWizardDialog : GuiDialog
     public void SetSession(TheBasicsSetupWizardResultMessage result)
     {
         RunId = result.RunId;
+        SupportsMaintenance = result.SupportsMaintenance;
+        _search.ReviewedKeys = result.SupportsMaintenance ? result.ReviewedKeys?.ToArray() ?? Array.Empty<string>() : null;
+        if (!SupportsMaintenance) _search.NewOnly = false;
         _isDedicated = result.IsDedicated;
         Draft.RefreshValues(result.Values);
         Draft.RefreshLanguages(result.Languages);
         Draft.RefreshSheetFields(result.SheetFields);
+        if (_searching) _search.Search(Draft, _search.Query);
         RefreshPrivilegeSuggestions(result.PrivilegeSuggestions);
         _restartKeys = result.RestartRequiredKeys?.ToArray() ?? Array.Empty<string>();
         _runtimeApplyFailed = result.RuntimeApplyFailed;
@@ -359,7 +369,22 @@ public sealed class SetupWizardDialog : GuiDialog
             }), "footer-rule");
 
         composer.BeginChildElements(ElementBounds.Fixed(ContentOffset, 0, Width, BodyHeight));
-        if (_searching) _search.Add(composer, capi, Width, StatusY, result => QueueNavigation(() => FocusSearchResult(result)));
+        if (_searching)
+        {
+            _search.Add(composer, capi, Width, StatusY, result => QueueNavigation(() => FocusSearchResult(result)));
+            composer.AddSmallButton(_search.NewOnly ? "Show all settings" : "New settings", () =>
+            {
+                QueueNavigation(() => { _search.NewOnly = !_search.NewOnly; ShowSearch(); });
+                return true;
+            }, ElementBounds.Fixed(Width - 180, 48, 180, 28), key: "new-settings");
+            composer.GetButton("new-settings").Enabled = SupportsMaintenance;
+            if (_search.NewOnly)
+            {
+                composer.AddSmallButton("Mark all new settings reviewed", () => { QueueNavigation(() => RequestMaintenance(SetupWizardRequestKind.MarkReviewed)); return true; },
+                    ElementBounds.Fixed(Width - 300, 84, 300, 28), key: "mark-reviewed");
+                composer.GetButton("mark-reviewed").Enabled = SupportsMaintenance && !IsCaptureOnly && !Draft.IsSavePending && !Draft.HasUnconfirmedSave && _onMaintenance != null;
+            }
+        }
         else if (CurrentStepId == "hub") ComposeHub(composer);
         else if (CurrentStepId == "review") ComposeReview(composer);
         else if (CurrentStepId == "finish") ComposeFinish(composer);
@@ -387,15 +412,18 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         var finished = !_searching && CurrentStepId == "finish";
         var reviewing = !_searching && CurrentStepId == "review";
-        composer.AddSmallButton("All settings", () =>
+        composer.AddSmallButton("Old settings", () =>
         {
             if (_onAdvanced == null) return false;
             QueueNavigation(() => { Track("advanced"); Suspend(); _onAdvanced(); });
             return true;
         }, ElementBounds.Fixed(0, FooterY, 140, 30), key: "all-settings");
         composer.GetButton("all-settings").Enabled = _onAdvanced != null && !_pending;
+        composer.AddSmallButton("Help", () => { QueueNavigation(() => _onHelp?.Invoke()); return true; },
+            ElementBounds.Fixed(150, FooterY, 70, 30), key: "setup-help");
+        composer.GetButton("setup-help").Enabled = _onHelp != null;
         composer.AddRichtext(DraftStatusText(), CairoFont.WhiteSmallText().WithFontSize(14),
-            ElementBounds.Fixed(156, FooterY + 6, DialogWidth - 480, 24), "footer-draft-count");
+            ElementBounds.Fixed(232, FooterY + 6, DialogWidth - 552, 24), "footer-draft-count");
         composer.AddSmallButton(finished ? NeedsRestart ? "Later" : "Done" : "Close",
             () => { QueueNavigation(() => TryClose()); return true; },
             ElementBounds.Fixed(DialogWidth - 300, FooterY, 110, 30), key: "close");
@@ -531,9 +559,30 @@ public sealed class SetupWizardDialog : GuiDialog
         }
         if (CurrentStepId == "server.integrations")
             composer.AddRichtext("Relay availability: not checked on the server.", CairoFont.WhiteSmallText().WithFontSize(15), ElementBounds.Fixed(SettingsX, 218, SettingsWidth, 55), "integration-availability");
+        if (CurrentStepId == "server.diagnostics")
+        {
+            Text(composer, "Reload settings", 0, 220, Width, 27, true);
+            composer.AddSmallButton("Reload from disk", () => { QueueNavigation(() => RequestMaintenance(SetupWizardRequestKind.Reload)); return true; },
+                ElementBounds.Fixed(0, 265, 210, 30), key: "reload-disk");
+            var enabled = SupportsMaintenance && !IsCaptureOnly && !Draft.IsSavePending && !Draft.HasUnconfirmedSave && _onMaintenance != null;
+            composer.GetButton("reload-disk").Enabled = enabled;
+            Text(composer, SupportsMaintenance ? "Reload reads the saved server file. Unsaved edits are discarded only after a successful reload." : "This server does not support these actions. Update it to review new settings or reload here.", 0, 310, Width, 72);
+        }
         if (CurrentStepId == "server.stats")
             SetStatsControlsEnabled(composer);
 
+    }
+
+    internal void RequestMaintenance(SetupWizardRequestKind kind)
+    {
+        if (!SupportsMaintenance || IsCaptureOnly || Draft.IsSavePending || Draft.HasUnconfirmedSave || _onMaintenance == null) return;
+        if (kind != SetupWizardRequestKind.Reload || !Draft.IsDirty) { _onMaintenance(kind); return; }
+        _closeConfirm?.Dispose();
+        _closeConfirm = new DiscardConfirmDialog(capi, "Reload from disk and discard your unsaved changes? If reload fails, your edits stay here.", discard =>
+        {
+            if (discard) _onMaintenance(kind);
+        });
+        _closeConfirm.TryOpen();
     }
 
     private bool SettingVisible(string key)

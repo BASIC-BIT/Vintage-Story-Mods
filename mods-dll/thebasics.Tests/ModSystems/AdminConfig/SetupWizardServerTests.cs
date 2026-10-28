@@ -1,6 +1,7 @@
 using System.Reflection;
 using FluentAssertions;
 using NSubstitute;
+using NSubstitute.Extensions;
 using thebasics.Configs;
 using thebasics.Extensions;
 using thebasics.Models;
@@ -406,6 +407,112 @@ public class SetupWizardServerTests : IDisposable
         };
         state.TryValidatePatch(config, request, out var candidate, out _, out _, out var errors).Should().BeTrue(string.Join("; ", errors));
         state.GetPendingRestartKeys(candidate).Should().Contain(key);
+    }
+
+    [Fact]
+    public void ReviewedMetadataChangesOnlyOnExplicitActionAndRetainsSettings()
+    {
+        var (system, api, results) = CreateSystem();
+        system.Config.ReviewedConfigSettingKeys = ["EnableChatter"];
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open, Destination = "chat.languageeditor" });
+        results.Last().SupportsMaintenance.Should().BeTrue();
+        results.Last().ReviewedKeys.Should().Equal("EnableChatter");
+        results.Last().Destination.Should().Be("chat.languageeditor");
+        var run = results.Last().RunId;
+        system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Save, RequestId = 1, RunId = run });
+        results.Last().ReviewedKeys.Should().Equal("EnableChatter");
+        system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.MarkReviewed, RequestId = 2, RunId = run });
+        results.Last().Success.Should().BeTrue();
+        system.Config.EnableChatter.Should().BeTrue();
+        results.Last().ReviewedKeys.Should().Contain(ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key));
+        api.Received().StoreModConfig(Arg.Any<ModConfig>(), Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData(SetupWizardRequestKind.MarkReviewed)]
+    [InlineData(SetupWizardRequestKind.Reload)]
+    public void MaintenanceRequiresRootAndRealSession(SetupWizardRequestKind kind)
+    {
+        var (system, api, results) = CreateSystem();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open, CaptureOnly = true });
+        system.OnSetupWizardRequest(player, new() { Kind = kind, RequestId = 1, RunId = results.Last().RunId });
+        results.Last().Success.Should().BeFalse();
+        player.PrivilegeCheck = _ => false;
+        system.OnSetupWizardRequest(player, new() { Kind = kind, RequestId = 2 });
+        results.Last().Kind.Should().Be(SetupWizardResultKind.Denied);
+        api.DidNotReceive().StoreModConfig(Arg.Any<ModConfig>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void UnknownDestinationFallsBackWithoutReplacingRunOrMarkingReviewed()
+    {
+        var (system, _, results) = CreateSystem();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open });
+        var run = results.Last().RunId;
+        var reviewed = results.Last().ReviewedKeys.ToArray();
+        system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open, Destination = "future.page" });
+        results.Last().RunId.Should().Be(run);
+        results.Last().Destination.Should().BeNull();
+        results.Last().ReviewedKeys.Should().Equal(reviewed);
+        system.OnSetupWizardRequest(player, new() { Kind = (SetupWizardRequestKind)999, RequestId = 7, RunId = run });
+        results.Last().Kind.Should().Be(SetupWizardResultKind.RequestFailed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DiskReloadUsesSafeReaderAndMalformedFileLeavesRuntimeUnchanged(bool malformed)
+    {
+        var (system, api, results) = CreateSystem();
+        var shared = typeof(thebasics.ModSystems.BaseBasicModSystem).GetField("_sharedConfig", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var previous = shared.GetValue(null);
+        shared.SetValue(null, system.Config);
+        var file = Path.Combine(Path.GetTempPath(), "setup-reload-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var disk = new ModConfig(); disk.InitializeDefaultsIfNeeded(); disk.EnableChatter = false;
+            File.WriteAllText(file, malformed ? "{ broken json" : Newtonsoft.Json.JsonConvert.SerializeObject(disk));
+            api.LoadModConfig<ModConfig>(Arg.Any<string>()).Returns(_ => Newtonsoft.Json.JsonConvert.DeserializeObject<ModConfig>(File.ReadAllText(file)));
+            var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+            system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open });
+            system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Reload, RequestId = 1, RunId = results.Last().RunId });
+            results.Last().Kind.Should().Be(SetupWizardResultKind.MaintenanceResult);
+            results.Last().Success.Should().Be(!malformed);
+            system.Config.EnableChatter.Should().Be(malformed);
+        }
+        finally { shared.SetValue(null, previous); File.Delete(file); }
+    }
+
+    [Fact]
+    public void ConfigAndSetupAliasesRetainRootAndPlayerRequirements()
+    {
+        LangTestHelper.EnsureEnglish();
+        var (system, api, _) = CreateSystem();
+        var commands = new Dictionary<string, IChatCommand>();
+        IChatCommand Command(string path, IChatCommand? parent = null)
+        {
+            if (commands.TryGetValue(path, out var existing)) return existing;
+            var command = Substitute.For<IChatCommand>(); commands[path] = command;
+            command.ReturnsForAll<IChatCommand>(command);
+            command.EndSubCommand().Returns(parent ?? command);
+            command.BeginSubCommand(Arg.Any<string>()).Returns(call => Command(path + "/" + call.Arg<string>(), command));
+            return command;
+        }
+        var root = Command("thebasics"); api.ChatCommands.GetOrCreate("thebasics").Returns(root);
+        typeof(RPProximityChatSystem).GetMethod("RegisterAdminConfigCommands", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(system, null);
+        root.Received().WithRootAlias("tb"); root.Received().WithRootAlias("basic");
+        foreach (var path in new[] { "config", "config/advanced", "config/languages", "config/charsheetfields", "setup", "setup/languages", "setup/charsheetfields", "charsheetfields" })
+        {
+            commands["thebasics/" + path].Received().RequiresPrivilege(Privilege.root);
+            commands["thebasics/" + path].Received().RequiresPlayer();
+        }
+        commands["thebasics/config/languages"].Received().WithAlias("language");
+        commands["thebasics/setup/languages"].Received().WithAlias("language");
+        foreach (var path in new[] { "config/charsheetfields", "setup/charsheetfields", "charsheetfields" })
+            commands["thebasics/" + path].Received().WithAlias("sheetfields", "biofields");
     }
 
     private static Dictionary<string, string> GetPendingRenames(RPProximityChatSystem system) =>

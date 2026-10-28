@@ -10,6 +10,22 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class SetupWizardProtocolTests
 {
     [Fact]
+    public void MaintenanceFieldsAreAdditiveAndOldResultsDisableMaintenance()
+    {
+        using var packet = new MemoryStream(new byte[] { 8, 1, 32, 1, 160, 6, 1 });
+        var old = Serializer.Deserialize<TheBasicsSetupWizardResultMessage>(packet);
+        old.Success.Should().BeTrue(); old.SupportsMaintenance.Should().BeFalse();
+        old.ReviewedKeys.Should().BeEmpty(); old.Destination.Should().BeNull();
+        var result = Serializer.DeepClone(new TheBasicsSetupWizardResultMessage { SupportsMaintenance = true, ReviewedKeys = ["EnableChatter"], Destination = "characters.builder" });
+        result.SupportsMaintenance.Should().BeTrue(); result.ReviewedKeys.Should().Equal("EnableChatter"); result.Destination.Should().Be("characters.builder");
+        var request = Serializer.DeepClone(new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open, Destination = "chat.languageeditor" });
+        request.Destination.Should().Be("chat.languageeditor");
+        SetupWizardState.ValidateRequest(new() { Kind = SetupWizardRequestKind.MarkReviewed, CaptureOnly = true }).Should().NotBeEmpty();
+        SetupWizardState.ValidateRequest(new() { Kind = SetupWizardRequestKind.Reload, CaptureOnly = true }).Should().NotBeEmpty();
+        SetupWizardState.ValidateRequest(new() { Kind = SetupWizardRequestKind.Open, Destination = new string('x', 65) }).Should().NotBeEmpty();
+    }
+
+    [Fact]
     public void NewTopicSettingsRoundtripFromSnapshotThroughValidatedSaveAndDraftRefresh()
     {
         var current = new ModConfig();
@@ -79,7 +95,9 @@ public class SetupWizardProtocolTests
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
             StepId = "review",
             JourneyAction = "save_requested",
-            ChoiceId = "off"
+            ChoiceId = "off",
+            Languages = [new() { OriginalName = "Old speech", Name = "River speech", Prefix = "river", Color = "#34AACC", Syllables = "ra, vo", Default = true, Hidden = true, GrantedToClasses = "hunter", GrantedToModels = "seraph", GrantedToModelGroups = "folk", GrantedToTraits = "keenears" }],
+            OriginalLanguages = [new() { OriginalName = "Old speech", Name = "Old speech", Description = "Old description", Prefix = "old", Color = "#E9DDCE", Syllables = "old" }]
         });
 
         request.Kind.Should().Be(SetupWizardRequestKind.Save);
@@ -90,6 +108,12 @@ public class SetupWizardProtocolTests
         request.StepId.Should().Be("review");
         request.JourneyAction.Should().Be("save_requested");
         request.ChoiceId.Should().Be("off");
+        request.Languages.Single().Should().BeEquivalentTo(new LanguageConfigEntryMessage
+        {
+            OriginalName = "Old speech", Name = "River speech", Prefix = "river", Color = "#34AACC", Syllables = "ra, vo", Default = true,
+            Hidden = true, GrantedToClasses = "hunter", GrantedToModels = "seraph", GrantedToModelGroups = "folk", GrantedToTraits = "keenears"
+        });
+        request.OriginalLanguages.Single().Description.Should().Be("Old description");
     }
 
     [Fact]
@@ -106,7 +130,8 @@ public class SetupWizardProtocolTests
             RestartRequiredKeys = ["DisableRPChat"],
             IsDedicated = true,
             RuntimeApplyFailed = true,
-            ConflictKeys = ["EnableChatter"]
+            ConflictKeys = ["EnableChatter", "Languages"],
+            Languages = [new() { OriginalName = "River speech", Name = "River speech", Color = "#34AACC" }]
         });
 
         result.Kind.Should().Be(SetupWizardResultKind.SaveResult);
@@ -118,7 +143,8 @@ public class SetupWizardProtocolTests
         result.RestartRequiredKeys.Should().Equal("DisableRPChat");
         result.IsDedicated.Should().BeTrue();
         result.RuntimeApplyFailed.Should().BeTrue();
-        result.ConflictKeys.Should().Equal("EnableChatter");
+        result.ConflictKeys.Should().Equal("EnableChatter", "Languages");
+        result.Languages.Single().Name.Should().Be("River speech");
     }
 
     [Fact]
@@ -132,5 +158,23 @@ public class SetupWizardProtocolTests
         request.Kind.Should().Be(SetupWizardRequestKind.Open);
         request.RequestId.Should().Be(125);
         request.CaptureOnly.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ExistingWireTagsRemainStableAndOldPacketsCannotClearFields()
+    {
+        var requestNames = new[] { "Kind", "RequestId", "RunId", "Values", "OriginalValues", "StepId", "ChoiceId", "JourneyAction", "CaptureOnly", "Languages", "OriginalLanguages", "SheetFields", "OriginalSheetFields" };
+        var resultNames = new[] { "Kind", "RequestId", "RunId", "Success", "Message", "Values", "RestartRequiredKeys", "IsDedicated", "ConflictKeys", "RuntimeApplyFailed", "PrivilegeSuggestions", "Languages", "SheetFields" };
+        foreach (var (type, names) in new[] { (typeof(TheBasicsSetupWizardRequestMessage), requestNames), (typeof(TheBasicsSetupWizardResultMessage), resultNames) })
+            for (var i = 0; i < names.Length; i++)
+                ((ProtoMemberAttribute)Attribute.GetCustomAttribute(type.GetProperty(names[i])!, typeof(ProtoMemberAttribute))!).Tag.Should().Be(i + 1);
+        using var oldPacket = new MemoryStream(new byte[] { 8, 3, 16, 1 });
+        var decoded = Serializer.Deserialize<TheBasicsSetupWizardRequestMessage>(oldPacket);
+        decoded.SheetFields.Should().BeEmpty();
+        decoded.OriginalSheetFields.Should().BeEmpty();
+        var current = new ModConfig();
+        current.InitializeDefaultsIfNeeded();
+        new SetupWizardState(current).TryValidatePatch(current, decoded, out var saved, out _, out _, out _).Should().BeTrue();
+        CharacterSheetFieldConfigAdmin.EntriesEqual(CharacterSheetFieldConfigAdmin.BuildEntries(current), CharacterSheetFieldConfigAdmin.BuildEntries(saved)).Should().BeTrue();
     }
 }
