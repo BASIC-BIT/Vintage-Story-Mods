@@ -15,7 +15,7 @@ public static class SetupWizardCaptureScenes
     public static readonly string[] Names =
     [
         "wizard-sheet-builder", "wizard-sheet-builder-unselected", "wizard-sheet-builder-selected", "wizard-sheet-builder-choice", "wizard-sheet-builder-hidden", "wizard-sheet-builder-empty", "wizard-sheet-builder-inspector", "wizard-sheet-builder-invalid", "wizard-sheet-builder-review", "wizard-sheet-builder-add", "wizard-sheet-builder-browse", "wizard-sheet-builder-layout",
-        "wizard-textappearance", "wizard-textappearance-bottom", "wizard-textappearance-custom", "wizard-occlusion", "wizard-occlusion-bottom", "wizard-occlusion-custom",
+        "wizard-textappearance-invalid", "wizard-occlusion-invalid", "wizard-occlusion-conflict", "wizard-occlusion-unlimited", "wizard-textappearance", "wizard-textappearance-bottom", "wizard-textappearance-custom", "wizard-occlusion", "wizard-occlusion-bottom", "wizard-occlusion-custom",
         "wizard-wording", "wizard-wording-bottom", "wizard-wording-custom", "wizard-shortcuts", "wizard-shortcuts-bottom", "wizard-shortcuts-custom",
         "wizard-hub", "wizard-chat-default", "wizard-chat-edited", "wizard-chat-presentation", "wizard-chat-language", "wizard-chat-ranges", "wizard-chat-tabs",
         "wizard-travel-default", "wizard-travel-edited", "wizard-notifications-default", "wizard-notifications-edited", "wizard-notifications-sleep",
@@ -260,6 +260,18 @@ public static class SetupWizardCaptureScenes
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) page = "characters.builder";
         if (scenario.StartsWith("wizard-textappearance", StringComparison.Ordinal)) page = "chat.textappearance";
         if (scenario.StartsWith("wizard-occlusion", StringComparison.Ordinal)) page = "chat.occlusion";
+        if (scenario == "wizard-textappearance-invalid") dialog.Draft.Set("ProximityChatDefaultFontSize.Normal", "129");
+        if (scenario == "wizard-occlusion-invalid") dialog.Draft.Set("SightPassThroughBlockCodePatterns", "unqualified");
+        if (scenario == "wizard-occlusion-conflict")
+        {
+            dialog.Draft.Set("SightPassThroughBlockCodePatterns", "game:glass-*");
+            dialog.Draft.Set("SightBlockingBlockCodePatterns", "game:glass-*");
+        }
+        if (scenario == "wizard-occlusion-unlimited")
+        {
+            dialog.Draft.Set("ProximityChatModeDistances.Normal", "-1");
+            dialog.Draft.Set("RequireClearSoundPathForSpeech.Normal", "1");
+        }
         if (scenario == "wizard-textappearance-custom")
         {
             dialog.Draft.Set("BoldNicknames", "1");

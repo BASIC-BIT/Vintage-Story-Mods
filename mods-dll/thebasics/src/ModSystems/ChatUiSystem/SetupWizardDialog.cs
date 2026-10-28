@@ -801,19 +801,24 @@ public sealed class SetupWizardDialog : GuiDialog
             _diagram = new GuiElementSetupPreviewDraw(capi, ElementBounds.Fixed(0, 134, 310, sceneHeight),
                 (context, surface, bounds) =>
                 {
-                    if (SetupWizardSpeechPreview.HasScene(CurrentStepId))
+                    if (CurrentStepId == "chat.occlusion" && SetupWizardTextAppearancePreview.Feedback(Draft, CurrentStepId).Length > 0)
+                    {
+                        context.SetSourceRGB(.19, .23, .19); context.Paint();
+                    }
+                    else if (SetupWizardSpeechPreview.HasScene(CurrentStepId))
                         SetupWizardSpeechPreview.Draw(context, surface, bounds, CurrentStepId, Draft, Time);
                     else SetupWizardTravelPreview.Draw(context, surface, bounds, CurrentStepId, Draft, Time);
                 });
             composer.AddInteractiveElement(_diagram, "preview-diagram");
             AddSceneActors(composer, ElementBounds.Fixed(0, 134, 310, sceneHeight), () =>
-                SetupWizardSpeechPreview.HasScene(CurrentStepId)
+                CurrentStepId == "chat.occlusion" && SetupWizardTextAppearancePreview.Feedback(Draft, CurrentStepId).Length > 0 ? [] : SetupWizardSpeechPreview.HasScene(CurrentStepId)
                     ? SetupWizardSpeechPreview.Actors(CurrentStepId, Draft, Time, 310, sceneHeight)
                     : SetupWizardTravelPreview.Actors(CurrentStepId, Draft, Time, 310, sceneHeight));
             if (CurrentStepId == "chat.occlusion")
             {
-                composer.AddRichtext(SetupWizardTextAppearancePreview.Sight(Draft), CairoFont.WhiteSmallText().WithFontSize(12),
-                    ElementBounds.Fixed(0, 136 + sceneHeight, 310, 34), "preview-sight");
+                composer.BeginClip(ElementBounds.Fixed(0, 136 + sceneHeight, 310, 34))
+                    .AddRichtext(SetupWizardTextAppearancePreview.Sight(Draft), CairoFont.WhiteSmallText().WithFontSize(11),
+                        ElementBounds.Fixed(0, 0, 310, 34), "preview-sight").EndClip();
                 AddChatPreview(composer, 180 + sceneHeight, CompactLayout ? 38 : 58);
             }
             else AddChatPreview(composer, 146 + sceneHeight, CompactLayout ? 72 : 92);
@@ -826,7 +831,15 @@ public sealed class SetupWizardDialog : GuiDialog
             composer.AddInteractiveElement(_diagram, "preview-diagram");
             return;
         }
-        if (CurrentStepId is "chat.textappearance" or "chat.basics" or "chat.language" or "chat.colors" or "chat.languageaccess" or "notifications.savestart" or "notifications.savefinish" or "notifications.deaths")
+        if (CurrentStepId == "chat.textappearance")
+        {
+            composer.BeginClip(ElementBounds.Fixed(0, 134, 310, 44))
+                .AddRichtext(SetupWizardTextAppearancePreview.Feedback(Draft, CurrentStepId), CairoFont.WhiteSmallText().WithFontSize(12),
+                    ElementBounds.Fixed(0, 0, 310, 44), "preview-validation").EndClip();
+            AddChatPreview(composer, CompactLayout ? 190 : 198, CompactLayout ? 158 : 204);
+            return;
+        }
+        if (CurrentStepId is "chat.basics" or "chat.language" or "chat.colors" or "chat.languageaccess" or "notifications.savestart" or "notifications.savefinish" or "notifications.deaths")
         {
             AddChatPreview(composer, CompactLayout ? 164 : 172, CompactLayout ? 184 : 230);
             return;
@@ -968,7 +981,8 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         SingleComposer.GetRichtext("preview-placement-range")?.SetNewText(PlacementRangeText(), CairoFont.WhiteSmallText().WithFontSize(14));
         if (CurrentStepId == "chat.languageeditor") _languageEditor.RefreshPreview();
-        SingleComposer.GetRichtext("preview-sight")?.SetNewText(SetupWizardTextAppearancePreview.Sight(Draft), CairoFont.WhiteSmallText().WithFontSize(12));
+        SingleComposer.GetRichtext("preview-sight")?.SetNewText(SetupWizardTextAppearancePreview.Sight(Draft), CairoFont.WhiteSmallText().WithFontSize(11));
+        SingleComposer.GetRichtext("preview-validation")?.SetNewText(SetupWizardTextAppearancePreview.Feedback(Draft, "chat.textappearance"), CairoFont.WhiteSmallText().WithFontSize(12));
         _diagram?.Redraw();
         if (CurrentStepId == "chat.textappearance") _sample?.SetNewText(SetupWizardTextAppearancePreview.Components(capi, Draft));
         else _sample?.SetNewText(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
@@ -985,7 +999,7 @@ public sealed class SetupWizardDialog : GuiDialog
     private string BuildPreviewText()
     {
         if (CurrentStepId == "chat.textappearance") return string.Join("<br>", SetupWizardTextAppearancePreview.Messages(Draft));
-        if (CurrentStepId == "chat.occlusion") return SetupWizardSpeechPreview.Message(CurrentStepId, Draft, Time);
+        if (CurrentStepId == "chat.occlusion") return SetupWizardTextAppearancePreview.Feedback(Draft, CurrentStepId).Length > 0 ? "" : SetupWizardSpeechPreview.Message(CurrentStepId, Draft, Time);
         if (SetupWizardChatTextEditor.Supports(CurrentStepId)) return SetupWizardChatTextEditor.Preview(CurrentStepId, Draft);
         if (CurrentStepId == "roleplay.descriptions") return "The old gate creaks in the wind.";
         if (CurrentStepId == "notifications.deaths") return Bool("EnableNearbyDeathMessagesInProximityChat") ? "PipPlayer died nearby." : "Nearby death messages are off.";

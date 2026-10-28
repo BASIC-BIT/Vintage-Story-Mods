@@ -19,8 +19,29 @@ internal static class SetupWizardTextAppearancePreview
         return config;
     }
 
+    internal static string Feedback(SetupWizardDraft draft, string page)
+    {
+        var config = Config(draft);
+        SetupWizardCatalog.TryGetPage(page, out var definition);
+        var keys = definition.SettingKeys.Concat(new[] { "ProximityChatModeDistances.Whisper", "ProximityChatModeDistances.Normal", "ProximityChatModeDistances.Yell" }).ToHashSet(StringComparer.Ordinal);
+        var errors = ConfigAdminSaveWorkflow.ApplyValues(config, draft.Values.Where(value => keys.Contains(value.Key)));
+        errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(config).Where(error =>
+            error.StartsWith("Whisper ", StringComparison.Ordinal) || error.StartsWith("Normal ", StringComparison.Ordinal) || error.StartsWith("Yell ", StringComparison.Ordinal) ||
+            page == "chat.occlusion" && (error.StartsWith("Sight block", StringComparison.Ordinal) || error.StartsWith("SpeechOcclusion", StringComparison.Ordinal))));
+        if (errors.Count == 0) return string.Empty;
+        var message = errors[0];
+        if (message.Contains("RequireClearSoundPathForSpeech", StringComparison.Ordinal)) message = "Unlimited speech cannot also require a clear sound path.";
+        else if (message.Contains("both", StringComparison.Ordinal)) message = "A sight pattern appears in both lists. Remove it from one list.";
+        else if (message.Contains("fully qualified", StringComparison.Ordinal)) message = "Sight patterns need domain:path, such as game:glass-*.";
+        else foreach (var key in keys)
+            if (ConfigAdminSettingRegistry.TryGet(key, out var setting)) message = message.Replace(key, setting.Label, StringComparison.Ordinal);
+        if (message.Length > 105) message = message[..102] + "...";
+        return "Invalid draft: " + VtmlUtils.EscapeVtml(message);
+    }
+
     internal static string[] Messages(SetupWizardDraft draft)
     {
+        if (Feedback(draft, "chat.textappearance").Length > 0) return [];
         var config = Config(draft);
         var nickname = NameTransformer.FormatName("Pip", "#91C5DF", true, config);
         var account = NameTransformer.FormatName("PipPlayer", "#91C5DF", false, config);
@@ -51,6 +72,8 @@ internal static class SetupWizardTextAppearancePreview
 
     internal static string Sight(SetupWizardDraft draft)
     {
+        var feedback = Feedback(draft, "chat.occlusion");
+        if (feedback.Length > 0) return feedback;
         var config = Config(draft);
         var glass = new Block { BlockId = 1, Code = new AssetLocation("game:glass-clear"), RenderPass = EnumChunkRenderPass.Transparent };
         var stone = new Block { BlockId = 2, Code = new AssetLocation("game:stone-granite"), RenderPass = EnumChunkRenderPass.Opaque };
