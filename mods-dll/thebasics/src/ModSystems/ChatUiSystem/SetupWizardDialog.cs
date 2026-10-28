@@ -616,6 +616,15 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         if (!ConfigAdminSettingRegistry.TryGet(key, out var definition)) return;
         var label = SettingLabel(definition);
+        if (!Draft.Contains(key))
+        {
+            composer.AddInteractiveElement(new SetupWizardViewportRichtext(capi,
+                VtmlUtils.EscapeVtml(label + "\n" + SetupWizardDraft.UnavailableSetting),
+                CairoFont.WhiteSmallText().WithFontSize(12).WithColor(new[] { 1d, 1d, 1d, .5d }),
+                ElementBounds.Fixed(SettingsX, y, SettingsWidth, 64)), "unavailable-" + key);
+            y += 70;
+            return;
+        }
         if (_inSettingsForm)
         {
             var font = CairoFont.WhiteSmallText().WithFontSize(14);
@@ -711,6 +720,7 @@ public sealed class SetupWizardDialog : GuiDialog
                 "ChatHistoryFlushIntervalMilliseconds" => "Milliseconds between writes of queued chat history to disk. 1000 milliseconds is 1 second. Changes require a server restart.",
                 "PlayerStatDistanceTravelledTimer" => "Milliseconds between movement samples. 1000 milliseconds is 1 second. Longer intervals sample less often. Changes require a server restart.",
                 "DisableRPChat" => "Enable roleplay commands, languages and global OOC. Nearby chat still works when this is off.",
+                "ProseNicknameToken" => "In prose, this token becomes the speaker's character name. Follow the token with a space and \"waves.\" to show the character waving.",
                 _ => definition.Description
             };
             if (definition.ReloadBehavior == ConfigAdminReloadBehavior.RestartRequired && !help.Contains("restart", StringComparison.OrdinalIgnoreCase))
@@ -725,7 +735,7 @@ public sealed class SetupWizardDialog : GuiDialog
         foreach (var key in SetupWizardCatalog.Pages.First(page => page.Id == "server.stats").SettingKeys.Where(key => key.StartsWith("PlayerStatToggles.", StringComparison.Ordinal) || key == "PlayerStatDistanceTravelledTimer"))
         {
             var enabled = Bool("PlayerStatSystem") && (key != "PlayerStatDistanceTravelledTimer" || Bool("PlayerStatToggles.DistanceTravelled"));
-            var control = (GuiElementControl)composer.GetElement(key);
+            if (composer.GetElement(key) is not GuiElementControl control) continue;
             control.Enabled = enabled;
             if (control is GuiElementTextBase text) text.Font.Color[3] = enabled ? 1 : .35;
         }
@@ -735,11 +745,11 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         var managed = Bool("ManageMapPlayerVisibility");
         var toggle = (GuiElementSetupToggle)composer.GetElement("ManageMapPlayerVisibility");
-        toggle.SetValue(managed);
+        toggle?.SetValue(managed);
         foreach (var key in new[] { "MapHideOtherPlayers", "MapPlayerRenderDistance" })
         {
             var enabled = managed && (key != "MapPlayerRenderDistance" || !Bool("MapHideOtherPlayers"));
-            var control = (GuiElementControl)composer.GetElement(key);
+            if (composer.GetElement(key) is not GuiElementControl control) continue;
             if (!enabled) control.OnFocusLost();
             control.Enabled = enabled;
             if (control is GuiElementTextBase text) text.Font.Color[3] = enabled ? 1 : 0.35;
@@ -761,6 +771,13 @@ public sealed class SetupWizardDialog : GuiDialog
         var enabled = started ? "SendServerSaveAnnouncement" : "SendServerSaveFinishedAnnouncement";
         var popup = started ? "ServerSaveAnnouncementAsNotification" : "ServerSaveFinishedAsNotification";
         var text = started ? "TEXT_ServerSaveAnnouncement" : "TEXT_ServerSaveFinished";
+        if (!Draft.Contains(enabled) || !Draft.Contains(popup))
+        {
+            AddSetting(composer, enabled, ref y);
+            AddSetting(composer, popup, ref y);
+            AddSetting(composer, text, ref y);
+            return;
+        }
         Text(composer, "Announcement", SettingsX, y, SettingsWidth, 21);
         composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "off", "chat", "popup" }, new[] { "Off", "Chat", "Chat notification" },
             !Bool(enabled) ? 0 : Bool(popup) ? 2 : 1, (choice, _) =>
@@ -918,6 +935,13 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void AddPreview(GuiComposer composer)
     {
+        if (SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId)) return;
+        if (SetupWizardCatalog.TryGetPage(CurrentStepId, out var page) && page.SettingKeys.Any(key => !Draft.Contains(key)))
+        {
+            composer.AddRichtext("The server has not provided the settings needed for this preview.",
+                CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(0, 138, 310, 100), "preview-unavailable");
+            return;
+        }
         if (SetupWizardVoicePreview.Supports(CurrentStepId))
         {
             composer.AddRichtext(SetupWizardVoicePreview.Text(Draft, CurrentStepId, IsCaptureOnly ? null : capi.ModLoader.IsModSystemEnabled("RPTTS.RPTTSAPI")),
@@ -929,7 +953,6 @@ public sealed class SetupWizardDialog : GuiDialog
             AddChatPreview(composer, 138, CompactLayout ? 250 : 300);
             return;
         }
-        if (SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId)) return;
         if (AnimatedPreview) AddPlayback(composer);
         if (CurrentStepId == "roleplay.descriptions")
         {
@@ -1290,7 +1313,7 @@ public sealed class SetupWizardDialog : GuiDialog
         ProximityChatPresentationModes.Prose => "Mix actions and dialogue in one message.",
         _ => "Adds a speech verb, such as \"says\", before the dialogue."
     };
-    private static string SettingLabel(ConfigAdminSettingDefinition definition) => SetupWizardVoicePreview.Label(definition.Key) ?? (definition.Key switch
+    internal static string SettingLabel(ConfigAdminSettingDefinition definition) => SetupWizardVoicePreview.Label(definition.Key) ?? (definition.Key switch
     {
         "DisableRPChat" => "Roleplay features",
         "EnableDistanceFontSizeSystem" => "Resize speech with distance",
@@ -1324,7 +1347,7 @@ public sealed class SetupWizardDialog : GuiDialog
         "ChatHistoryFlushIntervalMilliseconds" => "Write queued history every (milliseconds)",
         "PlayerStatDistanceTravelledTimer" => "Sample movement every (milliseconds)",
         "MaxEnvironmentPlacementDistance" => "Maximum placement distance (blocks)",
-        _ => definition.Label
+        _ => definition.Key.EndsWith(".Normal", StringComparison.Ordinal) ? definition.Label.Replace("Normal", "Talk", StringComparison.Ordinal) : definition.Label
     });
     private static string DisplayValue(ConfigAdminSettingDefinition definition, string value)
     {
@@ -1479,6 +1502,8 @@ public sealed class SetupWizardDialog : GuiDialog
     public override void OnKeyDown(KeyEvent args)
     {
         OpenColorPicker()?.OnKeyDown(capi, args);
+        if (args.Handled) return;
+        if (args.KeyCode == (int)GlKeys.Escape) OpenPrivilegePicker()?.OnKeyDown(capi, args);
         if (args.Handled) return;
         if (args.KeyCode == (int)GlKeys.Escape && _returnToSearch && !_searching)
         {

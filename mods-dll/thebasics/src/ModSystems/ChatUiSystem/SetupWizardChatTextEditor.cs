@@ -21,10 +21,22 @@ internal static class SetupWizardChatTextEditor
     internal static double Add(GuiComposer composer, ICoreClientAPI api, SetupWizardDraft draft, string page, double width, Action<string, string> changed)
     {
         var refresh = new List<Action>();
-        void Label(string text, double x, double y, double w, double h = 22) => composer.AddInteractiveElement(
-            new SetupWizardViewportRichtext(api, VtmlUtils.EscapeVtml(text), CairoFont.WhiteSmallText().WithFontSize(13), ElementBounds.Fixed(x, y, w, h)));
+        void Label(string text, double x, double y, double w, double h = 22, bool available = true)
+        {
+            var font = CairoFont.WhiteSmallText().WithFontSize(13);
+            if (!available) font.Color[3] = .5;
+            composer.AddInteractiveElement(new SetupWizardViewportRichtext(api, VtmlUtils.EscapeVtml(text), font, ElementBounds.Fixed(x, y, w, h)));
+        }
         void Input(string key, double x, double y, double w)
         {
+            if (!draft.Contains(key))
+            {
+                composer.AddInteractiveElement(new SetupWizardViewportRichtext(api, "Unavailable",
+                    CairoFont.WhiteSmallText().WithFontSize(12).WithColor(new[] { 1d, 1d, 1d, .5d }),
+                    ElementBounds.Fixed(x, y, w, 28)), "unavailable-" + key);
+                composer.AddHoverText(SetupWizardDraft.UnavailableSetting, CairoFont.WhiteSmallText(), 320, ElementBounds.Fixed(x, y, w, 28));
+                return;
+            }
             var input = new SetupWizardViewportTextInput(api, ElementBounds.Fixed(x, y, w, 28), value => { changed(key, value); foreach (var update in refresh) update(); }, CairoFont.TextInput());
             input.SetMaxLength(Math.Max(2048, draft.Get(key)?.Length ?? 0));
             input.SetValue(draft.Get(key), false);
@@ -42,7 +54,7 @@ internal static class SetupWizardChatTextEditor
                 for (int i = 0; i < 3; i++)
                 {
                     var cellWidth = i == 2 ? 64 : column;
-                    Label(labels[i], i * (column + 8), y, cellWidth);
+                    Label(labels[i], i * (column + 8), y, cellWidth, available: draft.Contains(prefixes[i] + mode));
                     Input(prefixes[i] + mode, i * (column + 8), y + 23, cellWidth);
                 }
                 y += 65;
@@ -54,7 +66,8 @@ internal static class SetupWizardChatTextEditor
         {
             var pair = Pairs[i];
             Label(PairLabels[i], 0, y, width); y += 23;
-            Label("Start", 0, y, half); Label("End", half + 12, y, half);
+            Label("Start", 0, y, half, available: draft.Contains("ChatDelimiters." + pair + ".Start"));
+            Label("End", half + 12, y, half, available: draft.Contains("ChatDelimiters." + pair + ".End"));
             Input("ChatDelimiters." + pair + ".Start", 0, y + 22, half);
             Input("ChatDelimiters." + pair + ".End", half + 12, y + 22, half);
             foreach (var output in new[] { ("typed", y + 56), ("result", y + 98) })
@@ -71,10 +84,22 @@ internal static class SetupWizardChatTextEditor
 
     private static string Excerpt(string value) => value.Length > 65 ? value[..62] + "..." : value;
 
-    internal static string Typed(SetupWizardDraft draft, string pair) => draft.Get("ChatDelimiters." + pair + ".Start") + Words(pair) + draft.Get("ChatDelimiters." + pair + ".End");
+    internal static string Typed(SetupWizardDraft draft, string pair) => HasPair(draft, pair)
+        ? draft.Get("ChatDelimiters." + pair + ".Start") + Words(pair) + draft.Get("ChatDelimiters." + pair + ".End") : "Shortcut unavailable from this server.";
+    private static bool HasPair(SetupWizardDraft draft, string pair) => draft.Contains("ChatDelimiters." + pair + ".Start") && draft.Contains("ChatDelimiters." + pair + ".End");
     private static string Words(string pair) => pair is "Emote" ? "waves." : pair is "Environmental" or "PlacedEnvironmental" ? "The gate creaks." : "Meet me by the gate.";
     internal static string Result(SetupWizardDraft draft, string pair)
     {
+        if (!HasPair(draft, pair)) return "Shortcut unavailable from this server.";
+        var required = pair switch
+        {
+            "Bold" or "Italic" => new[] { "ChatDelimiters.Bold.Start", "ChatDelimiters.Bold.End", "ChatDelimiters.Italic.Start", "ChatDelimiters.Italic.End" },
+            "Environmental" or "PlacedEnvironmental" => new[] { "AttributeFreeformMessagesToPlayerName" },
+            "OOC" => new[] { "UseNicknameInOOC" },
+            "GlobalOOC" => new[] { "UseNicknameInGlobalOOC", "EnableGlobalOOC", "DisableRPChat" },
+            _ => Array.Empty<string>()
+        };
+        if (required.Any(key => !draft.Contains(key))) return "Example unavailable: the server has not provided related settings.";
         var config = new ModConfig(); config.InitializeDefaultsIfNeeded();
         foreach (var part in new[] { "Start", "End" })
         {
@@ -111,6 +136,8 @@ internal static class SetupWizardChatTextEditor
 
     internal static string Preview(string page, SetupWizardDraft draft)
     {
+        SetupWizardCatalog.TryGetPage(page, out var definition);
+        if (definition.SettingKeys.Any(key => !draft.Contains(key))) return "The server has not provided the settings needed for this preview.";
         if (page == "chat.shortcuts") return "<strong>" + VtmlUtils.EscapeVtml(Excerpt(Result(draft, "Bold"))) + "</strong><br><i>" + VtmlUtils.EscapeVtml(Excerpt(Result(draft, "Italic"))) + "</i><br>" + VtmlUtils.EscapeVtml(Excerpt(Result(draft, "Emote")));
         var config = new ModConfig();
         config.InitializeDefaultsIfNeeded();
@@ -133,7 +160,6 @@ internal static class SetupWizardChatTextEditor
         var typed = config.ProseNicknameToken + " waves.";
         var prose = ChatHelper.FormatProseMessage(typed, null, config, false, nicknameReplacement: "Pip");
         return speech + "<br>" + VtmlUtils.EscapeVtml(Excerpt("Pip " + config.ProximityChatModeBabbleVerb + " ...")) +
-            "<br>Type: " + VtmlUtils.EscapeVtml(Excerpt(draft.Get("ProseNicknameToken") + " waves.")) +
             "<br>" + (config.AttributeFreeformMessagesToPlayerName ? "[PipPlayer] " : "") + prose;
 
     }

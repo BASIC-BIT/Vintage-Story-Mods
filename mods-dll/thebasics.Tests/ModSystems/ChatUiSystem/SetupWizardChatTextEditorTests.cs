@@ -30,7 +30,7 @@ public class SetupWizardChatTextEditorTests
         draft.Set("ProximityChatModeBabbleVerb", "mumbles");
         draft.Set("AttributeFreeformMessagesToPlayerName", "1");
         var prose = SetupWizardChatTextEditor.Preview("chat.wording", draft);
-        Assert.Contains("Type: @self waves.", prose);
+        Assert.DoesNotContain("Type:", prose);
         Assert.Contains("[PipPlayer] Pip", prose);
         Assert.Contains("mumbles", prose);
         draft.Set("ProximityChatModeVerbs.Normal", "<font>");

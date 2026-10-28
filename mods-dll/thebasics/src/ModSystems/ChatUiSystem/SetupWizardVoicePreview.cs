@@ -29,7 +29,7 @@ internal static class SetupWizardVoicePreview
                 ? "<strong>RPTTS detected on this client.</strong><br>Audio readiness unverified."
                 : "<strong>RPTTS not active on this client.</strong>") +
                 "<br><br>Gain controls audio level." +
-                "<br><br>Distance falloff is passed to RPTTS; its fade curve depends on RPTTS.";
+                "<br><br>Distance falloff controls how audio fades with distance. The exact fade depends on RPTTS.";
     }
     internal static string Label(string key)
     {

@@ -39,6 +39,8 @@ public sealed class SetupWizardDraft
     }
 
     public string Get(string key) => _values.TryGetValue(key, out var value) ? value : string.Empty;
+    public bool Contains(string key) => _values.ContainsKey(key);
+    internal const string UnavailableSetting = "This setting is unavailable from this server. Update the server mod to edit it here.";
     public string GetOriginal(string key) => _originals.TryGetValue(key, out var value) ? value : string.Empty;
     public List<LanguageConfigEntryMessage> Languages { get; private set; }
     public bool LanguagesChanged => !LanguageConfigAdmin.EntriesEqual(Languages, _originalLanguages);

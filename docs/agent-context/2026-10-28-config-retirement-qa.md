@@ -4,6 +4,8 @@ The sidebar editor has replacement controls, search and maintenance actions. Thi
 
 Read the [automated review](../qa/2026-10-28-config-retirement-automated-review.md) for current validation and artifact identity, then the [pending human QA cards](../qa/2026-10-28-config-retirement-human-qa.md). All human observations remain pending. Profile2 must remain unchanged until the owner reviews standalone previews and requests in-game continuation.
 
+The five final-review corrections cover partial server values, friendly Talk search, privilege-popup Escape order, prose help placement and TTS falloff copy. Current local evidence is in [final-reviewed-20261028](C:/Users/steve/.codex/visualizations/2026/10/02/01a0fa70-8ca5-7321-ac1f-07fe824f5be2/config-retirement/final-reviewed-20261028/capture-index.json), with the [revised package receipt](C:/Users/steve/.codex/visualizations/2026/10/02/01a0fa70-8ca5-7321-ac1f-07fe824f5be2/config-retirement/final-reviewed-20261028/package-receipt.json). The earlier final-20261028 package remains history. The automated review preserves the original full-suite failures and subsequent focused passes; no fresh full-green run is claimed.
+
 ## Remaining scope and gates
 
 - Observe direct commands, search return, keyboard/compact forms, mixed atomic saves, conflicts, permission revocation, disk reload and write failures.
