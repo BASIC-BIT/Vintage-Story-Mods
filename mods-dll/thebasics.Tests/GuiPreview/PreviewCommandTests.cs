@@ -6,8 +6,32 @@ using Xunit;
 
 namespace thebasics.Tests.GuiPreview;
 
+[Collection("Standalone GUI")]
 public class PreviewCommandTests
 {
+    [VisualTheory]
+    [InlineData("language-color-palette")]
+    [InlineData("language-color-custom")]
+    [InlineData("admin-chat-colors")]
+    [InlineData("admin-chat-colors-custom")]
+    [InlineData("admin-nametag-colors")]
+    [InlineData("scene-marker-colors")]
+    [InlineData("scene-marker-custom-color")]
+    [InlineData("scene-marker-custom-picker")]
+    [InlineData("scene-marker-custom-icon")]
+    [InlineData("scene-marker-custom-locked")]
+    public void Color_capture_dialogs_render_through_the_production_entry_points(string scenario)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
+            Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000, 1.25);
+        using var scene = PreviewScene.Create(scenario, host);
+        host.RenderGuiDialog(scene.Dialog, 0);
+        Assert.Empty(host.UnsupportedCalls);
+        if (scenario == "scene-marker-custom-picker")
+            Assert.Equal(new[] { "sound:menubutton", "sound:menubutton_down" }, host.RecordedEffects);
+        else Assert.Empty(host.RecordedEffects);
+    }
+
     [Fact]
     public void Rendering_cannot_label_a_stale_binary_with_current_source_identity()
     {
@@ -27,14 +51,36 @@ public class PreviewCommandTests
     [Fact]
     public void Setup_capture_fixtures_only_apply_wizard_keys()
     {
+        Assert.NotEmpty(SetupWizardCaptureScenes.Names);
+        Assert.Contains("wizard-wording-bottom", SetupWizardCaptureScenes.Names);
+        Assert.Contains("wizard-shortcuts-bottom", SetupWizardCaptureScenes.Names);
+        Assert.Equal(SetupWizardCaptureScenes.Names.Length, SetupWizardCaptureScenes.Names.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(SetupWizardCaptureScenes.Names,
+            PreviewScene.Names.Where(name => name.StartsWith("wizard-", StringComparison.Ordinal)));
         foreach (var scenario in SetupWizardCaptureScenes.Names)
         {
             var values = SetupWizardCaptureScenes.DefaultValues();
             Assert.All(values, value => Assert.True(SetupWizardCatalog.IsSettingKey(value.Key)));
-            var draft = new SetupWizardDraft(values);
+            var draft = new SetupWizardDraft(values, SetupWizardCaptureScenes.DefaultLanguages());
             SetupWizardCaptureScenes.ApplyDraft(draft, scenario);
             Assert.NotEmpty(draft.Values);
+            Assert.All(draft.Values, value => Assert.True(SetupWizardCatalog.IsSettingKey(value.Key)));
+            SetupWizardCaptureScenes.Validate(scenario, SetupWizardCaptureScenes.DefaultPreviewTime(scenario));
         }
+    }
+
+    [Fact]
+    public void Color_capture_fixtures_preserve_theme_and_alpha_examples()
+    {
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        SetupWizardCaptureScenes.ApplyDraft(draft, "wizard-nametag-colors-alpha");
+        Assert.Equal("#40352980", draft.Get("NametagBackgroundColor"));
+        Assert.Equal("#E9DDCEBF", draft.Get("NametagBorderColor"));
+        SetupWizardCaptureScenes.ApplyDraft(draft, "wizard-nametag-colors");
+        Assert.Equal(string.Empty, draft.Get("NametagBackgroundColor"));
+        Assert.Equal(string.Empty, draft.Get("NametagBorderColor"));
+        foreach (var name in new[] { "language-color-palette", "language-color-custom", "admin-chat-colors", "admin-chat-colors-custom", "admin-nametag-colors", "scene-marker-colors" })
+            Assert.Contains(name, PreviewScene.Names);
     }
 
     [Fact]

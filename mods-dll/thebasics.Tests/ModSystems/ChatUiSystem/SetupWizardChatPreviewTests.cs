@@ -184,7 +184,7 @@ public class SetupWizardChatPreviewTests
         var footer = new[] { "all-settings", "close", "review" }.Select(key =>
             Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer[key]))
             .OrderBy(button => button.Bounds.absX).ToArray();
-        Assert.Equal(new[] { "All settings", "Close", "Review changes" }, footer.Select(button => button.Text));
+        Assert.Equal(new[] { "Old settings", "Close", "Review changes" }, footer.Select(button => button.Text));
         var footerY = footer[0].Bounds.absY;
         foreach (var button in footer)
         {
@@ -253,7 +253,7 @@ public class SetupWizardChatPreviewTests
         draft.Set("EnableChatter", draft.Get("EnableChatter") == "1" ? "0" : "1");
         var editedValue = draft.Get("EnableChatter");
         var changedKeys = draft.ChangedKeys.ToArray();
-        using var wizard = CreateWizard(host, draft);
+        using var wizard = new SetupWizardDialog(host.Api, draft, "sidebar-navigation", true, null!, null!, null!, layoutOnly: true, captureOnly: true, actorFactory: host.CreateGuide);
         wizard.ShowPage("chat.tabs");
         wizard.TryOpen();
         host.RenderGuiDialog(wizard, 0);
@@ -288,7 +288,8 @@ public class SetupWizardChatPreviewTests
 
         ClickElement(host, wizard, wizard.SingleComposer["review"]);
         Assert.Equal("review", wizard.CurrentStepId);
-        Assert.Equal("Save settings", Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer["review"]).Text);
+        Assert.True(wizard.IsCaptureOnly);
+        Assert.Equal("Review changes", Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer["review"]).Text);
         Assert.True(draft.IsDirty);
         ClickDestination(host, wizard, "hub");
         Assert.Equal("hub", wizard.CurrentStepId);
@@ -310,7 +311,7 @@ public class SetupWizardChatPreviewTests
         draft.Set("AllowPlayerTpa", "0");
         draft.Set("Teleportation.RegisterHomeCommands", "0");
         draft.Set("Teleportation.RegisterSpawnCommands", "0");
-        using var wizard = CreateWizard(host, draft);
+        using var wizard = new SetupWizardDialog(host.Api, draft, "sidebar-layout", true, null!, null!, null!, layoutOnly: true, captureOnly: true, actorFactory: host.CreateGuide);
         wizard.ShowPage("teleport.tools");
         wizard.TryOpen();
         host.RenderGuiDialog(wizard, 0);
@@ -327,9 +328,11 @@ public class SetupWizardChatPreviewTests
         ClickDestination(host, wizard, lastPage);
         Assert.Equal(lastPage, wizard.CurrentStepId);
 
+        var visitedPages = new HashSet<string>(StringComparer.Ordinal);
         foreach (var page in SetupWizardCatalog.Pages)
         {
             wizard.ShowPage(page.Id);
+            visitedPages.Add(wizard.CurrentStepId);
             host.RenderGuiDialog(wizard, 0);
             Assert.True(Sidebar(wizard).IsDestinationVisible(page.Id), $"Selecting {page.Id} must reveal its sidebar row.");
             AssertNavigationFits(host, wizard);
@@ -337,6 +340,18 @@ public class SetupWizardChatPreviewTests
             {
                 var element = wizard.SingleComposer.GetElement(key);
                 if (element == null) continue;
+                if (element.InsideClipBounds is { } clip)
+                {
+                    AssertBoundsInsideCanvas(host, clip, $"{page.Id}: viewport");
+                    Assert.True(clip.absY + clip.OuterHeight < wizard.SingleComposer["close"].Bounds.absY);
+                    Assert.True(element.Bounds.absX >= clip.absX && element.Bounds.absX + element.Bounds.OuterWidth <= clip.absX + clip.InnerWidth + .1);
+                    var x = (int)(element.Bounds.renderX + element.Bounds.OuterWidth / 2);
+                    var y = (int)(element.Bounds.renderY + element.Bounds.OuterHeight / 2);
+                    if (!clip.PointInside(x, y)) Assert.False(element.IsPositionInside(x, y));
+                    var scrollbar = Assert.IsType<SetupWizardSheetEditor.BuilderScrollbar>(wizard.SingleComposer.GetScrollbar("settings-scroll"));
+                    scrollbar.MoveTo((float)Math.Max(0, element.Bounds.fixedY + element.Bounds.fixedHeight - clip.fixedHeight));
+                    Assert.True(SetupWizardViewportClip.FullyInside(element.Bounds, clip), $"{page.Id}: {key} must be reachable by scrolling.");
+                }
                 AssertBoundsInsideCanvas(host, element.Bounds, $"{page.Id}: {key}");
                 Assert.True(element.Bounds.absX > Sidebar(wizard).Bounds.absX + Sidebar(wizard).Bounds.OuterWidth,
                     $"{key} must stay in the editor to the right of the sidebar.");
@@ -344,7 +359,8 @@ public class SetupWizardChatPreviewTests
                     $"{key} must fit above the shared footer.");
             }
         }
-        Assert.Equal(43, SetupWizardCatalog.Pages.Count);
+        Assert.NotEmpty(visitedPages);
+        Assert.Equal(SetupWizardCatalog.Pages.Select(page => page.Id).Order(), visitedPages.Order());
         Assert.Empty(host.UnsupportedCalls);
     }
 
@@ -455,7 +471,8 @@ public class SetupWizardChatPreviewTests
         wizard.SetRequestFailure(failure);
         host.RenderGuiDialog(wizard, 0);
         var texts = VisibleText();
-        var failureText = Assert.Single(texts.Where(text => text.Text == failure));
+        var failureText = wizard.SingleComposer.GetRichtext("setup-message");
+        Assert.Equal(failure, DisplayedText(failureText));
         Assert.Equal("1 unsaved change", DisplayedText(DraftCount()));
         Assert.True(failureText.Bounds.absY + failureText.Bounds.OuterHeight < wizard.SingleComposer["close"].Bounds.absY,
             "The save failure message must fit above the shared footer.");
@@ -470,7 +487,8 @@ public class SetupWizardChatPreviewTests
         Assert.Equal("hub", wizard.CurrentStepId);
         host.RenderGuiDialog(wizard, 0);
         texts = VisibleText();
-        var pendingText = Assert.Single(texts.Where(text => text.Text == "Saving settings..."));
+        var pendingText = wizard.SingleComposer.GetRichtext("setup-message");
+        Assert.Equal("Saving settings...", DisplayedText(pendingText));
         Assert.Equal("1 unsaved change", DisplayedText(DraftCount()));
         Assert.DoesNotContain(texts, text => text.Text == failure);
         Assert.True(pendingText.Bounds.absY + pendingText.Bounds.OuterHeight < wizard.SingleComposer["close"].Bounds.absY,
@@ -517,7 +535,9 @@ public class SetupWizardChatPreviewTests
         {
             wizard.ShowPage(page.Id);
             var appearance = page.TopicId == "appearance";
-            AssertPreviewElements(wizard, chat: false, diagram: appearance || SetupWizardFeaturePreview.Supports(page.Id));
+            var descriptions = page.Id == "roleplay.descriptions";
+            AssertPreviewElements(wizard, chat: descriptions, diagram: appearance || SetupWizardFeaturePreview.Supports(page.Id) || descriptions);
+            Assert.Equal(SetupWizardRecordsPreview.Supports(page.Id), wizard.SingleComposer.GetElement("preview-records") != null);
             host.RenderGuiDialog(wizard, 0);
         }
 

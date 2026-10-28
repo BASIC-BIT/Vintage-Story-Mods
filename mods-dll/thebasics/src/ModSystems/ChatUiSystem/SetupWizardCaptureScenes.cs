@@ -327,6 +327,7 @@ public static class SetupWizardCaptureScenes
                 Values = dialog.Draft.Values.ToList(), RestartRequiredKeys = ["UseGeneralChannelAsProximityChat"],
                 IsDedicated = scenario == "wizard-restart-dedicated"
             });
+            dialog.ShowPage("finish");
         }
         dialog.SetPreviewTime(previewTime);
         if (scenario.StartsWith("wizard-language-color-", StringComparison.Ordinal))

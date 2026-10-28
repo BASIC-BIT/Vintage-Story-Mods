@@ -32,3 +32,14 @@ Review the standalone previews first. Starting this batch needs owner approval a
 ## Acceptance record
 
 All cards are pending. Standalone renders and automated fixture tests do not replace these observations. Default-route switching and legacy-window deletion remain separate acceptance decisions.
+
+## Retirement acceptance supplement
+
+12. **Search and compact keyboard access.** At 1280 by 720 and GUI scales 1 and 1.25, search for a scalar and for unsaved renamed language/sheet entries. Activate the result with the keyboard, edit the target, return to results, and use Escape. Expect the query, selected result, draft and intended focus to survive. Scroll the longest wording, shortcut, obstruction and TTS forms. Expect all fields, errors and actions to remain reachable without overlapping the fixed status area.
+13. **Save conflict and write failure.** In separate approved disposable fixtures, change the server baseline before saving, then deny the config-file write. Expect no partial scalar/language/sheet persistence, a useful failure message and retained edits. Restore write access and re-read the server snapshot before retrying.
+14. **Voice and optional providers.** After separate approval, listen to each speech mode and self-volume setting with two clients. Test TTS and relay only when their providers are available and explicitly in scope. Record absent-provider output as unavailable. Standalone previews and parameter-forwarding tests cannot pass this card.
+15. **Final activation and route decision.** Only after owner approval, stage the source-identified package and restart/reconnect. Observe restart-labelled settings after activation, then explicitly record whether the default route may change. Legacy-window deletion, fallback recovery and support for older clients require their own decision. No current checkbox authorizes those changes.
+
+These supplement cards are pending. No game launch, profile refresh, provider call, server restart or human acceptance occurred during local preparation.
+
+Before any later approved batch, verify the staged server ZIP and Profile2 ZIP both match the reviewed local package receipt SHA256. Matching version strings do not establish package identity. Installation and these staged hash checks are pending.
