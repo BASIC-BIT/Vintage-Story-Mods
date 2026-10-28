@@ -13,6 +13,8 @@ internal sealed class SetupWizardSettingsForm
     private ElementBounds _content;
     public double Width => _content.fixedWidth;
 
+    internal void Reset(string page) => _positions.Remove(page);
+
     public void Begin(GuiComposer composer, string page, ElementBounds clip)
     {
         _page = page;

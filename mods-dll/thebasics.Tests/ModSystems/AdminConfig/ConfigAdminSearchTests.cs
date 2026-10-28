@@ -46,4 +46,19 @@ public class ConfigAdminSearchTests
         Assert.Equal("occupation", field.EntryId);
         Assert.Equal("Options", field.Key);
     }
+    [Fact]
+    public void Search_matches_friendly_labels_and_help_without_exposing_session_identity()
+    {
+        var config = new ModConfig(); config.InitializeDefaultsIfNeeded();
+        var values = ConfigAdminSettingRegistry.Settings.ToDictionary(setting => setting.Key, setting => setting.GetValue(config));
+        var entries = ConfigAdminSearch.Build(config, values, values);
+        foreach (var setting in ConfigAdminSettingRegistry.Settings)
+        {
+            Assert.Contains(ConfigAdminSearch.Find(entries, setting.Label), result => result.Key == setting.Key);
+            if (!string.IsNullOrWhiteSpace(setting.Description))
+                Assert.Contains(ConfigAdminSearch.Find(entries, setting.Description), result => result.Key == setting.Key);
+        }
+        var entry = new ConfigSearchResult(ConfigSearchDestination.Language, "private-session-identity", "Name", "Language name", "Chat", "Help", "Common");
+        Assert.Empty(ConfigAdminSearch.Find(new[] { entry }, "private-session-identity"));
+    }
 }

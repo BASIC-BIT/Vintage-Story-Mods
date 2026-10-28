@@ -13,7 +13,7 @@ internal enum ConfigSearchDestination { Setting, Language, CharacterField }
 internal sealed record ConfigSearchResult(ConfigSearchDestination Destination, string EntryId, string Key,
     string Label, string Group, string Description, string Value, bool Unsaved = false, string RawValue = null)
 {
-    internal string SearchText => $"{EntryId} {Key} {Label} {Group} {Description} {Value} {RawValue}";
+    internal string SearchText => $"{Key} {Label} {Group} {Description} {Value} {RawValue}";
 }
 
 internal static class ConfigAdminSearch
@@ -28,6 +28,13 @@ internal static class ConfigAdminSearch
 
     internal static List<ConfigSearchResult> Build(ModConfig config, IReadOnlyDictionary<string, string> draft,
         IReadOnlyDictionary<string, string> loaded)
+        => Build(config, draft, loaded, LanguageConfigAdmin.BuildEntries(config), CharacterSheetFieldConfigAdmin.BuildEntries(config),
+            entry => entry.OriginalName, entry => entry.OriginalId);
+
+    internal static List<ConfigSearchResult> Build(ModConfig config, IReadOnlyDictionary<string, string> draft,
+        IReadOnlyDictionary<string, string> loaded, IEnumerable<LanguageConfigEntryMessage> languages,
+        IEnumerable<CharacterSheetFieldConfigEntryMessage> fields, Func<LanguageConfigEntryMessage, string> languageId,
+        Func<CharacterSheetFieldConfigEntryMessage, string> fieldId)
     {
         var results = ConfigAdminSettingRegistry.Settings.Select(setting =>
         {
@@ -44,24 +51,24 @@ internal static class ConfigAdminSearch
                 setting.Kind == ConfigAdminSettingKind.Boolean ? (value == "1" ? "1 true yes" : "0 false no") : value);
         }).ToList();
 
-        foreach (var entry in LanguageConfigAdmin.BuildEntries(config))
+        foreach (var entry in languages)
         {
-            var fields = new[] { ("Name", "name"), ("Description", "description"), ("Prefix", "prefix"),
+            var properties = new[] { ("Name", "name"), ("Description", "description"), ("Prefix", "prefix"),
                 ("Syllables", "syllables"), ("Color", "color"), ("Default", "default"), ("Hidden", "hidden"),
                 ("GrantedToClasses", "classes"), ("GrantedToTraits", "traits"), ("GrantedToModels", "models"),
                 ("GrantedToModelGroups", "model-groups") };
-            foreach (var (key, translation) in fields)
-                results.Add(Entry(ConfigSearchDestination.Language, entry.OriginalName, entry.Name, key,
+            foreach (var (key, translation) in properties)
+                results.Add(Entry(ConfigSearchDestination.Language, languageId(entry), entry.Name, key,
                     "Languages", "language-config-" + translation, typeof(LanguageConfigEntryMessage).GetProperty(key).GetValue(entry)));
         }
-        foreach (var entry in CharacterSheetFieldConfigAdmin.BuildEntries(config))
+        foreach (var entry in fields)
         {
-            var fields = new[] { ("Id", "key"), ("Label", "label"), ("Description", "description"), ("Type", "type"),
+            var properties = new[] { ("Id", "key"), ("Label", "label"), ("Description", "description"), ("Type", "type"),
                 ("Optional", "optional"), ("Options", "options"), ("BindTo", "bind-to"), ("MaxLength", "max-length"),
                 ("Visibility", "visibility"), ("ShowInLook", "show-in-look"), ("EditorRows", "editor-rows"),
                 ("LayoutSection", "layout"), ("Width", "width") };
-            foreach (var (key, translation) in fields)
-                results.Add(Entry(ConfigSearchDestination.CharacterField, entry.OriginalId, entry.Label, key,
+            foreach (var (key, translation) in properties)
+                results.Add(Entry(ConfigSearchDestination.CharacterField, fieldId(entry), entry.Label, key,
                     "Character sheet fields", "charsheet-field-config-" + translation,
                     typeof(CharacterSheetFieldConfigEntryMessage).GetProperty(key).GetValue(entry)));
         }

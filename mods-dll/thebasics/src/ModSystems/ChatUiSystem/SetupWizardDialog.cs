@@ -31,6 +31,15 @@ public sealed class SetupWizardDialog : GuiDialog
     private readonly SetupWizardSheetEditor _sheetEditor;
     private readonly List<SetupWizardActorLayer> _actorLayers = new();
     private readonly SetupWizardSettingsForm _settingsForm = new();
+    private readonly SetupWizardSearchPanel _search = new();
+    private bool _searching;
+    private bool _returnToSearch;
+    private string _searchReturnPage = "hub";
+    private string _searchFocusKey;
+    private bool _settingSearchText;
+    private string _searchHighlight;
+    private float _searchHighlightSeconds;
+    internal SetupWizardSearchPanel SearchPanel => _search;
     private bool _inSettingsForm;
     private bool _isDedicated;
     private GuiElementSetupPreviewDraw _diagram;
@@ -127,6 +136,9 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         if (stepId != "hub" && stepId != "review" && stepId != "finish" && !SetupWizardCatalog.TryGetPage(stepId, out _))
             throw new ArgumentException("Unknown setup page.", nameof(stepId));
+        _searching = false;
+        _returnToSearch = false;
+        _searchFocusKey = null;
         CurrentStepId = stepId;
         if (SetupWizardCatalog.TryGetPage(stepId, out var topicPage))
         {
@@ -143,6 +155,76 @@ public sealed class SetupWizardDialog : GuiDialog
         else _preview?.PlayAnimation(AnimationCode());
         ComposeDialog();
         Track("viewed");
+    }
+
+    public void ShowSearch(string query = null)
+    {
+        OpenColorPicker()?.Close();
+        foreach (var picker in _privilegePickers) picker.CloseSuggestions();
+        if (!_searching) _searchReturnPage = CurrentStepId;
+        _searching = true;
+        _search.Search(Draft, query ?? _search.Query);
+        ComposeDialog();
+        SingleComposer.FocusElement(SingleComposer.GetTextInput("setup-search").TabIndex);
+    }
+
+    internal bool FocusSearchResult(ConfigSearchResult result)
+    {
+        if (result.Destination == ConfigSearchDestination.Setting)
+        {
+            var found = FocusSetting(result.Key);
+            _returnToSearch = found;
+            return found;
+        }
+        string control;
+        if (result.Destination == ConfigSearchDestination.Language)
+        {
+            var entry = _search.ResolveLanguage(Draft, result.EntryId);
+            if (entry == null) return false;
+            _languageEditor.SelectedIndex = Draft.Languages.FindIndex(candidate => ReferenceEquals(candidate, entry));
+            ShowPage("chat.languageeditor");
+            control = "language-editor-" + result.Key;
+        }
+        else
+        {
+            var entry = _search.ResolveField(Draft, result.EntryId);
+            if (entry == null) return false;
+            control = _sheetEditor.SelectSearchField(entry, result.Key);
+            ShowPage("characters.builder");
+        }
+        _returnToSearch = FocusControl(control, result.Label);
+        return _returnToSearch;
+    }
+
+    public bool FocusSetting(string key)
+    {
+        var page = SetupWizardCatalog.FindPageForSetting(key);
+        if (page == null) return false;
+        ShowPage(page.Id);
+        _searchFocusKey = key;
+        if (key is "SendServerSaveAnnouncement" or "ServerSaveAnnouncementAsNotification" or "SendServerSaveFinishedAnnouncement" or "ServerSaveFinishedAsNotification")
+            return FocusControl("announcement-mode", ConfigAdminSettingRegistry.Settings.First(setting => setting.Key == key).Label);
+        if (SingleComposer.GetElement(key) == null) ComposeDialog();
+        return FocusControl(key, ConfigAdminSettingRegistry.Settings.First(setting => setting.Key == key).Label);
+    }
+
+    private bool FocusControl(string key, string label)
+    {
+        if (SingleComposer.GetElement(key) is not { } control) return false;
+        var scrollbarKey = key.StartsWith("language-editor-", StringComparison.Ordinal) ? "language-editor-scroll" :
+            key.StartsWith("sheet-editor-", StringComparison.Ordinal) ? "sheet-editor-inspector-scroll" : "settings-scroll";
+        if (control.InsideClipBounds is { } clip && SingleComposer.GetScrollbar(scrollbarKey) is SetupWizardSheetEditor.BuilderScrollbar scrollbar)
+        {
+            var top = Math.Max(0, control.Bounds.fixedY - 23);
+            var bottom = control.Bounds.fixedY + control.Bounds.fixedHeight;
+            if (top < scrollbar.CurrentYPosition) scrollbar.MoveTo((float)top);
+            else if (bottom > scrollbar.CurrentYPosition + clip.fixedHeight) scrollbar.MoveTo((float)(bottom - clip.fixedHeight));
+        }
+        SingleComposer.FocusElement(control.TabIndex);
+        _searchHighlight = key;
+        _searchHighlightSeconds = 2;
+        SingleComposer.GetRichtext("setup-message")?.SetNewText(VtmlUtils.EscapeVtml("Found: " + label), CairoFont.WhiteSmallText().WithFontSize(14));
+        return true;
     }
 
     public void SetPreviewTime(double timeSeconds)
@@ -242,7 +324,24 @@ public sealed class SetupWizardDialog : GuiDialog
             .AddShadedDialogBG(body)
             .AddDialogTitleBar(IsCaptureOnly ? "The BASICs setup (QA preview, save disabled)" : "The BASICs setup", () => TryClose())
             .BeginChildElements(body);
-        _sidebar = new GuiElementSetupSidebar(capi, ElementBounds.Fixed(0, 42, SidebarWidth, FooterY - 68),
+        composer.AddTextInput(ElementBounds.Fixed(0, 44, SidebarWidth, 28), value =>
+        {
+            if (!_settingSearchText) QueueNavigation(() =>
+            {
+                var caret = SingleComposer.GetTextInput("setup-search").CaretPosWithoutLineBreaks;
+                ShowSearch(value);
+                SingleComposer.GetTextInput("setup-search").CaretPosWithoutLineBreaks = caret;
+            });
+        }, CairoFont.TextInput().WithFontSize(14), "setup-search");
+        _settingSearchText = true;
+        composer.GetTextInput("setup-search").SetValue(_search.Query);
+        _settingSearchText = false;
+        composer.AddSmallButton(_searching ? "Back to settings" : string.IsNullOrEmpty(_search.Query) ? "Search settings" : "Back to results", () =>
+        {
+            QueueNavigation(() => { if (_searching) ShowPage(_searchReturnPage); else { ShowSearch(); _search.FocusSelection(SingleComposer); } });
+            return true;
+        }, ElementBounds.Fixed(0, 78, SidebarWidth, 28), key: "search-back");
+        _sidebar = new GuiElementSetupSidebar(capi, ElementBounds.Fixed(0, 114, SidebarWidth, FooterY - 140),
             destination =>
             {
                 var page = destination.StartsWith("topic:", StringComparison.Ordinal)
@@ -260,13 +359,14 @@ public sealed class SetupWizardDialog : GuiDialog
             }), "footer-rule");
 
         composer.BeginChildElements(ElementBounds.Fixed(ContentOffset, 0, Width, BodyHeight));
-        if (CurrentStepId == "hub") ComposeHub(composer);
+        if (_searching) _search.Add(composer, capi, Width, StatusY, result => QueueNavigation(() => FocusSearchResult(result)));
+        else if (CurrentStepId == "hub") ComposeHub(composer);
         else if (CurrentStepId == "review") ComposeReview(composer);
         else if (CurrentStepId == "finish") ComposeFinish(composer);
         else ComposePage(composer);
         composer.EndChildElements();
-        Text(composer, _message ?? (_pending ? "Saving settings..." : ""),
-            ContentOffset, StatusY, Width, CompactLayout ? 30 : 42);
+        composer.AddRichtext(VtmlUtils.EscapeVtml(_message ?? (_pending ? "Saving settings..." : "")), CairoFont.WhiteSmallText().WithFontSize(14),
+            ElementBounds.Fixed(ContentOffset, StatusY, Width, CompactLayout ? 30 : 42), "setup-message");
         ComposeFooter(composer);
         composer.EndChildElements().Compose(focusFirstElement: false);
         if (CurrentStepId == "map.visibility") RefreshMapControls(composer);
@@ -436,6 +536,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private bool SettingVisible(string key)
     {
+        if (key == _searchFocusKey) return true;
         if (key == "TpaCooldownInGameHours") return Bool("TpaUseCooldown");
         if (key == "TpaTimeoutMinutes") return Bool("TpaUseTimeout");
         if (key.StartsWith("Teleportation.Home", StringComparison.Ordinal)) return Bool("Teleportation.RegisterHomeCommands");
@@ -1215,6 +1316,13 @@ public sealed class SetupWizardDialog : GuiDialog
         }
         var colorPicker = OpenColorPicker();
         GuiPopupHoverGuard.RenderBackground(SingleComposer, colorPicker != null, () => base.OnRenderGUI(deltaTime));
+        if (_searchHighlightSeconds > 0 && SingleComposer.GetElement(_searchHighlight) is { } target)
+        {
+            _searchHighlightSeconds -= deltaTime;
+            if (_searchHighlightSeconds <= 0)
+                SingleComposer.GetRichtext("setup-message")?.SetNewText(VtmlUtils.EscapeVtml(_message ?? ""), CairoFont.WhiteSmallText().WithFontSize(14));
+            SetupWizardViewportClip.Render(capi, target.InsideClipBounds, () => target.RenderFocusOverlay(deltaTime));
+        }
         colorPicker?.RenderPopup(deltaTime);
         if (colorPicker?.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY) == true)
             MouseOverCursor = colorPicker.MouseOverCursor;
@@ -1288,6 +1396,27 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         OpenColorPicker()?.OnKeyDown(capi, args);
         if (args.Handled) return;
+        if (args.KeyCode == (int)GlKeys.Escape && _returnToSearch && !_searching)
+        {
+            ShowSearch(); _search.FocusSelection(SingleComposer); args.Handled = true; return;
+        }
+        var searchKeyboard = _searching && (SingleComposer.GetTextInput("setup-search").HasFocus || _search.HasResultFocus(SingleComposer));
+        if (args.KeyCode == (int)GlKeys.Escape && _searching)
+        {
+            args.Handled = true;
+            if (!string.IsNullOrEmpty(_search.Query)) ShowSearch(""); else ShowPage(_searchReturnPage);
+            return;
+        }
+        if (searchKeyboard && args.KeyCode is (int)GlKeys.Down or (int)GlKeys.Up)
+        {
+            _search.Move(SingleComposer, args.KeyCode == (int)GlKeys.Down ? 1 : -1);
+            args.Handled = true; return;
+        }
+        if (searchKeyboard && args.KeyCode == (int)GlKeys.Enter && _search.Results.Count > 0)
+        {
+            _search.RememberFocus(SingleComposer);
+            FocusSearchResult(_search.Results[_search.Selection]); args.Handled = true; return;
+        }
         if (_chatFocus?.SkipClosedTabNavigation(SingleComposer, args) == true) return;
         base.OnKeyDown(args);
         FlushNavigation();
@@ -1305,6 +1434,7 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         OpenColorPicker()?.OnKeyPress(capi, args);
         if (!args.Handled) base.OnKeyPress(args);
+        FlushNavigation();
     }
 
     private void Track(string action, string choice = null) => _onTrack?.Invoke(CurrentStepId, action, choice);

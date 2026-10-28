@@ -131,6 +131,9 @@ public static class SetupWizardCatalog
 
     private static readonly HashSet<string> SettingKeys = Pages.SelectMany(page => page.SettingKeys).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+    public static SetupWizardPage FindPageForSetting(string key) =>
+        Pages.FirstOrDefault(page => page.SettingKeys.Contains(key, StringComparer.OrdinalIgnoreCase));
+
     public static bool IsSettingKey(string key) => key != null && SettingKeys.Contains(key);
 
     public static bool TryGetPage(string id, out SetupWizardPage page)
