@@ -1,4 +1,8 @@
 using TheBasics.GuiPreview;
+using thebasics.Configs;
+using thebasics.ModSystems.ProximityChat;
+using thebasics.ModSystems.ProximityChat.Models;
+using thebasics.ModSystems.ProximityChat.Transformers;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatUiSystem;
 using thebasics.Tests.GuiPreview;
@@ -51,6 +55,30 @@ public class SetupWizardChatTextEditorTests
         }
     }
 
+    [Theory]
+    [InlineData("Bold", "[b]", "[/b]", "by", "")]
+    [InlineData("Italic", "by", "", "[i]", "[/i]")]
+    public void AccentExamplesUseBothDraftPairs(string pair, string boldStart, string boldEnd, string italicStart, string italicEnd)
+    {
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
+        draft.Set("ChatDelimiters.Bold.Start", boldStart);
+        draft.Set("ChatDelimiters.Bold.End", boldEnd);
+        draft.Set("ChatDelimiters.Italic.Start", italicStart);
+        draft.Set("ChatDelimiters.Italic.End", italicEnd);
+        var config = new ModConfig(); config.InitializeDefaultsIfNeeded();
+        Assert.Empty(ConfigAdminSaveWorkflow.ApplyValues(config, draft.Values));
+        var production = new AccentTransformer(new RPProximityChatSystem { Config = config })
+            .Transform(new MessageContext { Message = SetupWizardChatTextEditor.Typed(draft, pair) }).Message;
+        var text = production.Replace("<strong>", "").Replace("</strong>", "").Replace("<i>", "").Replace("</i>", "");
+        Assert.Equal("Meet me  the gate.", text);
+        Assert.Equal(text, SetupWizardChatTextEditor.Result(draft, pair));
+        var otherKey = "ChatDelimiters." + (pair == "Bold" ? "Italic" : "Bold") + ".Start";
+        draft.Set(otherKey, "");
+        var errors = ConfigAdminSaveWorkflow.ApplyValues(config, draft.Values);
+        Assert.Equal(Assert.Single(errors), SetupWizardChatTextEditor.Result(draft, pair));
+        Assert.Equal("", draft.Get(otherKey));
+    }
+
     [VisualTheory]
     [InlineData(1d)]
     [InlineData(1.25d)]
@@ -73,6 +101,10 @@ public class SetupWizardChatTextEditorTests
             Assert.Equal(previewTop, wizard.SingleComposer.GetElement("preview-text").Bounds.renderY);
         }
         var composer = wizard.SingleComposer;
+        composer.GetTextInput("ChatDelimiters.Italic.Start").SetValue("by");
+        composer.GetTextInput("ChatDelimiters.Italic.End").SetValue("");
+        Assert.Same(composer, wizard.SingleComposer);
+        Assert.Contains("Meet me  the gate.", string.Join("", ((GuiElementRichtext)composer.GetElement("shortcut-Bold-result")).Components.OfType<RichTextComponent>().Select(c => c.DisplayText)));
         var input = composer.GetTextInput("ChatDelimiters.Bold.Start");
         input.SetValue("<new>");
         Assert.Same(composer, wizard.SingleComposer);

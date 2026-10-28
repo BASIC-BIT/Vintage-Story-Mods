@@ -88,6 +88,10 @@ internal static class SetupWizardChatTextEditor
             return "Shared opening shortcut; interpretation depends on context.";
         if (pair is "Bold" or "Italic")
         {
+            var errors = ConfigAdminSaveWorkflow.ApplyValues(config, draft.Values.Where(value =>
+                value.Key.StartsWith("ChatDelimiters.Bold.", StringComparison.Ordinal) ||
+                value.Key.StartsWith("ChatDelimiters.Italic.", StringComparison.Ordinal)));
+            if (errors.Count > 0) return errors[0];
             // AccentTransformer is pure text processing; the isolated system never starts or sends chat.
             var context = new MessageContext { Message = Typed(draft, pair) };
             var result = new AccentTransformer(new RPProximityChatSystem { Config = config }).Transform(context).Message;
