@@ -24,9 +24,16 @@ public sealed class SetupWizardDialog : GuiDialog
     private readonly Action<string, string, string> _onTrack;
     private readonly Action _onClose;
     private readonly Action _onAdvanced;
-    private readonly SetupGuidePreview _preview;
+    private readonly ISetupGuidePreview _preview;
+    private readonly System.Func<ICoreClientAPI, string, ISetupGuidePreview> _actorFactory;
+    private readonly SetupWizardActorPool _actors;
+    private readonly SetupWizardLanguageEditor _languageEditor;
+    private readonly SetupWizardSheetEditor _sheetEditor;
+    private readonly List<SetupWizardActorLayer> _actorLayers = new();
+    private readonly SetupWizardSettingsForm _settingsForm = new();
+    private bool _inSettingsForm;
     private bool _isDedicated;
-    private GuiElementCustomDraw _diagram;
+    private GuiElementSetupPreviewDraw _diagram;
     private GuiElementRichtext _sample;
     private GuiElementRichtext _sleepCount;
     private int _chatPreviewTab = 1;
@@ -38,14 +45,20 @@ public sealed class SetupWizardDialog : GuiDialog
     private bool _forceClose;
     private bool _closing;
     private bool _runtimeApplyFailed;
-    private int _reviewOffset;
     private double _elapsed;
     private double? _fixedTime;
+    private bool _previewPaused;
+    private int? _manualChatTab;
+    private GuiElementSlider _timeline;
+    private GuiElementRichtext _previewStage;
+    private SetupWizardChatFocusElement _chatFocus;
+    private int _timelineValue = -1;
     private int _lastBeat = -1;
     private readonly Dictionary<string, string> _topicPages = SetupWizardCatalog.Topics
         .ToDictionary(topic => topic.Id, topic => topic.EntryPageId, StringComparer.Ordinal);
     private IReadOnlyList<ConfigAdminPrivilegeSuggestion> _privilegeSuggestions = Array.Empty<ConfigAdminPrivilegeSuggestion>();
     private readonly List<GuiElementPrivilegePicker> _privilegePickers = new();
+    private readonly List<GuiElementColorPicker> _colorPickers = new();
     private GuiElementSetupSidebar _sidebar;
     private GuiElementRichtext _draftStatus;
     private string _activeTopicId = "chat";
@@ -56,9 +69,13 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public SetupWizardDialog(ICoreClientAPI api, SetupWizardDraft draft, string runId, bool isDedicated,
         Action onSave, Action<string, string, string> onTrack, Action onClose, Action onAdvanced = null,
-        bool layoutOnly = false, bool captureOnly = false) : base(api)
+        bool layoutOnly = false, bool captureOnly = false,
+        System.Func<ICoreClientAPI, string, ISetupGuidePreview> actorFactory = null) : base(api)
     {
         Draft = draft;
+        _languageEditor = new SetupWizardLanguageEditor(api, draft,
+            () => { RefreshNavigation(); Track("choice", "edited"); },
+            action => QueueNavigation(() => { action(); ComposeDialog(); }));
         RunId = runId;
         _isDedicated = isDedicated;
         _onSave = onSave;
@@ -67,11 +84,16 @@ public sealed class SetupWizardDialog : GuiDialog
         _onAdvanced = onAdvanced;
         LayoutOnly = layoutOnly;
         IsCaptureOnly = captureOnly;
+        _actorFactory = actorFactory ?? (layoutOnly ? null : (client, identity) => new SetupGuidePreview(client, identity));
+        _actors = _actorFactory == null ? null : new(api, _actorFactory);
+        _sheetEditor = new SetupWizardSheetEditor(api, draft, RefreshNavigation,
+            action => QueueNavigation(() => { action(); ComposeDialog(); }), _actorFactory,
+            action => Track(action));
         try
         {
-            if (!layoutOnly)
+            if (_actors != null)
             {
-                _preview = new SetupGuidePreview(api);
+                _preview = _actors.Get("guide", "Pip");
                 _preview.PlayAnimation(AnimationCode());
             }
             ComposeDialog();
@@ -85,11 +107,17 @@ public sealed class SetupWizardDialog : GuiDialog
     }
 
     public SetupWizardDraft Draft { get; }
+    public void ShowLanguageEditor(int index = 0)
+    {
+        _languageEditor.SelectedIndex = index;
+        ShowPage("chat.languageeditor");
+    }
     public string RunId { get; private set; }
     public string CurrentStepId { get; private set; } = "hub";
     public bool LayoutOnly { get; }
     public bool IsCaptureOnly { get; }
-    public bool IsPreviewReady => LayoutOnly || SingleComposer?.GetElement("pip") == null || _preview?.IsReady == true;
+    public bool IsPreviewReady => (_preview == null || _preview.IsReady) && _actorLayers.All(layer => layer.IsReady) &&
+        SetupWizardRecordsPreview.IsReady(SingleComposer) && (_sheetEditor?.Preview?.IsReady ?? true);
     public override string ToggleKeyCombinationCode => null;
     public override bool UnregisterOnClose => true;
     public override bool PrefersUngrabbedMouse => true;
@@ -107,8 +135,9 @@ public sealed class SetupWizardDialog : GuiDialog
         }
         _preview?.EndDrag(false);
         _chatPreviewTab = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || Bool("UseGeneralChannelAsProximityChat") || CurrentStepId == "chat.tabs" && !Bool("ProximityChatAsDefault") ? 0 : 1;
-        _reviewOffset = 0;
         _elapsed = 0;
+        _previewPaused = false;
+        _manualChatTab = null;
         _lastBeat = -1;
         if (_fixedTime.HasValue) _preview?.SetAnimation(AnimationCode(), _fixedTime.Value);
         else _preview?.PlayAnimation(AnimationCode());
@@ -120,6 +149,7 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         if (!double.IsFinite(timeSeconds) || timeSeconds is < 0 or > 60) throw new ArgumentOutOfRangeException(nameof(timeSeconds));
         _fixedTime = timeSeconds;
+        _timelineValue = -1;
         _preview?.SetAnimation(AnimationCode(), timeSeconds);
         RefreshPreview();
     }
@@ -128,7 +158,12 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         _fixedTime = null;
         _elapsed = 0;
+        _previewPaused = false;
+        _manualChatTab = null;
+        _timelineValue = -1;
+        _preview?.SetAnimation(AnimationCode(), 0);
         _preview?.PlayAnimation(AnimationCode());
+        RefreshPreview();
     }
 
     public void SetSession(TheBasicsSetupWizardResultMessage result)
@@ -136,6 +171,8 @@ public sealed class SetupWizardDialog : GuiDialog
         RunId = result.RunId;
         _isDedicated = result.IsDedicated;
         Draft.RefreshValues(result.Values);
+        Draft.RefreshLanguages(result.Languages);
+        Draft.RefreshSheetFields(result.SheetFields);
         RefreshPrivilegeSuggestions(result.PrivilegeSuggestions);
         _restartKeys = result.RestartRequiredKeys?.ToArray() ?? Array.Empty<string>();
         _runtimeApplyFailed = result.RuntimeApplyFailed;
@@ -184,12 +221,19 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void ComposeDialog()
     {
+        _sheetEditor?.Detach();
         SingleComposer?.Dispose();
         _privilegePickers.Clear();
+        _colorPickers.Clear();
         _diagram = null;
         _sample = null;
         _sleepCount = null;
         _draftStatus = null;
+        _timeline = null;
+        _timelineValue = -1;
+        _previewStage = null;
+        _chatFocus = null;
+        _actorLayers.Clear();
         _composedWidth = Width;
         _composedHeight = BodyHeight;
         var body = ElementBounds.Fixed(0, 0, DialogWidth, BodyHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
@@ -229,6 +273,9 @@ public sealed class SetupWizardDialog : GuiDialog
         _sample = SingleComposer.GetRichtext("preview-text");
         _sleepCount = SingleComposer.GetRichtext("preview-sleep-count");
         _draftStatus = SingleComposer.GetRichtext("footer-draft-count");
+        _previewStage = SingleComposer.GetRichtext("preview-stage");
+        _timeline = SingleComposer.GetSlider("preview-time");
+        RefreshPreview();
         if (_focusSidebarAfterNavigation)
         {
             SingleComposer.FocusElement(_sidebar.TabIndex);
@@ -267,7 +314,10 @@ public sealed class SetupWizardDialog : GuiDialog
             });
             return true;
         }, ElementBounds.Fixed(DialogWidth - 180, FooterY, 180, 30), key: "review");
-        composer.GetButton("review").Enabled = !_pending && !(CurrentStepId == "review" && IsCaptureOnly);
+        composer.GetButton("review").Enabled = !_pending && !(CurrentStepId == "review" && IsCaptureOnly) &&
+            !(save && (Draft.HasUnconfirmedSave || Draft.LanguagesChanged && LanguageConfigAdmin.ValidateEntries(Draft.Languages, out _).Count > 0 ||
+                Draft.SheetFieldsChanged && (!Draft.CanEditSheetFields || SetupWizardState.ValidateSheetSnapshots(Draft.SheetFields, Draft.OriginalSheetFields).Count > 0 ||
+                    CharacterSheetFieldConfigAdmin.ValidateEntries(SetupWizardState.NormalizeSheetDraft(Draft.SheetFields), out _).Count > 0 || SetupWizardState.ValidateSheetChoices(Draft.SheetFields).Count > 0)));
     }
 
     private string DraftStatusText() => Draft.ChangedKeys.Count switch
@@ -311,7 +361,7 @@ public sealed class SetupWizardDialog : GuiDialog
                 () => { QueueNavigation(() => ShowPage(_topicPages[topic.Id])); return true; }, ElementBounds.Fixed(x, y, cardWidth, CompactLayout ? 110 : 124)), "topic-" + topic.Id);
         }
         var guideBounds = ElementBounds.Fixed(Width - 114, 36, 100, 84);
-        if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guideBounds.fixedX, guideBounds.fixedY, guideBounds.fixedWidth, guideBounds.fixedHeight);
+        if (_preview == null) Text(composer, "Native seraph omitted", guideBounds.fixedX, guideBounds.fixedY, guideBounds.fixedWidth, guideBounds.fixedHeight);
         else composer.AddInteractiveElement(new PreviewActorElement(capi, guideBounds, this), "pip");
     }
 
@@ -330,6 +380,17 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void ComposePage(GuiComposer composer)
     {
+        if (CurrentStepId == "characters.builder")
+        {
+            _sheetEditor.SetAvailableHeight(StatusY - 166);
+            _sheetEditor.Add(composer, Width, CompactLayout);
+            return;
+        }
+        if (CurrentStepId == "chat.languageeditor")
+        {
+            _languageEditor.Add(composer, Width, CompactLayout);
+            return;
+        }
         SetupWizardCatalog.TryGetPage(CurrentStepId, out var page);
         Text(composer, page.Title, 0, 48, Width, 27, true);
         Text(composer, page.Description, 0, 80, Width, 44);
@@ -338,8 +399,29 @@ public sealed class SetupWizardDialog : GuiDialog
         if (CurrentStepId == "notifications.savestart" || CurrentStepId == "notifications.savefinish")
             AddAnnouncement(composer, ref y);
         else
-            foreach (var key in page.SettingKeys.Where(SettingVisible))
-                AddSetting(composer, key, ref y);
+        {
+            var keys = page.SettingKeys.Where(SettingVisible).ToArray();
+            var rowHeight = CompactLayout ? 54 : 65;
+            var scroll = keys.Length * rowHeight > StatusY - y - 8 && CurrentStepId != "chat.basics";
+            if (scroll)
+            {
+                _settingsForm.Begin(composer, CurrentStepId, ElementBounds.Fixed(SettingsX, y, SettingsWidth, StatusY - y - 8));
+                _inSettingsForm = true;
+                y = 0;
+            }
+            foreach (var key in keys) AddSetting(composer, key, ref y);
+            if (scroll)
+            {
+                _inSettingsForm = false;
+                _settingsForm.End(composer, capi, y, () =>
+                {
+                    foreach (var picker in _privilegePickers) picker.CloseSuggestions();
+                    foreach (var picker in _colorPickers) picker.Close();
+                });
+            }
+        }
+        if (CurrentStepId == "server.stats")
+            SetStatsControlsEnabled(composer);
 
     }
 
@@ -357,33 +439,30 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         if (!ConfigAdminSettingRegistry.TryGet(key, out var definition)) return;
         var label = SettingLabel(definition);
-        if (key is "MapHideOtherPlayers" or "MapPlayerRenderDistance")
+        if (_inSettingsForm)
+        {
+            var font = CairoFont.WhiteSmallText().WithFontSize(14);
+            if (CurrentStepId == "server.stats" && (key.StartsWith("PlayerStatToggles.", StringComparison.Ordinal) || key == "PlayerStatDistanceTravelledTimer") &&
+                (!Bool("PlayerStatSystem") || key == "PlayerStatDistanceTravelledTimer" && !Bool("PlayerStatToggles.DistanceTravelled"))) font.Color[3] = .35;
+            composer.AddInteractiveElement(new SetupWizardViewportRichtext(capi, VtmlUtils.EscapeVtml(label), font,
+                ElementBounds.Fixed(SettingsX, y, SettingsWidth, 21)), "setting-label-" + key);
+        }
+        else if (key is "MapHideOtherPlayers" or "MapPlayerRenderDistance")
             composer.AddStaticText(label, CairoFont.WhiteSmallText().WithFontSize(14),
                 ElementBounds.Fixed(SettingsX, y, SettingsWidth, 21), "setting-label-" + key);
         else Text(composer, label, SettingsX, y, SettingsWidth, 21);
         var bounds = ElementBounds.Fixed(SettingsX, y + 23, SettingsWidth, 28);
         var value = Draft.Get(key);
-        if (key == "ManageMapPlayerVisibility")
-        {
-            bounds.fixedWidth = 92;
-            composer.AddToggleButton(Bool(key) ? "On" : "Off", CairoFont.WhiteSmallText(), on =>
-            {
-                Changed(key, on ? "1" : "0", on ? "on" : "off", false);
-                RefreshMapControls(composer);
-            }, bounds, key);
-            composer.GetToggleButton(key).SetValue(Bool(key));
-        }
-        else if (definition.Kind == ConfigAdminSettingKind.Boolean)
+        if (definition.Kind == ConfigAdminSettingKind.Boolean)
         {
             var inverted = key == "DisableRPChat";
-            var selected = Bool(key) != inverted ? 1 : 0;
-            composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "0", "1" }, new[] { "Off", "On" }, selected,
-                (choice, _) =>
+            bounds.fixedWidth = 112;
+            composer.AddInteractiveElement(new GuiElementSetupToggle(capi, Bool(key) != inverted,
+                on =>
                 {
-                    Changed(key, inverted ? (choice == "1" ? "0" : "1") : choice, choice == "1" ? "on" : "off", key != "MapHideOtherPlayers");
-                    if (key == "MapHideOtherPlayers") RefreshMapControls(composer);
-                },
-                bounds, CairoFont.WhiteSmallText(), false), key);
+                    Changed(key, on != inverted ? "1" : "0", on ? "on" : "off", key is not ("MapHideOtherPlayers" or "ManageMapPlayerVisibility"));
+                    if (key is "MapHideOtherPlayers" or "ManageMapPlayerVisibility") RefreshMapControls(composer);
+                }, bounds), key);
         }
         else if (definition.Kind == ConfigAdminSettingKind.Select)
         {
@@ -398,9 +477,34 @@ public sealed class SetupWizardDialog : GuiDialog
                 y += 30;
             }
             else
-                composer.AddInteractiveElement(new GuiElementDropDown(capi, options,
+                composer.AddInteractiveElement(new SetupWizardViewportDropDown(capi, options,
                     options.Select((option, index) => SettingOptionName(key, option, definition.OptionNames[index])).ToArray(), selected,
-                    (choice, _) => Changed(key, choice, "option" + Array.IndexOf(options, choice), false), bounds, CairoFont.WhiteSmallText(), false), key);
+                    (choice, _) => Changed(key, choice, "option" + Array.IndexOf(options, choice), false), bounds, CairoFont.WhiteSmallText()), key);
+        }
+        else if (key is "EmoteColor" or "OOCColor" or "GlobalOOCColor" or "NametagBackgroundColor" or "NametagBorderColor")
+        {
+            var mode = key.StartsWith("Nametag", StringComparison.Ordinal) ? ColorPickerMode.RgbaWithTheme : ColorPickerMode.Rgb;
+            var updating = false;
+            var picker = new GuiElementColorPicker(capi, ElementBounds.Fixed(SettingsX, y + 23, 32, 28), value, choice =>
+            {
+                updating = true;
+                try { composer.GetTextInput(key)?.SetValue(choice); }
+                finally { updating = false; }
+                Changed(key, choice, "edited", false);
+            }, mode);
+            bounds.fixedX += 39;
+            bounds.fixedWidth -= 39;
+            var input = new SetupWizardViewportTextInput(capi, bounds, choice =>
+            {
+                if (updating) return;
+                picker.SetValue(choice);
+                Changed(key, choice, "edited", false);
+            }, CairoFont.TextInput());
+            input.SetMaxLength(definition.Kind == ConfigAdminSettingKind.Text ? 2048 : 32);
+            input.SetValue(value);
+            _colorPickers.Add(picker);
+            composer.AddInteractiveElement(picker, "color-picker-" + key);
+            composer.AddInteractiveElement(input, key);
         }
         else if (definition.IsPrivilege)
         {
@@ -411,7 +515,7 @@ public sealed class SetupWizardDialog : GuiDialog
         }
         else
         {
-            var input = new GuiElementTextInput(capi, bounds, choice =>
+            var input = new SetupWizardViewportTextInput(capi, bounds, choice =>
             {
                 var requested = choice;
                 if (key == "SleepNotificationThreshold" && double.TryParse(choice, NumberStyles.Float, CultureInfo.InvariantCulture, out var percentage))
@@ -427,6 +531,8 @@ public sealed class SetupWizardDialog : GuiDialog
             var help = key switch
             {
                 "SleepNotificationThreshold" => "Percentage of online players who must be in bed to trigger a reminder. Enter 50 for 50%. At 0% or 100%, no reminder is sent.",
+                "ChatHistoryFlushIntervalMilliseconds" => "Milliseconds between writes of queued chat history to disk. 1000 milliseconds is 1 second. Changes require a server restart.",
+                "PlayerStatDistanceTravelledTimer" => "Milliseconds between movement samples. 1000 milliseconds is 1 second. Longer intervals sample less often. Changes require a server restart.",
                 "DisableRPChat" => "Enable roleplay commands, languages and global OOC. Nearby chat still works when this is off.",
                 _ => definition.Description
             };
@@ -437,19 +543,29 @@ public sealed class SetupWizardDialog : GuiDialog
         y += CurrentStepId == "chat.basics" ? (CompactLayout ? 50 : 61) : CompactLayout ? 54 : 65;
     }
 
+    private void SetStatsControlsEnabled(GuiComposer composer)
+    {
+        foreach (var key in SetupWizardCatalog.Pages.First(page => page.Id == "server.stats").SettingKeys.Where(key => key.StartsWith("PlayerStatToggles.", StringComparison.Ordinal) || key == "PlayerStatDistanceTravelledTimer"))
+        {
+            var enabled = Bool("PlayerStatSystem") && (key != "PlayerStatDistanceTravelledTimer" || Bool("PlayerStatToggles.DistanceTravelled"));
+            var control = (GuiElementControl)composer.GetElement(key);
+            control.Enabled = enabled;
+            if (control is GuiElementTextBase text) text.Font.Color[3] = enabled ? 1 : .35;
+        }
+    }
+
     private void RefreshMapControls(GuiComposer composer)
     {
         var managed = Bool("ManageMapPlayerVisibility");
-        var toggle = composer.GetToggleButton("ManageMapPlayerVisibility");
-        toggle.Text = managed ? "On" : "Off";
+        var toggle = (GuiElementSetupToggle)composer.GetElement("ManageMapPlayerVisibility");
         toggle.SetValue(managed);
         foreach (var key in new[] { "MapHideOtherPlayers", "MapPlayerRenderDistance" })
         {
             var enabled = managed && (key != "MapPlayerRenderDistance" || !Bool("MapHideOtherPlayers"));
-            var control = (GuiElementTextBase)composer.GetElement(key);
+            var control = (GuiElementControl)composer.GetElement(key);
             if (!enabled) control.OnFocusLost();
             control.Enabled = enabled;
-            control.Font.Color[3] = enabled ? 1 : 0.35;
+            if (control is GuiElementTextBase text) text.Font.Color[3] = enabled ? 1 : 0.35;
             var label = (GuiElementStaticText)composer.GetElement("setting-label-" + key);
             label.Font.Color[3] = enabled ? 1 : 0.35;
         }
@@ -486,6 +602,12 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         if (Draft.Get(key) == value) return;
         Draft.Set(key, value);
+        _timelineValue = -1;
+        if (!_fixedTime.HasValue && AnimatedPreview && _elapsed >= PreviewDuration)
+        {
+            _elapsed = Math.Max(0, PreviewDuration - 0.001);
+            _timelineValue = -1;
+        }
         if (CurrentStepId == "chat.tabs")
             _chatPreviewTab = Bool("UseGeneralChannelAsProximityChat") || !Bool("ProximityChatAsDefault") ? 0 : 1;
         Track("choice", choice);
@@ -503,20 +625,64 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         Text(composer, "Review changes", 0, 50, Width, 28, true);
         Text(composer, "Check the changes below, then save. Anything marked After restart will take effect when the server restarts.", 0, 85, Width, 42);
-        var keys = Draft.ChangedKeys;
-        var y = 140d;
-        foreach (var key in keys.Skip(_reviewOffset).Take(5))
+        var rows = Draft.ChangedKeys.Where(key => key != "Languages" && key != "CharacterSheetFields").Select(key =>
         {
             ConfigAdminSettingRegistry.TryGet(key, out var definition);
-            Text(composer, SettingLabel(definition) + (definition.ReloadBehavior == ConfigAdminReloadBehavior.Live ? "" : " | After restart"), 0, y, Width, 20, true);
-            Text(composer, $"{DisplayValue(definition, Draft.GetOriginal(key))}  >  {DisplayValue(definition, Draft.Get(key))}", 0, y + 22, Width, 36);
-            y += CompactLayout ? 54 : 64;
+            return (Title: SettingLabel(definition) + (definition.ReloadBehavior == ConfigAdminReloadBehavior.Live ? "" : " | After restart"),
+                Detail: $"{DisplayValue(definition, Draft.GetOriginal(key))}  >  {DisplayValue(definition, Draft.Get(key))}");
+        }).Concat(LanguageReviewRows(Draft.OriginalLanguages, Draft.Languages))
+            .Concat(SetupWizardSheetReview.Rows(Draft.OriginalSheetFields, Draft.SheetFields, Bool("EnableCharacterSheets") && Bool("CharacterSheetRequireRequiredFieldsForRoleplay"), Bool("DisableNicknames"))).ToArray();
+        var viewport = ElementBounds.Fixed(0, 140, Width - 20, Math.Max(100, StatusY - 150));
+        var content = ElementBounds.Fixed(0, 0, Width - 30, 1);
+        composer.BeginClip(viewport).BeginChildElements(content);
+        var y = 0d;
+        foreach (var row in rows)
+        {
+            var lines = row.Detail.Split('\n').Sum(line => Math.Max(1, (int)Math.Ceiling(line.Length / Math.Max(30, (Width - 30) / 8))));
+            var detailHeight = Math.Max(36, lines * 22);
+            composer.AddRichtext(VtmlUtils.EscapeVtml(row.Title), CairoFont.WhiteSmallText().WithFontSize(16).WithWeight(FontWeight.Bold), ElementBounds.Fixed(0, y, Width - 30, 22));
+            composer.AddRichtext(VtmlUtils.EscapeVtml(row.Detail).Replace("\n", "<br>"), CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(0, y + 24, Width - 30, detailHeight));
+            y += detailHeight + 38;
         }
-        if (keys.Count == 0) Text(composer, NeedsRestart ? "No new changes. Restart the server to apply your saved settings." : "No changes to save.", 0, y, Width, 60);
-        if (keys.Count > 5)
-            Button(composer, $"More changes ({_reviewOffset + 1}-{Math.Min(_reviewOffset + 5, keys.Count)} of {keys.Count})", () =>
-            { QueueNavigation(() => { _reviewOffset = _reviewOffset + 5 < keys.Count ? _reviewOffset + 5 : 0; ComposeDialog(); }); },
-                0, y + 8, Math.Min(420, Width));
+        if (rows.Length == 0) Text(composer, NeedsRestart ? "No new changes. Restart the server to apply your saved settings." : "No changes to save.", 0, y, Width - 30, 60);
+        content.fixedHeight = Math.Max(viewport.fixedHeight, y + 60);
+        composer.EndChildElements().EndClip();
+        composer.AddVerticalScrollbar(value =>
+        {
+            content.fixedY = -value; content.MarkDirtyRecursive(); content.CalcWorldBounds();
+        }, ElementBounds.Fixed(Width - 14, 140, 12, viewport.fixedHeight), "review-scroll");
+        composer.OnComposed += () => composer.GetScrollbar("review-scroll").SetHeights((float)viewport.fixedHeight, (float)content.fixedHeight);
+    }
+    internal static IReadOnlyList<(string Title, string Detail)> LanguageReviewRows(
+        IReadOnlyList<LanguageConfigEntryMessage> originals, IReadOnlyList<LanguageConfigEntryMessage> current)
+    {
+        var rows = new List<(string Title, string Detail)>();
+        if (LanguageConfigAdmin.EntriesEqual(originals, current)) return rows;
+        var fields = new (string Label, System.Func<LanguageConfigEntryMessage, string> Read)[]
+        {
+            ("Name", value => value.Name), ("Chat code", value => value.Prefix),
+            ("Text color", value => value.Color), ("Description", value => value.Description),
+            ("Unfamiliar sounds", value => value.Syllables),
+            ("Everyone starts with it", value => value.Default ? "On" : "Off"),
+            ("Hide from language lists", value => value.Hidden ? "On" : "Off"),
+            ("Classes", value => value.GrantedToClasses), ("Traits", value => value.GrantedToTraits),
+            ("Models", value => value.GrantedToModels), ("Model groups", value => value.GrantedToModelGroups)
+        };
+        foreach (var entry in current)
+        {
+            var original = originals.FirstOrDefault(value => string.Equals(value.Name, entry.OriginalName, StringComparison.OrdinalIgnoreCase));
+            foreach (var field in fields)
+            {
+                var before = original == null ? "" : field.Read(original) ?? "";
+                var after = field.Read(entry) ?? "";
+                if (before != after) rows.Add(($"{entry.Name}: {field.Label}", original == null ? "New language: " + after : before + "  >  " + after));
+            }
+        }
+        foreach (var removed in originals.Where(value => !current.Any(entry => string.Equals(entry.OriginalName, value.Name, StringComparison.OrdinalIgnoreCase))))
+            rows.Add(("Remove language: " + removed.Name, "This language will be removed from the server configuration."));
+        if (!originals.Select(entry => entry.Name).SequenceEqual(current.Select(entry => entry.OriginalName), StringComparer.OrdinalIgnoreCase))
+            rows.Add(("Language order", string.Join(" > ", current.Select(entry => entry.Name))));
+        return rows;
     }
 
     private void ComposeFinish(GuiComposer composer)
@@ -540,74 +706,238 @@ public sealed class SetupWizardDialog : GuiDialog
     private void AddPreview(GuiComposer composer)
     {
         if (SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId)) return;
-        if (SetupWizardFeaturePreview.Supports(CurrentStepId))
+        if (AnimatedPreview) AddPlayback(composer);
+        if (CurrentStepId == "roleplay.descriptions")
         {
-            var appearance = CurrentStepId.StartsWith("appearance.", StringComparison.Ordinal);
-            _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 134, 310,
-                appearance ? 64 : FeaturePreviewHeight),
-                (context, surface, bounds) => SetupWizardFeaturePreview.Draw(context, surface, bounds, CurrentStepId, Draft, capi), true);
+            _diagram = new GuiElementSetupPreviewDraw(capi, ElementBounds.Fixed(0, 134, 310, 100),
+                (context, surface, bounds) =>
+                {
+                    var reach = Number("MaxEnvironmentPlacementDistance");
+                    var scale = surface.Width / 310d;
+                    context.Scale(scale, scale);
+                    context.SetSourceRGBA(.8, .75, .6, 1);
+                    context.LineWidth = 2;
+                    context.MoveTo(20, 55); context.LineTo(280, 55); context.Stroke();
+                    context.SetSourceRGBA(.35, .7, .45, .6);
+                    context.Rectangle(20, 49, Math.Min(260, reach / 20 * 260), 12); context.Fill();
+                    context.SetSourceRGBA(reach >= 10 ? .6 : .9, reach >= 10 ? .9 : .4, .3, 1);
+                    context.Arc(150, 55, 7, 0, Math.PI * 2); context.Fill();
+                });
             composer.AddInteractiveElement(_diagram, "preview-diagram");
-            if (appearance)
-            {
-                var guide = ElementBounds.Fixed(0, 202, 310, CompactLayout ? 190 : 240);
-                if (LayoutOnly) Text(composer, "Native 3D Pip omitted", guide.fixedX, guide.fixedY, guide.fixedWidth, guide.fixedHeight);
-                else composer.AddInteractiveElement(new PreviewActorElement(capi, guide, this), "pip");
-            }
+            composer.AddRichtext(PlacementRangeText(),
+                CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(0, 205, 310, 38), "preview-placement-range");
+            AddChatPreview(composer, 245, CompactLayout ? 100 : 145);
             return;
         }
-        if (CurrentStepId is "chat.basics" or "chat.language" or "chat.languageaccess" or "chat.signlanguage" or "chat.tabs" or "notifications.savestart" or "notifications.savefinish")
+        if (CurrentStepId == "chat.tabs")
+        {
+            composer.AddRichtext(ChatFocusState.StageText, CairoFont.WhiteSmallText().WithFontSize(14),
+                ElementBounds.Fixed(0, 134, 310, 38), "preview-stage");
+            _chatFocus = new SetupWizardChatFocusElement(capi, ElementBounds.Fixed(0, 178, 310, CompactLayout ? 216 : 274), index =>
+            {
+                SetPreviewPaused(true);
+                _manualChatTab = index;
+                RefreshPreview();
+            });
+            composer.AddInteractiveElement(_chatFocus, "preview-chat-focus");
+            _chatFocus.Refresh(Draft, Time, AutoSelectChat, AutoOpenChat, _manualChatTab);
+            return;
+        }
+        if (SetupWizardAppearancePreview.Supports(CurrentStepId))
+        {
+            var height = CompactLayout ? 270 : 310;
+            _diagram = new GuiElementSetupPreviewDraw(capi, ElementBounds.Fixed(0, 134, 310, height),
+                (context, surface, bounds) => SetupWizardAppearancePreview.Draw(context, surface, bounds,
+                    CurrentStepId, Draft, Time, capi));
+            composer.AddInteractiveElement(_diagram, "preview-diagram");
+            if (_preview != null)
+                composer.AddInteractiveElement(new PreviewActorElement(capi,
+                    ElementBounds.Fixed(SetupWizardAppearancePreview.ActorX,
+                        134 + SetupWizardAppearancePreview.ActorY + (height - 270) / 2,
+                        SetupWizardAppearancePreview.ActorWidth, SetupWizardAppearancePreview.ActorHeight), this), "pip");
+            else Text(composer, "Native seraph omitted", 112, 134 + 135, 100, 30);
+            return;
+        }
+        if (SetupWizardRecordsPreview.Supports(CurrentStepId))
+        {
+            SetupWizardRecordsPreview.Add(composer, capi, ElementBounds.Fixed(0, 134, 310, CompactLayout ? 270 : 310),
+                CurrentStepId, Draft, Time, _actorFactory, () => _previewPaused || _fixedTime.HasValue);
+            return;
+        }
+        if (SetupWizardSpeechPreview.HasScene(CurrentStepId) || SetupWizardTravelPreview.Supports(CurrentStepId))
+        {
+            var sceneHeight = CompactLayout ? 130 : 180;
+            _diagram = new GuiElementSetupPreviewDraw(capi, ElementBounds.Fixed(0, 134, 310, sceneHeight),
+                (context, surface, bounds) =>
+                {
+                    if (SetupWizardSpeechPreview.HasScene(CurrentStepId))
+                        SetupWizardSpeechPreview.Draw(context, surface, bounds, CurrentStepId, Draft, Time);
+                    else SetupWizardTravelPreview.Draw(context, surface, bounds, CurrentStepId, Draft, Time);
+                });
+            composer.AddInteractiveElement(_diagram, "preview-diagram");
+            AddSceneActors(composer, ElementBounds.Fixed(0, 134, 310, sceneHeight), () =>
+                SetupWizardSpeechPreview.HasScene(CurrentStepId)
+                    ? SetupWizardSpeechPreview.Actors(CurrentStepId, Draft, Time, 310, sceneHeight)
+                    : SetupWizardTravelPreview.Actors(CurrentStepId, Draft, Time, 310, sceneHeight));
+            AddChatPreview(composer, 146 + sceneHeight, CompactLayout ? 72 : 92);
+            return;
+        }
+        if (SetupWizardFeaturePreview.Supports(CurrentStepId))
+        {
+            _diagram = new GuiElementSetupPreviewDraw(capi, ElementBounds.Fixed(0, 134, 310, FeaturePreviewHeight),
+                (context, surface, bounds) => SetupWizardFeaturePreview.Draw(context, surface, bounds, CurrentStepId, Draft, capi));
+            composer.AddInteractiveElement(_diagram, "preview-diagram");
+            return;
+        }
+        if (CurrentStepId is "chat.basics" or "chat.language" or "chat.colors" or "chat.languageaccess" or "notifications.savestart" or "notifications.savefinish" or "notifications.deaths")
         {
             AddChatPreview(composer, CompactLayout ? 164 : 172, CompactLayout ? 184 : 230);
             return;
         }
-        var hearing = CurrentStepId is "chat.ranges" or "chat.obfuscation";
         var sleep = CurrentStepId == "notifications.sleep";
-        var pictureHeight = hearing ? CompactLayout ? 274 : 330 : sleep ? CompactLayout ? 112 : 140 : CompactLayout ? 146 : 168;
-        _diagram = new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, 134, 310, pictureHeight), DrawDiagram, true);
+        if (!sleep) return;
+        var pictureHeight = CompactLayout ? 112 : 140;
+        _diagram = new GuiElementSetupPreviewDraw(capi, ElementBounds.Fixed(0, 134, 310, pictureHeight), DrawSleepScene);
         composer.AddInteractiveElement(_diagram, "preview-diagram");
-        if (sleep)
-        {
-            composer.AddRichtext(SleepCountText(), CairoFont.WhiteSmallText().WithFontSize(14),
-                ElementBounds.Fixed(0, CompactLayout ? 249 : 277, 310, 20), "preview-sleep-count");
-            AddChatPreview(composer, CompactLayout ? 274 : 307, CompactLayout ? 72 : 92);
-        }
-        else if (!hearing)
-            composer.AddRichtext(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(10, CompactLayout ? 298 : 326, 289, CompactLayout ? 103 : 129), "preview-text");
+        AddSceneActors(composer, ElementBounds.Fixed(0, 134, 310, pictureHeight), () => SleepActors(Time, pictureHeight));
+        composer.AddRichtext(SleepCountText(), CairoFont.WhiteSmallText().WithFontSize(14),
+            ElementBounds.Fixed(0, CompactLayout ? 249 : 277, 310, 20), "preview-sleep-count");
+        AddChatPreview(composer, CompactLayout ? 274 : 307, CompactLayout ? 72 : 92);
     }
 
+    private void AddSceneActors(GuiComposer composer, ElementBounds bounds, Func<SetupWizardActorSample[]> samples)
+    {
+        if (_actors == null)
+        {
+            Text(composer, "Native seraphs omitted", bounds.fixedX + 8, bounds.fixedY + 4, bounds.fixedWidth - 16, 20);
+            return;
+        }
+        var layer = new SetupWizardActorLayer(capi, bounds, _actors, samples, () => _previewPaused || _fixedTime.HasValue);
+        _actorLayers.Add(layer);
+        composer.AddInteractiveElement(layer, "preview-actors");
+    }
+
+    internal static SetupWizardActorSample[] SleepActors(double time, double height) => Enumerable.Range(0, 4).Select(index =>
+    {
+        var x = 12 + index % 2 * 154;
+        var y = 12 + index / 2 * 53 + (height - 112) / 2;
+        var asleep = index < (int)(time / 2) % 4;
+        return new SetupWizardActorSample("sleep-" + index, index % 2 == 0 ? "Pip" : "Mara", asleep ? "sleep" : "idle", time % 60,
+            asleep ? x + 5 : x + 111, asleep ? y + 3 : y - 8, asleep ? 108 : 32, asleep ? 35 : 50,
+            YawOffset: asleep ? 1.2707963f + MathF.PI : 0);
+    }).ToArray();
+
     private void AddChatPreview(GuiComposer composer, double y, double historyHeight)
+    {
+        var tabs = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || SetupWizardTravelPreview.Supports(CurrentStepId) || Bool("UseGeneralChannelAsProximityChat")
+            ? new[] { new GuiTab { Name = "General", DataInt = 0 } }
+            : new[] { new GuiTab { Name = "General", DataInt = 0 }, new GuiTab { Name = "Proximity", DataInt = 1 } };
+        AddChatWindow(composer, capi, y, historyHeight, tabs, tabs.Length == 1 ? 0 : _chatPreviewTab,
+            index => { _chatPreviewTab = index; RefreshPreview(); }, BuildPreviewText());
+    }
+
+    internal static void AddChatWindow(GuiComposer composer, ICoreClientAPI api, double y, double historyHeight,
+        GuiTab[] tabs, int selected, Action<int> onSelect, string text)
     {
         const double historyWidth = 288;
         var bounds = ElementBounds.Fixed(0, y, historyWidth + 22, historyHeight + 57);
         composer.BeginChildElements(bounds)
             .AddGameOverlay(ElementBounds.Fixed(0, 23, historyWidth + 22, historyHeight + 34), new[] { 0.25, 0.208, 0.161, 0.75 });
-        var tabs = CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal) || Bool("UseGeneralChannelAsProximityChat")
-            ? new[] { new GuiTab { Name = "General", DataInt = 0 } }
-            : new[] { new GuiTab { Name = "General", DataInt = 0 }, new GuiTab { Name = "Proximity", DataInt = 1 } };
         var font = CairoFont.WhiteDetailText().WithFontSize(14);
-        composer.AddHorizontalTabs(tabs, ElementBounds.Fixed(0, 0, historyWidth + 22, 23), index =>
-        { _chatPreviewTab = index; RefreshPreview(); }, font, font.Clone().WithColor(GuiStyle.ActiveButtonTextColor), "preview-chat-tabs");
-        composer.GetHorizontalTabs("preview-chat-tabs").SetValue(tabs.Length == 1 ? 0 : _chatPreviewTab, false);
+        composer.AddHorizontalTabs(tabs, ElementBounds.Fixed(0, 0, historyWidth + 22, 23), onSelect,
+            font, font.Clone().WithColor(GuiStyle.ActiveButtonTextColor), "preview-chat-tabs");
+        composer.GetHorizontalTabs("preview-chat-tabs").SetValue(selected, false);
         var clip = ElementBounds.Fixed(6, 26, historyWidth, historyHeight);
         composer.BeginClip(clip)
-            .AddRichtext(BuildPreviewText(), font, ElementBounds.Fixed(0, 0, historyWidth, historyHeight), "preview-text")
+            .AddRichtext(text, font, ElementBounds.Fixed(0, 0, historyWidth, historyHeight), "preview-text")
             .EndClip()
             .AddCompactVerticalScrollbar(value =>
             {
-                var text = SingleComposer.GetRichtext("preview-text");
-                text.Bounds.fixedY = -value;
-                text.Bounds.MarkDirtyRecursive();
-                text.Bounds.CalcWorldBounds();
+                var history = composer.GetRichtext("preview-text");
+                history.Bounds.fixedY = -value;
+                history.Bounds.MarkDirtyRecursive();
+                history.Bounds.CalcWorldBounds();
             }, ElementBounds.Fixed(historyWidth + 12, 24, 10, historyHeight + 3), "preview-chat-scroll");
-        var input = new GuiElementChatInput(capi, ElementBounds.Fixed(0, historyHeight + 29, historyWidth + 22, 25), _ => { }) { Enabled = false };
+        var input = new GuiElementChatInput(api, ElementBounds.Fixed(0, historyHeight + 29, historyWidth + 22, 25), _ => { }) { Enabled = false };
         composer.AddInteractiveElement(input, "preview-chat-input").EndChildElements();
     }
 
+    private void AddPlayback(GuiComposer composer)
+    {
+        var y = CompactLayout ? 416 : 480;
+        composer.AddInset(ElementBounds.Fixed(0, y - 3, 310, 30), 1, 0.6f);
+        composer.AddSmallButton("Replay", () => { ResumePreview(); return true; },
+            ElementBounds.Fixed(3, y, 64, 24), key: "preview-replay");
+        composer.AddToggleButton("Pause", CairoFont.WhiteSmallText().WithFontSize(13), SetPreviewPaused,
+            ElementBounds.Fixed(74, y, 62, 24), "preview-pause");
+        composer.AddSlider(value =>
+        {
+            _elapsed = Math.Min(PreviewDuration * value / 1000, Math.Max(0, PreviewDuration - 0.001));
+            _fixedTime = null;
+            _previewPaused = true;
+            _manualChatTab = null;
+            _timelineValue = -1;
+            _preview?.SetAnimation(AnimationCode(), Time % 60);
+            RefreshPreview();
+            return true;
+        }, ElementBounds.Fixed(146, y + 2, 158, 20), "preview-time");
+        var slider = composer.GetSlider("preview-time");
+        slider.OnSliderTooltip = _ => PreviewClockText();
+        slider.SetValues(0, 0, 1000, 1);
+        composer.AddRichtext(PreviewClockText(), CairoFont.WhiteSmallText().WithFontSize(12),
+            ElementBounds.Fixed(318, y + 4, 154, 20), "preview-clock");
+        composer.AddHoverText("Restart this example.", CairoFont.WhiteSmallText(), 260,
+            ElementBounds.Fixed(3, y, 64, 24), "preview-replay-help");
+        composer.AddHoverText("Pause or resume this example.", CairoFont.WhiteSmallText(), 260,
+            ElementBounds.Fixed(74, y, 62, 24), "preview-pause-help");
+    }
+
+    private void SetPreviewPaused(bool paused)
+    {
+        _elapsed = Time;
+        _fixedTime = null;
+        _previewPaused = paused;
+        if (!paused)
+        {
+            _manualChatTab = null;
+            _preview?.PlayAnimation(AnimationCode());
+        }
+        RefreshPreview();
+    }
+
+    private void RefreshPlayback()
+    {
+        if (_timeline == null) return;
+        SingleComposer.GetToggleButton("preview-pause").SetValue(_previewPaused || _fixedTime.HasValue);
+        var second = (int)Math.Floor(Time);
+        if (_timelineValue == second) return;
+        _timelineValue = second;
+        _timeline.SetValues((int)Math.Clamp(Time / PreviewDuration * 1000, 0, 1000), 0, 1000, 1);
+        SingleComposer.GetRichtext("preview-clock").SetNewText(PreviewClockText(), CairoFont.WhiteSmallText().WithFontSize(12));
+    }
+
+    private string PreviewClockText() => Clock(Time) + " / " + Clock(PreviewDuration);
+    private static string Clock(double seconds)
+    {
+        var time = TimeSpan.FromSeconds(Math.Max(0, seconds));
+        return (seconds >= 3600 ? ((long)time.TotalHours).ToString(CultureInfo.InvariantCulture) + ":" + time.Minutes.ToString("00")
+            : ((long)time.TotalMinutes).ToString(CultureInfo.InvariantCulture)) + ":" + time.Seconds.ToString("00");
+    }
+
+    private string PlacementRangeText() => Number("MaxEnvironmentPlacementDistance") >= 10
+        ? "Target at 10 blocks: within placement range." : "Target at 10 blocks: out of placement range.";
+
     private void RefreshPreview()
     {
+        SingleComposer.GetRichtext("preview-placement-range")?.SetNewText(PlacementRangeText(), CairoFont.WhiteSmallText().WithFontSize(14));
+        if (CurrentStepId == "chat.languageeditor") _languageEditor.RefreshPreview();
         _diagram?.Redraw();
         _sample?.SetNewText(BuildPreviewText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
         _sleepCount?.SetNewText(SleepCountText(), CairoFont.WhiteSmallText().WithFontSize(14), null);
+        _chatFocus?.Refresh(Draft, Time, AutoSelectChat, AutoOpenChat, _manualChatTab);
+        _previewStage?.SetNewText(ChatFocusState.StageText, CairoFont.WhiteSmallText().WithFontSize(14));
+        SetupWizardRecordsPreview.Refresh(SingleComposer, CurrentStepId, Draft, Time);
+        RefreshPlayback();
         var scroll = SingleComposer.GetCompactScrollbar("preview-chat-scroll");
         if (scroll != null && _sample != null)
             scroll.SetHeights((float)_sample.InsideClipBounds.fixedHeight, (float)_sample.Bounds.fixedHeight);
@@ -615,15 +945,24 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private string BuildPreviewText()
     {
+        if (CurrentStepId == "roleplay.descriptions") return "The old gate creaks in the wind.";
+        if (CurrentStepId == "notifications.deaths") return Bool("EnableNearbyDeathMessagesInProximityChat") ? "PipPlayer died nearby." : "Nearby death messages are off.";
+        if (CurrentStepId == "chat.colors")
+            return ChatHelper.Color("Pip waves.", PreviewColor("EmoteColor")) + "<br>" +
+                ChatHelper.Color("(OOC) PipPlayer: One moment.", PreviewColor("OOCColor")) + "<br>" +
+                ChatHelper.Color("(GOOC) MaraPlayer: Back in a minute.", PreviewColor("GlobalOOCColor"));
+        if (CurrentStepId == "chat.tabs") return ChatFocusState.Messages;
+        if (SetupWizardTravelPreview.Supports(CurrentStepId))
+            return SetupWizardTravelPreview.Message(CurrentStepId, Draft, Time);
         if (CurrentStepId.StartsWith("chat.", StringComparison.Ordinal))
         {
-            if (CurrentStepId == "chat.signlanguage")
-                return Bool("EnableLanguageSystem") && !Bool("DisableRPChat") ? "Pip signs, \"Meet me by the gate.\"" : "";
             if (CurrentStepId == "chat.languageaccess")
                 return Bool("EnableLanguageSystem") && !Bool("DisableRPChat") ? "Pip says in Common, \"Hello, traveler!\"" : "";
             var replacement = Bool("UseGeneralChannelAsProximityChat");
             if (!replacement && _chatPreviewTab == 0)
                 return "MaraPlayer: Anyone heading north?<br>PipPlayer: Meet you by the gate.";
+            if (SetupWizardSpeechPreview.HasScene(CurrentStepId))
+                return SetupWizardSpeechPreview.Message(CurrentStepId, Draft, Time);
             var mode = Draft.Get("ProximityChatPresentationMode");
             var config = new ModConfig();
             config.InitializeDefaultsIfNeeded();
@@ -637,9 +976,10 @@ public sealed class SetupWizardDialog : GuiDialog
                 _ => name + " says " + quoted
             };
             var oocName = Bool("UseNicknameInOOC") ? "Pip" : "PipPlayer";
-            var lines = example + "<br><font color=\"#eaf188\">(OOC) " + oocName + ": One moment.</font>";
+            var speech = CurrentStepId == "chat.language" ? SetupWizardSpeechPreview.Message(CurrentStepId, Draft, Time) : example;
+            var lines = speech + "<br><font color=\"#eaf188\">(OOC) " + oocName + ": One moment.</font>";
             if (Bool("EnableGlobalOOC") && !Bool("DisableRPChat"))
-                lines += "<br><font color=\"#f1b288\">(GOOC) MaraPlayer: Back in a minute.</font>";
+                lines += "<br><font color=\"#f1b288\">(GOOC) " + (Bool("UseNicknameInGlobalOOC") ? "Mara" : "MaraPlayer") + ": Back in a minute.</font>";
             return lines;
         }
         if (CurrentStepId.StartsWith("notifications.", StringComparison.Ordinal))
@@ -659,38 +999,27 @@ public sealed class SetupWizardDialog : GuiDialog
             var escaped = VtmlUtils.EscapeVtml(wording);
             return popup ? "<font color=\"#CCe0cfbb\">" + escaped + "</font>" : escaped;
         }
-        return VtmlUtils.EscapeVtml(TeleportExplanation());
-    }
-
-    private string TeleportExplanation()
-    {
-        if (CurrentStepId.Contains("request", StringComparison.Ordinal))
-            return "The other player must accept.\n" +
-                (Bool("TpaRequireTemporalGear") ? "Sending a request costs one temporal gear." : "No temporal gear is required.") + "\n" +
-                (Bool("TpaUseCooldown") ? $"Wait {Draft.Get("TpaCooldownInGameHours")} in-game hours between requests." : "No wait between requests.") + "\n" +
-                (Bool("TpaUseTimeout") ? $"Requests expire after {Draft.Get("TpaTimeoutMinutes")} real minutes." : "Requests do not expire.") + "\n" +
-                (Number("Teleportation.TpaWarmupSeconds") > 0 ? $"After acceptance, stand still for {Draft.Get("Teleportation.TpaWarmupSeconds")} real seconds." : "Teleport immediately after acceptance.");
-        if (CurrentStepId.Contains("stuck", StringComparison.Ordinal))
-            return "Use /stuck to return to spawn. No temporal gear is required.\n" +
-                (Number("Teleportation.StuckWarmupSeconds") > 0 ? $"Stand still for {Draft.Get("Teleportation.StuckWarmupSeconds")} real seconds." : "Travel is immediate.");
-        return CurrentStepId switch
-        {
-            "teleport.homes" => "Set a home with /sethome, then use /home to return.",
-            "teleport.spawn" => "Use /spawn to return to the world's spawn point.",
-            "teleport.top" => "Use /top to find a safe place above you.",
-            "teleport.back" => "Use /back to return to the place you last teleported from.",
-            "teleport.warmup" => "Moving cancels the wait before a teleport.",
-            _ => ""
-        };
+        return "";
     }
 
     private double Time => _fixedTime ?? _elapsed;
+    private bool AutoSelectChat => capi.Settings.Bool.Get("autoChatOpenSelected", true);
+    private bool AutoOpenChat => capi.Settings.Bool.Get("autoChat", true);
+    private SetupWizardChatFocusPreview.State ChatFocusState => SetupWizardChatFocusPreview.At(Draft, Time, AutoSelectChat, AutoOpenChat, _manualChatTab);
+    private bool AnimatedPreview => SetupWizardAppearancePreview.Supports(CurrentStepId) ||
+        SetupWizardSpeechPreview.HasScene(CurrentStepId) || SetupWizardTravelPreview.Supports(CurrentStepId) ||
+        CurrentStepId is "chat.tabs" or "characters.slots" or "notifications.sleep";
+    private double PreviewDuration => SetupWizardAppearancePreview.Supports(CurrentStepId)
+        ? SetupWizardAppearancePreview.DurationSeconds(CurrentStepId, Draft)
+        : SetupWizardTravelPreview.Supports(CurrentStepId) ? SetupWizardTravelPreview.DurationSeconds(CurrentStepId, Draft)
+        : CurrentStepId == "chat.tabs" ? SetupWizardChatFocusPreview.DurationSeconds
+        : CurrentStepId is "characters.slots" or "notifications.sleep" ? 8 : 12;
     private int Sleepers => (int)(Time / 2) % 4;
     private string SleepCountText() => $"{Sleepers} of 4 players are asleep.";
     private bool NeedsRestart => _runtimeApplyFailed || _restartKeys.Count > 0;
     private bool CompactLayout => capi.Render.FrameHeight / Math.Max(RuntimeEnv.GUIScale, 0.1f) < 660;
-    private double SettingsWidth => SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? Math.Min(546, Width - 32) : Math.Min(546, Width - 334);
-    private double SettingsX => SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? (Width - SettingsWidth) / 2 : 334;
+    private double SettingsWidth => _inSettingsForm ? _settingsForm.Width : SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? Math.Min(546, Width - 32) : Math.Min(546, Width - 334);
+    private double SettingsX => _inSettingsForm ? 0 : SetupWizardFeaturePreview.IsSettingsOnly(CurrentStepId) ? (Width - SettingsWidth) / 2 : 334;
     private double FeaturePreviewHeight => CurrentStepId == "map.visibility" ? 270 : 220;
     private double BodyHeight => CompactLayout ? 528 : 608;
     private double FooterY => BodyHeight - 38;
@@ -715,6 +1044,24 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         "DisableRPChat" => "Roleplay features",
         "SleepNotificationThreshold" => "Sleeping players needed (%)",
+        "ProximityChatName" => "Proximity tab name",
+        "ProximityChatTabPosition" => "Proximity tab position",
+        "PlayerStatSystem" => "Track player activity",
+        "PlayerStatClearPermission" => "Who can clear saved statistics",
+        "PlayerStatToggles.BlockBreaks" => "Count blocks broken",
+        "PlayerStatToggles.Deaths" => "Count deaths",
+        "PlayerStatToggles.DistanceTravelled" => "Track distance travelled",
+        "PlayerStatToggles.NpcKills" => "Count creature kills",
+        "PlayerStatToggles.PlayerKills" => "Count player kills",
+        "EnableTh3EssentialsDiscordRelay" => "Allow th3essentials Discord relay",
+        "EnableNearbyDeathMessagesInProximityChat" => "Show nearby deaths in Proximity chat",
+        "DebugMode" => "Extra diagnostic logging",
+        "UseNicknameInGlobalOOC" => "Use character names in global OOC",
+        "SetHomeCommandPrivilege" => "Who can set or delete homes",
+        "SetSpawnCommandPrivilege" => "Who can set world spawn",
+        "ChatHistoryFlushIntervalMilliseconds" => "Write queued history every (milliseconds)",
+        "PlayerStatDistanceTravelledTimer" => "Sample movement every (milliseconds)",
+        "MaxEnvironmentPlacementDistance" => "Maximum placement distance (blocks)",
         _ => definition.Label
     };
     private static string DisplayValue(ConfigAdminSettingDefinition definition, string value)
@@ -741,102 +1088,59 @@ public sealed class SetupWizardDialog : GuiDialog
     private bool Bool(string key) => ConfigAdminSettingDefinition.TryParseBool(Draft.Get(key), out var value) && value;
     private double Number(string key) => double.TryParse(Draft.Get(key), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && double.IsFinite(value) ? value : 0;
 
-    private void DrawDiagram(Context context, ImageSurface surface, ElementBounds bounds)
+    private void DrawSleepScene(Context context, ImageSurface surface, ElementBounds bounds)
     {
         context.Save();
-        context.SetSourceRGBA(0.08, 0.11, 0.12, 0.8);
-        context.Rectangle(0, 0, surface.Width, surface.Height);
-        context.Fill();
-        var scale = Math.Min(surface.Width / 169d, surface.Height / 168d);
-        context.Translate((surface.Width - 169 * scale) / 2, 0);
+        var scale = Math.Min(surface.Width / 310d, surface.Height / 112d);
+        context.Translate((surface.Width - 310 * scale) / 2, (surface.Height - 112 * scale) / 2);
         context.Scale(scale, scale);
-        if (CurrentStepId.StartsWith("chat.", StringComparison.Ordinal)) DrawHearing(context);
-        else if (CurrentStepId == "notifications.sleep")
+        for (var index = 0; index < 4; index++)
         {
-            var sleepers = Sleepers;
-            for (var index = 0; index < 4; index++)
+            var x = 12 + index % 2 * 154;
+            var y = 12 + index / 2 * 53;
+            var asleep = index < Sleepers;
+            context.SetSourceRGB(0.29, 0.21, 0.14);
+            context.Rectangle(x, y + 5, 115, 32); context.Fill();
+            context.Rectangle(x + 3, y + 37, 6, 7);
+            context.Rectangle(x + 106, y + 37, 6, 7); context.Fill();
+            context.SetSourceRGB(0.84, 0.78, 0.63);
+            context.Rectangle(x + 4, y + 8, 107, 24); context.Fill();
+            context.SetSourceRGB(0.94, 0.89, 0.74);
+            context.Rectangle(x + 7, y + 10, 22, 20); context.Fill();
+            context.SetSourceRGB(0.25, 0.39, 0.43);
+            context.Rectangle(x + 34, y + 9, 75, 23); context.Fill();
+            context.SetSourceRGBA(0.78, 0.84, 0.77, 0.5);
+            context.Rectangle(x + 36, y + 10, 3, 21); context.Fill();
+            if (asleep)
             {
-                Person(context, 25 + index * 38, 68, index < sleepers);
-                if (index < sleepers) { context.Rectangle(16 + index * 38, 101, 27, 12); context.Fill(); }
+                context.SetSourceRGBA(0.94, 0.89, 0.74, 0.7);
+                context.SelectFontFace("sans-serif", FontSlant.Normal, FontWeight.Normal);
+                context.SetFontSize(11); context.MoveTo(x + 25, y + 2); context.ShowText("z");
             }
-        }
-        else
-        {
-            var phase = (int)(Time / 1.5) % 4;
-            for (var index = 0; index < 4; index++) Person(context, 22 + index * 42, 70, index == phase);
-            context.SetSourceRGBA(0.8, 0.73, 0.45, 1);
-            context.MoveTo(22, 115); context.LineTo(146, 115); context.Stroke();
         }
         context.Restore();
-    }
-
-    private void DrawHearing(Context context)
-    {
-        var modes = new[] { "Whisper", "Normal", "Yell" };
-        var ranges = modes.Select(mode => Number("ProximityChatModeDistances." + mode)).ToArray();
-        var onsets = modes.Select(mode => Number("ProximityChatModeObfuscationRanges." + mode)).ToArray();
-        var obfuscation = Bool("EnableDistanceObfuscationSystem");
-        var extent = Math.Max(1, ranges.Concat(obfuscation ? onsets : Array.Empty<double>()).Max());
-        var pixelsPerBlock = 45 / extent;
-        const double centerX = 84, centerY = 57;
-        context.SetSourceRGBA(0.2, 0.25, 0.27, 1);
-        for (var line = -3; line <= 3; line++)
-        {
-            context.MoveTo(28, centerY + line * 15); context.LineTo(140, centerY + line * 15);
-            context.MoveTo(centerX + line * 15, 7); context.LineTo(centerX + line * 15, 107);
-        }
-        context.Stroke();
-        context.SelectFontFace("sans-serif", FontSlant.Normal, FontWeight.Normal);
-        context.SetFontSize(10);
-        for (var index = modes.Length - 1; index >= 0; index--)
-        {
-            context.SetSourceRGBA(index == 0 ? 0.6 : index == 1 ? 0.35 : 0.98,
-                index == 0 ? 0.78 : index == 1 ? 0.85 : 0.7, index == 0 ? 1 : index == 1 ? 0.52 : 0.38, 1);
-            context.LineWidth = 1.5;
-            if (ranges[index] > 0)
-            {
-                var radius = Math.Max(0.8, (Math.Ceiling(ranges[index]) - 1) * pixelsPerBlock);
-                context.MoveTo(centerX, centerY - radius);
-                context.LineTo(centerX + radius, centerY);
-                context.LineTo(centerX, centerY + radius);
-                context.LineTo(centerX - radius, centerY);
-                context.ClosePath(); context.Stroke();
-            }
-            var fades = obfuscation && ranges[index] > 0;
-            if (fades)
-            {
-                context.SetDash(new[] { 3d, 3d }, index);
-                context.Arc(centerX, centerY, Math.Max(0, onsets[index]) * pixelsPerBlock, 0, Math.PI * 2);
-                context.Stroke(); context.SetDash(Array.Empty<double>(), 0);
-            }
-            var rangeLabel = ranges[index] == -1 ? "server-wide" : ranges[index] <= 0 ? "no listeners" : "up to " + (Math.Ceiling(ranges[index]) - 1).ToString("G3", CultureInfo.InvariantCulture) + " blocks";
-            var onsetLabel = fades ? "; fade " + onsets[index].ToString("G3", CultureInfo.InvariantCulture) : "";
-            context.MoveTo(4, 122 + index * 17);
-            context.ShowText((index == 1 ? "Talk" : modes[index]) + ": " + rangeLabel + onsetLabel);
-        }
-        context.SetSourceRGBA(1, 1, 1, 1);
-        context.Arc(centerX, centerY, 1.5, 0, Math.PI * 2); context.Fill();
-    }
-
-    private static void Person(Context context, double x, double y, bool active)
-    {
-        context.SetSourceRGBA(active ? 0.9 : 0.4, active ? 0.78 : 0.46, active ? 0.43 : 0.48, 1);
-        context.Arc(x, y, 6, 0, Math.PI * 2); context.Fill();
-        context.Rectangle(x - 6, y + 9, 12, 22); context.Fill();
     }
 
     public override void OnRenderGUI(float deltaTime)
     {
         if (Math.Abs(Width - _composedWidth) > 0.1 || Math.Abs(BodyHeight - _composedHeight) > 0.1)
             ComposeDialog();
-        _elapsed += deltaTime;
-        var beat = (int)(Time / (CurrentStepId == "notifications.sleep" ? 2 : 1.5));
+        if (!_previewPaused && !_fixedTime.HasValue)
+        {
+            _elapsed += deltaTime;
+            if (AnimatedPreview && _elapsed >= PreviewDuration) _elapsed %= PreviewDuration;
+        }
+        var beat = (int)(Time / (AnimatedPreview ? 0.1 : 1.5));
         if (beat != _lastBeat)
         {
             _lastBeat = beat;
             RefreshPreview();
         }
-        base.OnRenderGUI(deltaTime);
+        var colorPicker = OpenColorPicker();
+        GuiPopupHoverGuard.RenderBackground(SingleComposer, colorPicker != null, () => base.OnRenderGUI(deltaTime));
+        colorPicker?.RenderPopup(deltaTime);
+        if (colorPicker?.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY) == true)
+            MouseOverCursor = colorPicker.MouseOverCursor;
         var picker = OpenPrivilegePicker();
         if (picker?.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY) == true)
             MouseOverCursor = picker.MouseOverCursor;
@@ -844,8 +1148,24 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private GuiElementPrivilegePicker OpenPrivilegePicker() => _privilegePickers.FirstOrDefault(picker => picker.IsSuggestionsOpen);
 
+    private GuiElementColorPicker OpenColorPicker() => _colorPickers.FirstOrDefault(picker => picker.IsOpen) ??
+        (SingleComposer?.GetElement("language-editor-color-picker") is GuiElementColorPicker { IsOpen: true } picker ? picker : null);
+
+    private string PreviewColor(string key)
+    {
+        var value = Draft.Get(key);
+        return string.IsNullOrWhiteSpace(value) || value.IndexOfAny(new[] { '"', '\'', '<', '>' }) >= 0 ? "#FFFFFF" : value;
+    }
+
     public override bool OnEscapePressed()
     {
+        var colorPicker = OpenColorPicker();
+        if (colorPicker != null)
+        {
+            colorPicker.Close();
+            SingleComposer.FocusElement(colorPicker.TabIndex);
+            return true;
+        }
         var picker = OpenPrivilegePicker();
         if (picker == null) return base.OnEscapePressed();
         picker.CloseSuggestions();
@@ -854,6 +1174,8 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public override void OnMouseDown(MouseEvent args)
     {
+        OpenColorPicker()?.OnMouseDown(capi, args);
+        if (args.Handled) return;
         if (CurrentStepId == "map.visibility")
             foreach (var key in new[] { "MapHideOtherPlayers", "MapPlayerRenderDistance" })
             {
@@ -872,26 +1194,40 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public override void OnMouseMove(MouseEvent args)
     {
+        OpenColorPicker()?.OnMouseMove(capi, args);
+        if (args.Handled) return;
         OpenPrivilegePicker()?.OnMouseMove(capi, args);
         if (!args.Handled) base.OnMouseMove(args);
     }
 
     public override void OnMouseUp(MouseEvent args)
     {
-        base.OnMouseUp(args);
+        OpenColorPicker()?.OnMouseUp(capi, args);
+        if (!args.Handled) base.OnMouseUp(args);
         FlushNavigation();
     }
 
     public override void OnKeyDown(KeyEvent args)
     {
+        OpenColorPicker()?.OnKeyDown(capi, args);
+        if (args.Handled) return;
+        if (_chatFocus?.SkipClosedTabNavigation(SingleComposer, args) == true) return;
         base.OnKeyDown(args);
         FlushNavigation();
     }
 
     public override void OnMouseWheel(MouseWheelEventArgs args)
     {
+        OpenColorPicker()?.OnMouseWheel(capi, args);
+        if (args.IsHandled) return;
         OpenPrivilegePicker()?.OnMouseWheel(capi, args);
         if (!args.IsHandled) base.OnMouseWheel(args);
+    }
+
+    public override void OnKeyPress(KeyEvent args)
+    {
+        OpenColorPicker()?.OnKeyPress(capi, args);
+        if (!args.Handled) base.OnKeyPress(args);
     }
 
     private void Track(string action, string choice = null) => _onTrack?.Invoke(CurrentStepId, action, choice);
@@ -942,7 +1278,8 @@ public sealed class SetupWizardDialog : GuiDialog
         _closeConfirm?.Dispose();
         _closeConfirm = null;
         base.TryClose();
-        try { _preview?.Dispose(); }
+        _sheetEditor?.Dispose();
+        try { _actors?.Dispose(); }
         finally { base.Dispose(); }
     }
 
@@ -960,7 +1297,7 @@ public sealed class SetupWizardDialog : GuiDialog
         public override void ComposeElements(Context context, ImageSurface surface) => Bounds.CalcWorldBounds();
         public override void RenderInteractiveElements(float deltaTime)
         {
-            _dialog._preview.Render(deltaTime, Bounds);
+            _dialog._preview.Render(_dialog._previewPaused ? 0 : deltaTime, Bounds);
         }
         public override void OnMouseDown(ICoreClientAPI api, MouseEvent args)
         {

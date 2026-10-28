@@ -9,7 +9,6 @@ public class SetupWizardCoverageTests
     // Remove a key only when its destination is implemented and verified.
     private static readonly string[] PendingMigrationKeys =
     [
-        "UseNicknameInGlobalOOC",
         "RequireClearSoundPathForSpeech.Normal",
         "RequireClearSoundPathForSpeech.Whisper",
         "RequireClearSoundPathForSpeech.Yell",
@@ -34,8 +33,6 @@ public class SetupWizardCoverageTests
         "ChatDelimiters.Quote.Start",
         "ChatDelimiters.SignLanguageQuote.End",
         "ChatDelimiters.SignLanguageQuote.Start",
-        "ProximityChatName",
-        "ProximityChatTabPosition",
         "ApplyColorsToNicknames",
         "ApplyColorsToPlayerNames",
         "BoldNicknames",
@@ -71,19 +68,6 @@ public class SetupWizardCoverageTests
         "ProximityChatModeVerbs.Whisper",
         "ProximityChatModeVerbs.Yell",
         "RPTextTogglePermission",
-        "EnableNearbyDeathMessagesInProximityChat",
-        "MaxEnvironmentPlacementDistance",
-        "DebugMode",
-        "EnableTh3EssentialsDiscordRelay",
-        "ChatHistoryFlushIntervalMilliseconds",
-        "PlayerStatDistanceTravelledTimer",
-        "PlayerStatToggles.BlockBreaks",
-        "PlayerStatToggles.Deaths",
-        "PlayerStatToggles.DistanceTravelled",
-        "PlayerStatToggles.NpcKills",
-        "PlayerStatToggles.PlayerKills",
-        "SetHomeCommandPrivilege",
-        "SetSpawnCommandPrivilege",
     ];
 
     private static string[] RegisteredKeys => ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key).ToArray();
@@ -93,8 +77,8 @@ public class SetupWizardCoverageTests
     public void CatalogAndPendingInventoryPartitionTheScalarRegistry()
     {
         RegisteredKeys.Should().HaveCount(210).And.OnlyHaveUniqueItems();
-        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(135);
-        PendingMigrationKeys.Should().HaveCount(75).And.OnlyHaveUniqueItems();
+        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(151);
+        PendingMigrationKeys.Should().HaveCount(59).And.OnlyHaveUniqueItems();
         CoverageErrors(RegisteredKeys, CoveredKeys, PendingMigrationKeys).Should().BeEmpty();
         foreach (var key in PendingMigrationKeys)
             SetupWizardCatalog.IsSettingKey(key).Should().BeFalse($"{key} has no implemented wizard destination yet");

@@ -31,7 +31,7 @@ public sealed class GuiElementPrivilegePicker : GuiElementControl
         this.value = value ?? "";
         this.onChanged = onChanged;
         this.suggestions = ConfigAdminPrivilegeSuggestions.ForClient(suggestions, new[] { this.value }).ToArray();
-        input = new GuiElementTextInput(api, ElementBounds.Fixed(0, 0, 1, 1).WithParent(bounds),
+        input = new SetupWizardViewportTextInput(api, ElementBounds.Fixed(0, 0, 1, 1).WithParent(bounds),
             TextChanged, font.Clone());
         menu = new PrivilegeListMenu(api, ElementBounds.Fixed(0, 0, 1, 1).WithParent(bounds),
             SelectSuggestion, font.Clone().WithFontSize(17));
@@ -144,7 +144,8 @@ public sealed class GuiElementPrivilegePicker : GuiElementControl
 
     public override void RenderInteractiveElements(float deltaTime)
     {
-        RenderControl(deltaTime);
+        input.InsideClipBounds = InsideClipBounds;
+        SetupWizardViewportClip.Render(api, InsideClipBounds, () => RenderControl(deltaTime));
         RenderSuggestions(deltaTime);
     }
 
@@ -207,7 +208,7 @@ public sealed class GuiElementPrivilegePicker : GuiElementControl
         menu.OnFocusLost();
     }
 
-    public override bool IsPositionInside(int x, int y) => base.IsPositionInside(x, y) || menu.IsPositionInside(x, y);
+    public override bool IsPositionInside(int x, int y) => ((InsideClipBounds == null || InsideClipBounds.PointInside(x, y)) && base.IsPositionInside(x, y)) || menu.IsPositionInside(x, y);
 
     public override void OnMouseDown(ICoreClientAPI api, MouseEvent args)
     {
@@ -219,7 +220,7 @@ public sealed class GuiElementPrivilegePicker : GuiElementControl
         }
         var wasOpen = menu.IsOpened;
         CloseSuggestions();
-        if (!base.IsPositionInside(args.X, args.Y)) return;
+        if ((InsideClipBounds != null && !InsideClipBounds.PointInside(args.X, args.Y)) || !base.IsPositionInside(args.X, args.Y)) return;
         if (args.X >= Bounds.renderX + Bounds.InnerWidth - arrowReleased.Width)
         {
             if (!wasOpen) ShowSuggestions(true);

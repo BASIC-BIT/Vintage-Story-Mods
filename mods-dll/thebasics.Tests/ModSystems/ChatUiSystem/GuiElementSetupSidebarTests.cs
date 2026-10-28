@@ -21,7 +21,7 @@ public class GuiElementSetupSidebarTests
             Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, width, height, scale);
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
         using var wizard = new SetupWizardDialog(host.Api, draft, "sidebar-card-fit", true,
-            null!, null!, null!, layoutOnly: true);
+            null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         wizard.TryOpen();
         host.RenderGuiDialog(wizard, 0);
         foreach (var topic in SetupWizardCatalog.Topics)
@@ -59,7 +59,7 @@ public class GuiElementSetupSidebarTests
             }
         }
         Render(host, composer);
-        Assert.Equal(40, SetupWizardCatalog.Pages.Count);
+        Assert.Equal(SetupWizardCatalog.Pages.Count, SetupWizardCatalog.Pages.Select(page => page.Id).Distinct().Count());
         Assert.Empty(host.UnsupportedCalls);
     }
 

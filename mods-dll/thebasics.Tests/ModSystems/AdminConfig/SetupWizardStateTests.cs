@@ -9,7 +9,7 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class SetupWizardStateTests
 {
     [Fact]
-    public void Catalog_UsesReadOnlyTopicsWithBoundedRegistryBackedPages()
+    public void Catalog_UsesReadOnlyTopicsWithRegistryBackedPages()
     {
         var topicIds = new[] { "chat", "teleportation", "notifications", "appearance", "map", "characters", "roleplay", "server" };
         SetupWizardCatalog.Topics.Select(topic => topic.Id).Should().OnlyHaveUniqueItems().And.BeEquivalentTo(topicIds);
@@ -30,7 +30,8 @@ public class SetupWizardStateTests
         {
             page.Title.Should().NotBeNullOrWhiteSpace();
             page.Description.Should().NotBeNullOrWhiteSpace();
-            page.SettingKeys.Should().NotBeEmpty().And.HaveCountLessThanOrEqualTo(5);
+            if (page.Id is "chat.languageeditor" or "characters.builder") page.SettingKeys.Should().BeEmpty();
+            else page.SettingKeys.Should().NotBeEmpty();
             SetupWizardCatalog.TryGetPage(page.Id, out var found).Should().BeTrue();
             found.Should().Be(page);
             foreach (var key in page.SettingKeys)
@@ -42,7 +43,8 @@ public class SetupWizardStateTests
 
         SetupWizardCatalog.TryGetPage("unknown-page", out _).Should().BeFalse();
         SetupWizardCatalog.IsSettingKey("UnknownSetting").Should().BeFalse();
-        SetupWizardCatalog.IsSettingKey("DebugMode").Should().BeFalse();
+        SetupWizardCatalog.IsSettingKey("DebugMode").Should().BeTrue();
+        SetupWizardCatalog.IsSettingKey("Languages").Should().BeFalse();
     }
 
     [Fact]
@@ -83,7 +85,7 @@ public class SetupWizardStateTests
     [Theory]
     [InlineData("UnknownSetting")]
     [InlineData("Teleportation.UnknownCommand")]
-    [InlineData("DebugMode")]
+    [InlineData("ReviewedConfigSettingKeys")]
     public void TryValidatePatch_RejectsUnknownAndNonWizardKeysWithoutMutatingCurrent(string key)
     {
         var current = CreateConfig();
@@ -196,6 +198,150 @@ public class SetupWizardStateTests
     {
         SetupWizardState.ValidateRequest(Request([Value("EnableChatter", "0")], [])).Should().NotBeEmpty();
         SetupWizardState.ValidateRequest(Request([], [Value("EnableChatter", "1")])).Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void LanguagePatchAndSettingsProduceOneDetachedDraftPreservingGrants()
+    {
+        var current = CreateConfig();
+        var originals = LanguageConfigAdmin.BuildEntries(current);
+        var request = Request([Value("EnableChatter", "0")], [Value("EnableChatter", "1")]);
+        request.OriginalLanguages = LanguageConfigAdmin.CloneEntries(originals);
+        request.Languages = LanguageConfigAdmin.CloneEntries(originals);
+        request.Languages[0].Name = "River speech";
+        request.Languages[0].Prefix = "river";
+        request.Languages[0].Color = "#34AACC";
+        request.Languages[0].GrantedToClasses = "hunter, tailor";
+        request.Languages[0].GrantedToModels = "seraph";
+        request.Languages[0].GrantedToModelGroups = "folk";
+        request.Languages[0].GrantedToTraits = "keenears";
+
+        new SetupWizardState(current).TryValidatePatch(current, request, out var draft, out var changed, out var conflicts, out var errors)
+            .Should().BeTrue();
+
+        errors.Should().BeEmpty();
+        conflicts.Should().BeEmpty();
+        changed.Should().BeEquivalentTo("EnableChatter", "Languages");
+        draft.EnableChatter.Should().BeFalse();
+        draft.Languages[0].Name.Should().Be("River speech");
+        draft.Languages[0].GrantedToClasses.Should().Equal("hunter", "tailor");
+        draft.Languages[0].GrantedToModels.Should().Equal("seraph");
+        draft.Languages[0].GrantedToModelGroups.Should().Equal("folk");
+        draft.Languages[0].GrantedToTraits.Should().Equal("keenears");
+        LanguageConfigAdmin.EntriesEqual(LanguageConfigAdmin.BuildEntries(current), originals).Should().BeTrue();
+        current.EnableChatter.Should().BeTrue();
+    }
+
+    [Fact]
+    public void StaleLanguageSnapshotRejectsTheWholePatch()
+    {
+        var current = CreateConfig();
+        var state = new SetupWizardState(current);
+        var request = Request([Value("EnableChatter", "0")], [Value("EnableChatter", "1")]);
+        request.OriginalLanguages = LanguageConfigAdmin.BuildEntries(current);
+        request.Languages = LanguageConfigAdmin.CloneEntries(request.OriginalLanguages);
+        request.Languages[0].Color = "#ABCDEF";
+        current.Languages[0] = current.Languages[0] with { Description = "Changed by another administrator" };
+
+        state.TryValidatePatch(current, request, out var draft, out _, out var conflicts, out var errors).Should().BeFalse();
+
+        draft.Should().BeNull();
+        conflicts.Should().Equal("Languages");
+        errors.Should().Contain(error => error.Contains("changed since setup opened"));
+        current.EnableChatter.Should().BeTrue();
+        current.Languages[0].Description.Should().Be("Changed by another administrator");
+    }
+
+    [Fact]
+    public void ScalarPatchPreservesLanguagesChangedSinceSetupOpened()
+    {
+        var current = CreateConfig();
+        var state = new SetupWizardState(current);
+        current.Languages[0] = current.Languages[0] with { Description = "Changed by another administrator" };
+
+        state.TryValidatePatch(current, Request([Value("EnableChatter", "0")], [Value("EnableChatter", "1")]),
+            out var draft, out var changed, out _, out var errors).Should().BeTrue();
+
+        errors.Should().BeEmpty();
+        changed.Should().Equal("EnableChatter");
+        draft.Languages[0].Description.Should().Be("Changed by another administrator");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void InvalidLanguagesRejectScalarChangesAtomically(bool removeAll)
+    {
+        var current = CreateConfig();
+        var request = Request([Value("EnableChatter", "0")], [Value("EnableChatter", "1")]);
+        request.OriginalLanguages = LanguageConfigAdmin.BuildEntries(current);
+        request.Languages = removeAll ? [] : LanguageConfigAdmin.CloneEntries(request.OriginalLanguages);
+        if (!removeAll) request.Languages[0].Color = "not-a-color";
+
+        new SetupWizardState(current).TryValidatePatch(current, request, out var draft, out _, out _, out var errors)
+            .Should().BeFalse();
+
+        draft.Should().BeNull();
+        errors.Should().Contain(error => error.Contains(removeAll ? "At least one language" : "hex color"));
+        current.EnableChatter.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("duplicate")]
+    public void InvalidRenameIdentityRejectsLanguagePatch(string issue)
+    {
+        var current = CreateConfig();
+        var request = Request([], []);
+        request.OriginalLanguages = LanguageConfigAdmin.BuildEntries(current);
+        request.Languages = LanguageConfigAdmin.CloneEntries(request.OriginalLanguages);
+        if (issue == "unknown") request.Languages[0].OriginalName = "Missing language";
+        else request.Languages.Add(request.Languages[0] with { Name = "New speech", Prefix = "new" });
+
+        new SetupWizardState(current).TryValidatePatch(current, request, out _, out _, out _, out var errors)
+            .Should().BeFalse();
+
+        errors.Should().Contain(error => error.Contains("original name"));
+    }
+
+    [Fact]
+    public void NoOpLanguagePatchDoesNotReportChangedLanguages()
+    {
+        var current = CreateConfig();
+        var request = Request([], []);
+        request.OriginalLanguages = LanguageConfigAdmin.BuildEntries(current);
+        request.Languages = LanguageConfigAdmin.CloneEntries(request.OriginalLanguages);
+
+        new SetupWizardState(current).TryValidatePatch(current, request, out _, out var changed, out _, out var errors)
+            .Should().BeTrue();
+
+        errors.Should().BeEmpty();
+        changed.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("rows")]
+    [InlineData("field")]
+    [InlineData("payload")]
+    [InlineData("null-row")]
+    [InlineData("null-list")]
+    [InlineData("non-save")]
+    public void LanguagePayloadRejectsOversizedMissingAndNonSaveData(string issue)
+    {
+        var request = Request([], []);
+        var entry = LanguageConfigAdmin.BuildEntries(CreateConfig())[0];
+        request.Languages = issue switch
+        {
+            "rows" => Enumerable.Repeat(entry, 257).ToList(),
+            "field" => [entry with { GrantedToTraits = new string('x', 4097) }],
+            "payload" => Enumerable.Repeat(entry with { Description = new string('x', 4096), GrantedToClasses = new string('x', 4096) }, 40).ToList(),
+            "null-row" => [null!],
+            "null-list" => null!,
+            _ => [entry]
+        };
+        if (issue == "non-save") request.Kind = SetupWizardRequestKind.Open;
+
+        SetupWizardState.ValidateRequest(request).Should().NotBeEmpty();
     }
 
     [Theory]

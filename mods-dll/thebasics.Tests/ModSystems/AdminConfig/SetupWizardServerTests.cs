@@ -2,10 +2,12 @@ using System.Reflection;
 using FluentAssertions;
 using NSubstitute;
 using thebasics.Configs;
+using thebasics.Extensions;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ProximityChat;
+using thebasics.ModSystems.ProximityChat.Models;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -36,6 +38,7 @@ public class SetupWizardServerTests : IDisposable
         results.Last().Kind.Should().Be(SetupWizardResultKind.Denied);
         results.Last().RequestId.Should().Be(4);
         results.Last().Success.Should().BeFalse();
+        results.Last().Languages.Should().BeEmpty();
         system.Config.EnableChatter.Should().BeTrue();
         api.DidNotReceive().StoreModConfig(Arg.Any<ModConfig>(), Arg.Any<string>());
     }
@@ -165,9 +168,14 @@ public class SetupWizardServerTests : IDisposable
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }]
         };
 
+        request.OriginalSheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(system.Config);
+        request.SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(request.OriginalSheetFields);
+        request.SheetFields[0].Label = "Persisted before live failure";
         system.OnSetupWizardRequest(player, request);
 
         var saved = results.Last();
+        saved.SheetFields[0].Label.Should().Be("Persisted before live failure");
+        system.Config.CharacterSheetFields[0].Label.Should().Be("Persisted before live failure");
         saved.Success.Should().BeTrue();
         saved.RuntimeApplyFailed.Should().BeTrue();
         saved.Message.Should().Contain("Settings saved").And.Contain("Restart");
@@ -209,6 +217,200 @@ public class SetupWizardServerTests : IDisposable
         channel.Received(2).SendPacket(Arg.Is<TheBasicsSetupWizardResultMessage>(result =>
             result.Kind == SetupWizardResultKind.SaveResult && result.RequestId == 4 && result.Success), Arg.Any<IServerPlayer[]>());
     }
+
+    [Fact]
+    public void OpenAndCaptureReturnActualConfiguredLanguagesWithoutWriting()
+    {
+        var (system, api, results) = CreateSystem();
+        system.Config.Languages = [new Language("River speech", "A local dialect", "river", ["ra", "vo"], "#34AACC", true,
+            GrantedToClasses: ["hunter"], GrantedToModels: ["seraph"], GrantedToModelGroups: ["folk"], GrantedToTraits: ["keenears"])];
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+
+        foreach (var captureOnly in new[] { false, true })
+        {
+            system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open, CaptureOnly = captureOnly });
+
+            results.Last().Languages.Should().BeEquivalentTo(LanguageConfigAdmin.BuildEntries(system.Config));
+            results.Last().Languages.Single().OriginalName.Should().Be("River speech");
+            results.Last().Languages.Single().GrantedToTraits.Should().Be("keenears");
+        }
+        api.DidNotReceive().StoreModConfig(Arg.Any<ModConfig>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void SaveLanguagesPersistsOneAtomicDraftReconcilesRenamesAndCachesRetry()
+    {
+        var (system, api, results) = CreateSystem();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        var languageIndex = system.Config.Languages.ToList().FindIndex(language => !language.Default);
+        var oldLanguage = system.Config.Languages[languageIndex];
+        player.SetLanguages([oldLanguage.Name]);
+        player.SetDefaultLanguage(oldLanguage);
+        player.SetLanguageSkills(new Dictionary<string, int> { [oldLanguage.Name] = 65 });
+        var learner = new FakeServerPlayer("learner");
+        learner.SetLanguages([]);
+        learner.SetLanguageSkills(new Dictionary<string, int> { [oldLanguage.Name] = 65 });
+        api.World.AllOnlinePlayers.Returns([player, learner]);
+        system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open });
+        var request = new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Save, RequestId = 5, RunId = results.Last().RunId,
+            Values = [new() { Key = "EnableChatter", Value = "0" }],
+            OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
+            OriginalLanguages = LanguageConfigAdmin.CloneEntries(results.Last().Languages),
+            Languages = LanguageConfigAdmin.CloneEntries(results.Last().Languages)
+        };
+        request.OriginalSheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(results.Last().SheetFields);
+        request.SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(results.Last().SheetFields);
+        request.SheetFields[0].Label = "Atomic field";
+        request.Languages[languageIndex].Name = "River speech";
+        request.Languages[languageIndex].Prefix = "river";
+        request.Languages[languageIndex].GrantedToClasses = "hunter";
+
+        system.OnSetupWizardRequest(player, request);
+
+        var saved = results.Last();
+        saved.Success.Should().BeTrue();
+        system.Config.EnableChatter.Should().BeFalse();
+        system.Config.Languages[languageIndex].Name.Should().Be("River speech");
+        system.Config.Languages[languageIndex].GrantedToClasses.Should().Equal("hunter");
+        player.GetLanguages().Should().Equal("River speech");
+        player.GetDefaultLanguageName().Should().Be("River speech");
+        player.GetLanguageSkills().Should().BeEmpty();
+        learner.GetLanguageSkills().Should().ContainKey("River speech").WhoseValue.Should().Be(65);
+        GetPendingRenames(system).Should().ContainKey(oldLanguage.Name).WhoseValue.Should().Be("River speech");
+        saved.Languages[languageIndex].OriginalName.Should().Be("River speech");
+        saved.SheetFields[0].Label.Should().Be("Atomic field");
+        system.Config.CharacterSheetFields[0].Label.Should().Be("Atomic field");
+        system.OnSetupWizardRequest(player, request);
+        results.Last().Should().BeSameAs(saved);
+        api.Received(1).StoreModConfig(Arg.Is<ModConfig>(config => !config.EnableChatter && config.Languages[languageIndex].Name == "River speech"), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void FailedLanguageWriteLeavesSettingsAndPlayerKnowledgeUnchanged()
+    {
+        var (system, api, results) = CreateSystem();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        var oldName = system.Config.Languages[0].Name;
+        player.SetLanguages([oldName]);
+        api.World.AllOnlinePlayers.Returns([player]);
+        system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open });
+        var request = new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Save, RequestId = 6, RunId = results.Last().RunId,
+            Values = [new() { Key = "EnableChatter", Value = "0" }],
+            OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
+            OriginalLanguages = LanguageConfigAdmin.CloneEntries(results.Last().Languages),
+            Languages = LanguageConfigAdmin.CloneEntries(results.Last().Languages)
+        };
+        var oldFields = CharacterSheetFieldConfigAdmin.BuildEntries(system.Config);
+        request.OriginalSheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(oldFields);
+        request.SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(oldFields);
+        request.SheetFields[0].Label = "Must not persist";
+        request.Languages[0].Name = "River speech";
+        api.When(value => value.StoreModConfig(Arg.Any<ModConfig>(), Arg.Any<string>()))
+            .Do(_ => throw new IOException("test write failure"));
+
+        system.OnSetupWizardRequest(player, request);
+
+        results.Last().Success.Should().BeFalse();
+        results.Last().Message.Should().Contain("Could not write");
+        system.Config.EnableChatter.Should().BeTrue();
+        system.Config.Languages[0].Name.Should().Be(oldName);
+        player.GetLanguages().Should().Equal(oldName);
+        GetPendingRenames(system).Should().BeEmpty();
+        CharacterSheetFieldConfigAdmin.EntriesEqual(CharacterSheetFieldConfigAdmin.BuildEntries(system.Config), oldFields).Should().BeTrue();
+    }
+
+
+    [Theory]
+    [InlineData("invalid")]
+    [InlineData("delete-all")]
+    [InlineData("duplicate-binding")]
+    [InlineData("stale")]
+    public void RejectedFieldPatchNeverWritesAnyConfiguration(string fault)
+    {
+        var (system, api, results) = CreateSystem();
+        var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+        system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open });
+        var request = new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Save, RequestId = 20, RunId = results.Last().RunId,
+            Values = [new() { Key = "EnableChatter", Value = "0" }], OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
+            SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(results.Last().SheetFields),
+            OriginalSheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(results.Last().SheetFields)
+        };
+        switch (fault)
+        {
+            case "invalid": request.SheetFields[0].Label = ""; break;
+            case "delete-all": request.SheetFields.Clear(); break;
+            case "duplicate-binding": request.SheetFields[0].BindTo = request.SheetFields[1].BindTo = "thebasics.fullName"; break;
+            case "stale": system.Config.CharacterSheetFields[0].Label = "Legacy editor save"; break;
+        }
+        system.OnSetupWizardRequest(player, request);
+        results.Last().Success.Should().BeFalse();
+        system.Config.EnableChatter.Should().BeTrue();
+        api.DidNotReceive().StoreModConfig(Arg.Any<ModConfig>(), Arg.Any<string>());
+        if (fault == "stale") results.Last().ConflictKeys.Should().Contain("CharacterSheetFields");
+    }
+
+    [Theory]
+    [InlineData("SetHomeCommandPrivilege", "sethome")]
+    [InlineData("SetSpawnCommandPrivilege", "setspawn")]
+    public void SetupSaveRefreshesRegisteredHomeSpawnCommandPermissions(string key, string commandName)
+    {
+        thebasics.Tests.Support.LangTestHelper.EnsureEnglish();
+        var (system, api, results) = CreateSystem();
+        var command = Substitute.For<IChatCommand>();
+        api.ChatCommands.Get(commandName).Returns(command);
+        system.Config.Teleportation.RegisterHomeCommands = true;
+        system.Config.Teleportation.RegisterSpawnCommands = true;
+        var home = new thebasics.ModSystems.HomeSpawn.HomeSpawnSystem { API = api, Config = system.Config };
+        var loaded = (List<thebasics.ModSystems.BaseBasicModSystem>)typeof(thebasics.ModSystems.BaseBasicModSystem)
+            .GetField("LoadedSystems", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+        loaded.Add(home);
+        try
+        {
+            var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+            system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open });
+            ConfigAdminSettingRegistry.TryGet(key, out var setting);
+            system.OnSetupWizardRequest(player, new()
+            {
+                Kind = SetupWizardRequestKind.Save, RequestId = 10, RunId = results.Last().RunId,
+                Values = [new() { Key = key, Value = "custom.travel" }],
+                OriginalValues = [new() { Key = key, Value = setting.GetValue(system.Config) }]
+            });
+            results.Last().Success.Should().BeTrue();
+            command.Received().RequiresPrivilege("custom.travel");
+        }
+        finally { loaded.Remove(home); }
+    }
+
+    [Theory]
+    [InlineData("ProximityChatName", "Nearby")]
+    [InlineData("ChatHistoryFlushIntervalMilliseconds", "1250")]
+    [InlineData("PlayerStatDistanceTravelledTimer", "1500")]
+    public void MigratedRestartSettingsRemainClassifiedAfterSaving(string key, string value)
+    {
+        ConfigAdminSettingRegistry.TryGet(key, out var setting).Should().BeTrue();
+        setting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.RestartRequired);
+        var config = new ModConfig();
+        config.InitializeDefaultsIfNeeded();
+        var state = new SetupWizardState(config);
+        var request = new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Save, RequestId = 1,
+            Values = [new() { Key = key, Value = value }],
+            OriginalValues = [new() { Key = key, Value = setting.GetValue(config) }]
+        };
+        state.TryValidatePatch(config, request, out var candidate, out _, out _, out var errors).Should().BeTrue(string.Join("; ", errors));
+        state.GetPendingRestartKeys(candidate).Should().Contain(key);
+    }
+
+    private static Dictionary<string, string> GetPendingRenames(RPProximityChatSystem system) =>
+        (Dictionary<string, string>)typeof(RPProximityChatSystem)
+            .GetField("_languageRenameMapForJoiningPlayers", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(system)!;
 
     private static void OfferInvitation(RPProximityChatSystem system, IServerPlayer player)
     {
