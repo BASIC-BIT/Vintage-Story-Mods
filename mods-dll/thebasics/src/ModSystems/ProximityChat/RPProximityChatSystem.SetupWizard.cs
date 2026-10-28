@@ -123,6 +123,7 @@ public partial class RPProximityChatSystem
     private void MaintainSetupWizard(IServerPlayer player, TheBasicsSetupWizardRequestMessage request, SetupWizardRun run)
     {
         var success = false;
+        var kind = SetupWizardResultKind.MaintenanceResult;
         string message;
         if (request.Kind == SetupWizardRequestKind.MarkReviewed)
         {
@@ -133,19 +134,26 @@ public partial class RPProximityChatSystem
         }
         else
         {
+            var loaded = false;
             try
             {
-                success = TryReloadConfigAndGetChangedKeys(out _);
+                success = TryReloadConfigAndGetChangedKeys(out _, out loaded);
                 message = success ? "Settings reloaded from disk." : "Could not reload the config file. Your edits are still here.";
             }
             catch (Exception error)
             {
-                _setupWizardRuntimeApplyFailed = true;
-                API.Logger?.Error("The BASICs: config reload live application failed ({0}).", error.GetType().Name);
-                message = "Reload could not finish. Your edits are still here. Restart the server before trying again.";
+                if (loaded)
+                {
+                    kind = SetupWizardResultKind.ReloadPartiallyApplied;
+                    _setupWizardRuntimeApplyFailed = true;
+                }
+                API.Logger?.Error("The BASICs: config reload failed after load={0} ({1}).", loaded, error.GetType().Name);
+                message = loaded
+                    ? "Disk settings loaded. Some changes failed. Restart the server. Your edits are unsaved."
+                    : "Could not reload the config file. Your edits are still here.";
             }
         }
-        SendSetupWizardResult(player, SetupWizardResultKind.MaintenanceResult, request.RequestId, run.Id, success, message);
+        SendSetupWizardResult(player, kind, request.RequestId, run.Id, success, message);
     }
 
     private void SaveSetupWizard(IServerPlayer player, TheBasicsSetupWizardRequestMessage request, SetupWizardRun run)

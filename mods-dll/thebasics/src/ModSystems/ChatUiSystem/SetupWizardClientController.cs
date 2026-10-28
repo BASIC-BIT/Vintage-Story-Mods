@@ -92,9 +92,9 @@ public sealed class SetupWizardClientController : IDisposable
             _maintenance = null;
             if (CurrentDialog != null && result.Kind != SetupWizardResultKind.Denied)
             {
-                if (result.Success && result.Kind == SetupWizardResultKind.MaintenanceResult)
+                if (result.Kind == SetupWizardResultKind.ReloadPartiallyApplied || result.Success && result.Kind == SetupWizardResultKind.MaintenanceResult)
                 {
-                    if (action == SetupWizardRequestKind.Reload) CurrentDialog.Draft.ReplaceAfterReload(result);
+                    if (action == SetupWizardRequestKind.Reload && result.Success) CurrentDialog.Draft.ReplaceAfterReload(result);
                     CurrentDialog.SetSession(result);
                 }
                 CurrentDialog.SetRequestFailure(result.Message ?? "This action is unavailable. Your edits are still here.");
@@ -282,6 +282,7 @@ public sealed class SetupWizardClientController : IDisposable
                 Track("review", "save_timeout", null);
                 RequestOpen(SetupWizardRequestKind.Open, _runId);
             });
+        dialog.RememberSaveNavigation();
         var request = dialog.Draft.CreateSaveRequest(id, _runId);
         Track("review", "save_requested", null);
         _channel.SendPacketSafely(request, () => _requests.Fail(id));

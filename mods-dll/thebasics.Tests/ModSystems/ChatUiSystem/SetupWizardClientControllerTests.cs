@@ -280,9 +280,11 @@ public class SetupWizardClientControllerTests
         sent.Last(request => request.Kind == SetupWizardRequestKind.Save).Languages[0].OriginalName.Should().Be("Coastal");
     }
     [VisualTheory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void RepeatedTargetedCommandsDoNotConsumeDelayedSaveResult(bool success)
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public void RepeatedTargetedCommandsDoNotConsumeDelayedSaveResult(bool success, bool navigate)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720);
         var api = Substitute.For<ICoreClientAPI>(); var channel = Substitute.For<IClientNetworkChannel>(); channel.Connected.Returns(true);
@@ -294,15 +296,59 @@ public class SetupWizardClientControllerTests
         var dialog = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         typeof(SetupWizardClientController).GetProperty(nameof(SetupWizardClientController.CurrentDialog))!.SetValue(controller, dialog);
         typeof(SetupWizardClientController).GetField("_runId", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(controller, "run");
+        dialog.ShowPage("review");
         typeof(SetupWizardClientController).GetMethod("Save", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(controller, null);
         var request = sent.Single(x => x.Kind == SetupWizardRequestKind.Save);
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; navigate && i < 3; i++)
             controller.HandleResult(new() { Kind = SetupWizardResultKind.Open, Success = true, RunId = "run", Destination = "characters.builder", Values = SetupWizardCaptureScenes.DefaultValues() });
         draft.IsSavePending.Should().BeTrue();
+        if (navigate) draft.Set("DebugMode", "1");
+        controller.HandleResult(new() { Kind = SetupWizardResultKind.SaveResult, RequestId = request.RequestId, RunId = "run", Success = success, RestartRequiredKeys = success ? ["ProximityChatName"] : [], Message = "Settings saved.",
+            Values = [new() { Key = "EnableChatter", Value = success ? "0" : "1" }] });
+        draft.IsSavePending.Should().BeFalse(); draft.IsDirty.Should().Be(!success || navigate);
+        draft.Get("EnableChatter").Should().Be("0"); controller.CurrentDialog.Should().BeSameAs(dialog);
+        dialog.CurrentStepId.Should().Be(navigate ? "characters.builder" : success ? "finish" : "review");
+        if (navigate && success)
+        {
+            string.Concat(dialog.SingleComposer.GetRichtext("setup-message").Components.OfType<RichTextComponent>().Select(c => c.DisplayText))
+                .Should().Contain("Restart").And.Contain("Review changes");
+            dialog.ShowPage("review");
+            string.Concat(dialog.SingleComposer.GetRichtext("review-detail-0").Components.OfType<RichTextComponent>().Select(c => c.DisplayText))
+                .Should().Contain("Proximity tab name");
+            draft.Get("DebugMode").Should().Be("1"); draft.IsDirty.Should().BeTrue();
+        }
+    }
+
+    [VisualTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SaveResultDuringHelpPreservesSearchAndScroll(bool success)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720);
+        var api = Substitute.For<ICoreClientAPI>(); api.Gui.Returns(host.Api.Gui);
+        var channel = Substitute.For<IClientNetworkChannel>(); channel.Connected.Returns(true);
+        var sent = new List<TheBasicsSetupWizardRequestMessage>();
+        channel.When(x => x.SendPacket(Arg.Any<TheBasicsSetupWizardRequestMessage>())).Do(call => sent.Add(call.Arg<TheBasicsSetupWizardRequestMessage>()));
+        using var safe = new SafeClientNetworkChannel(channel, api, new() { EnableDebugLogging = false });
+        using var controller = new SetupWizardClientController(api, safe);
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues()); draft.Set("EnableChatter", "0");
+        var dialog = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
+        typeof(SetupWizardClientController).GetProperty(nameof(SetupWizardClientController.CurrentDialog))!.SetValue(controller, dialog);
+        typeof(SetupWizardClientController).GetField("_runId", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(controller, "run");
+        dialog.ShowPage("review"); dialog.TryOpen();
+        typeof(SetupWizardClientController).GetMethod("Save", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(controller, null);
+        var request = sent.Single(x => x.Kind == SetupWizardRequestKind.Save);
+        dialog.ShowSearch("chat"); dialog.SearchPanel.Move(dialog.SingleComposer, 9);
+        var scroll = dialog.SingleComposer.GetScrollbar("settings-scroll").CurrentYPosition;
+        scroll.Should().BeGreaterThan(0);
+        controller.OpenHelp();
         controller.HandleResult(new() { Kind = SetupWizardResultKind.SaveResult, RequestId = request.RequestId, RunId = "run", Success = success,
             Values = [new() { Key = "EnableChatter", Value = success ? "0" : "1" }] });
-        draft.IsSavePending.Should().BeFalse(); draft.IsDirty.Should().Be(!success);
-        draft.Get("EnableChatter").Should().Be("0"); controller.CurrentDialog.Should().BeSameAs(dialog);
+        dialog.IsOpened().Should().BeFalse();
+        controller.ReturnFromHelp(); dialog.IsOpened().Should().BeTrue();
+        dialog.SingleComposer.GetElement("search-result-0").Should().NotBeNull();
+        dialog.SearchPanel.Query.Should().Be("chat");
+        dialog.SingleComposer.GetScrollbar("settings-scroll").CurrentYPosition.Should().Be(scroll);
     }
 
 }

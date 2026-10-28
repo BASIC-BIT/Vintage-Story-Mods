@@ -16,7 +16,8 @@ public class SetupWizardProtocolTests
         var old = Serializer.Deserialize<TheBasicsSetupWizardResultMessage>(packet);
         old.Success.Should().BeTrue(); old.SupportsMaintenance.Should().BeFalse();
         old.ReviewedKeys.Should().BeEmpty(); old.Destination.Should().BeNull();
-        var result = Serializer.DeepClone(new TheBasicsSetupWizardResultMessage { SupportsMaintenance = true, ReviewedKeys = ["EnableChatter"], Destination = "characters.builder" });
+        var result = Serializer.DeepClone(new TheBasicsSetupWizardResultMessage { Kind = SetupWizardResultKind.ReloadPartiallyApplied, SupportsMaintenance = true, ReviewedKeys = ["EnableChatter"], Destination = "characters.builder" });
+        result.Kind.Should().Be(SetupWizardResultKind.ReloadPartiallyApplied);
         result.SupportsMaintenance.Should().BeTrue(); result.ReviewedKeys.Should().Equal("EnableChatter"); result.Destination.Should().Be("characters.builder");
         var request = Serializer.DeepClone(new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open, Destination = "chat.languageeditor" });
         request.Destination.Should().Be("chat.languageeditor");

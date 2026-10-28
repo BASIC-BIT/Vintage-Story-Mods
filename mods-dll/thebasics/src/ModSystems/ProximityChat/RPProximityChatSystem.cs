@@ -1078,8 +1078,12 @@ public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProxi
     /// "nothing was reloaded"; conflating them is what let the editors report success on a parse
     /// failure.
     /// </summary>
-    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys)
+    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys) =>
+        TryReloadConfigAndGetChangedKeys(out changedKeys, out _);
+
+    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys, out bool loaded)
     {
+        loaded = false;
         var before = CloneConfig(Config);
         if (!TryReloadSharedConfigFromDisk(API, out _))
         {
@@ -1087,6 +1091,7 @@ public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProxi
             return false;
         }
 
+        loaded = true;
         changedKeys = GetChangedConfigKeys(before, Config);
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();

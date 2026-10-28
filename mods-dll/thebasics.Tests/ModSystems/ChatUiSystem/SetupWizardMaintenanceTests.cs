@@ -63,9 +63,13 @@ public class SetupWizardMaintenanceTests
         wizard.ShowPage("server.diagnostics");
         wizard.SetRequestFailure("Could not reload the config file. Your edits are still here."); Capture("reload-failed", wizard);
         draft.IsDirty.Should().BeTrue();
+        wizard.SetRequestFailure("Disk settings loaded. Some changes failed. Restart the server. Your edits are unsaved."); Capture("reload-partial", wizard);
         wizard.RequestMaintenance(SetupWizardRequestKind.MarkReviewed);
         requests.Should().Equal(SetupWizardRequestKind.MarkReviewed);
-        wizard.SetSession(new() { RunId = "run", Values = snapshot.Values, Languages = snapshot.Languages, SheetFields = snapshot.SheetFields });
+        wizard.SetSession(new() { RunId = "run", Values = snapshot.Values, Languages = snapshot.Languages, SheetFields = snapshot.SheetFields, IsDedicated = true, RestartRequiredKeys = ["ProximityChatName"] });
+        wizard.SetRequestFailure("Settings saved. Restart needed. See Review changes for details.");
+        wizard.ShowPage("review"); Capture("restart-details", wizard);
+        wizard.ShowPage("server.diagnostics");
         wizard.SingleComposer.GetButton("reload-disk").Enabled.Should().BeFalse();
         wizard.RequestMaintenance(SetupWizardRequestKind.Reload); requests.Should().HaveCount(1);
         draft.IsDirty.Should().BeTrue();
@@ -84,10 +88,13 @@ public class SetupWizardMaintenanceTests
     }
 
     [VisualTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ReloadResponseDiscardsOnlyOnSuccessAndHelpReturnsSameDialog(bool success)
+    [InlineData("failed")]
+    [InlineData("success")]
+    [InlineData("partial")]
+    public void ReloadResponseDiscardsOnlyOnSuccessAndHelpReturnsSameDialog(string outcome)
     {
+        var success = outcome == "success";
+        var partial = outcome == "partial";
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720);
         var api = Substitute.For<ICoreClientAPI>(); api.Gui.Returns(host.Api.Gui);
         var channel = Substitute.For<IClientNetworkChannel>(); channel.Connected.Returns(true);
@@ -104,8 +111,16 @@ public class SetupWizardMaintenanceTests
         handbookStandIn.TryClose(); controller.ReturnFromHelp();
         wizard.IsOpened().Should().BeTrue(); wizard.CurrentStepId.Should().Be("server.diagnostics");
         controller.Maintain(SetupWizardRequestKind.Reload); wizard.IsOpened().Should().BeFalse();
-        controller.HandleResult(new() { Kind = SetupWizardResultKind.MaintenanceResult, RequestId = 1, RunId = "run", Success = success,
-            SupportsMaintenance = true, Values = SetupWizardCaptureScenes.DefaultValues(), Message = success ? "Settings reloaded from disk." : "Reload failed." });
+        var loaded = SetupWizardCaptureScenes.DefaultValues(); loaded.Single(x => x.Key == "DebugMode").Value = "1";
+        controller.HandleResult(new() { Kind = partial ? SetupWizardResultKind.ReloadPartiallyApplied : SetupWizardResultKind.MaintenanceResult,
+            RequestId = 1, RunId = "run", Success = success, RuntimeApplyFailed = partial,
+            SupportsMaintenance = true, Values = loaded, Message = success ? "Settings reloaded from disk." : partial ? "Settings loaded. Restart the server." : "Reload failed." });
+        draft.Get("DebugMode").Should().Be(success || partial ? "1" : "0");
+        if (partial)
+        {
+            typeof(SetupWizardDialog).GetField("_runtimeApplyFailed", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(wizard).Should().Be(true);
+            draft.GetOriginal("EnableChatter").Should().Be("1");
+        }
         controller.CurrentDialog.Should().BeSameAs(wizard); wizard.IsOpened().Should().BeTrue();
         draft.IsDirty.Should().Be(!success); draft.Get("EnableChatter").Should().Be(success ? "1" : "0");
         controller.Maintain(SetupWizardRequestKind.MarkReviewed);

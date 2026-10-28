@@ -515,6 +515,36 @@ public class SetupWizardServerTests : IDisposable
             commands["thebasics/" + path].Received().WithAlias("sheetfields", "biofields");
     }
 
+    [Fact]
+    public void LoadedConfigWithBroadcastFailureIsDistinctFromBrokenFileEvenWithStickyFailure()
+    {
+        var (system, api, results) = CreateSystem();
+        var shared = typeof(thebasics.ModSystems.BaseBasicModSystem).GetField("_sharedConfig", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var previous = shared.GetValue(null); shared.SetValue(null, system.Config);
+        try
+        {
+            var disk = new ModConfig(); disk.InitializeDefaultsIfNeeded(); disk.EnableChatter = false;
+            api.LoadModConfig<ModConfig>(Arg.Any<string>()).Returns(disk);
+            var player = new FakeServerPlayer { PrivilegeCheck = _ => true };
+            system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open });
+            var run = results.Last().RunId;
+            api.World.AllOnlinePlayers.Returns(_ => throw new InvalidOperationException("broadcast unavailable"));
+            system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Reload, RequestId = 1, RunId = run });
+            var partial = results.Last();
+            partial.Kind.Should().Be(SetupWizardResultKind.ReloadPartiallyApplied);
+            partial.Success.Should().BeFalse(); partial.RuntimeApplyFailed.Should().BeTrue();
+            system.Config.EnableChatter.Should().BeFalse();
+            partial.Values.Single(x => x.Key == "EnableChatter").Value.Should().Be("0");
+            partial.Message.Should().Contain("loaded").And.Contain("Restart");
+            api.LoadModConfig<ModConfig>(Arg.Any<string>()).Returns(_ => throw new FormatException("broken config"));
+            system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Reload, RequestId = 2, RunId = run });
+            results.Last().Kind.Should().Be(SetupWizardResultKind.MaintenanceResult);
+            results.Last().Success.Should().BeFalse(); results.Last().RuntimeApplyFailed.Should().BeTrue();
+            system.Config.EnableChatter.Should().BeFalse();
+        }
+        finally { shared.SetValue(null, previous); }
+    }
+
     private static Dictionary<string, string> GetPendingRenames(RPProximityChatSystem system) =>
         (Dictionary<string, string>)typeof(RPProximityChatSystem)
             .GetField("_languageRenameMapForJoiningPlayers", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(system)!;

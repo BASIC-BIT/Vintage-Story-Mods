@@ -53,6 +53,9 @@ public sealed class SetupWizardDialog : GuiDialog
     private IReadOnlyList<string> _restartKeys = Array.Empty<string>();
     private string _message;
     private bool _pending;
+    private long _navigationVersion;
+    private long? _saveNavigationVersion;
+    private float _reviewScroll;
     private bool _disposing;
     private bool _forceClose;
     private bool _closing;
@@ -140,6 +143,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public void ShowPage(string stepId)
     {
+        _navigationVersion++;
         if (stepId != "hub" && stepId != "review" && stepId != "finish" && !SetupWizardCatalog.TryGetPage(stepId, out _))
             throw new ArgumentException("Unknown setup page.", nameof(stepId));
         _searching = false;
@@ -165,6 +169,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public void ShowSearch(string query = null)
     {
+        _navigationVersion++;
         OpenColorPicker()?.Close();
         foreach (var picker in _privilegePickers) picker.CloseSuggestions();
         if (!_searching) _searchReturnPage = CurrentStepId;
@@ -271,9 +276,14 @@ public sealed class SetupWizardDialog : GuiDialog
         ComposeDialog();
     }
 
+    internal void RememberSaveNavigation() => _saveNavigationVersion =
+        !_searching && CurrentStepId == "review" ? _navigationVersion : null;
+
     public void SetResult(TheBasicsSetupWizardResultMessage result)
     {
         if (!Draft.MergeSaveResult(result)) return;
+        var completeOnReview = _saveNavigationVersion == _navigationVersion && !_searching && CurrentStepId == "review";
+        _saveNavigationVersion = null;
         RefreshPrivilegeSuggestions(result.PrivilegeSuggestions);
         _pending = false;
         _isDedicated = result.IsDedicated;
@@ -282,14 +292,19 @@ public sealed class SetupWizardDialog : GuiDialog
         _runtimeApplyFailed = result.RuntimeApplyFailed;
         if (result.Success && !Draft.IsDirty)
         {
-            _message = null;
-            ShowPage("finish");
+            if (completeOnReview) { _message = null; ShowPage("finish"); }
             Track("completed");
         }
         else
         {
             if (result.Success) _message = (_runtimeApplyFailed ? result.Message + " " : "Saved. ") + "Your newer edits are not saved yet.";
-            ShowPage("review");
+            if (completeOnReview) ShowPage("review");
+        }
+        if (!completeOnReview)
+        {
+            if (result.Success && NeedsRestart) _message += " Restart needed. See Review changes for details.";
+            if (_searching) _search.Search(Draft, _search.Query);
+            ComposeDialog();
         }
     }
 
@@ -303,6 +318,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     public void Suspend()
     {
+        _navigationVersion++;
         _pendingNavigation = null;
         (SingleComposer?.GetElement("pip") as PreviewActorElement)?.CancelDrag();
         _closeConfirm?.TryClose();
@@ -812,26 +828,43 @@ public sealed class SetupWizardDialog : GuiDialog
                 Detail: $"{DisplayValue(definition, Draft.GetOriginal(key))}  >  {DisplayValue(definition, Draft.Get(key))}");
         }).Concat(LanguageReviewRows(Draft.OriginalLanguages, Draft.Languages))
             .Concat(SetupWizardSheetReview.Rows(Draft.OriginalSheetFields, Draft.SheetFields, Bool("EnableCharacterSheets") && Bool("CharacterSheetRequireRequiredFieldsForRoleplay"), Bool("DisableNicknames"))).ToArray();
+        if (NeedsRestart)
+        {
+            var names = _restartKeys.Select(key => ConfigAdminSettingRegistry.TryGet(key, out var setting) ? SettingLabel(setting) : key);
+            var detail = (_runtimeApplyFailed ? "Some saved changes could not be applied.\n" : "") +
+                string.Join("\n", names) + "\n" + RestartInstructions();
+            rows = new[] { (Title: "Saved settings needing restart", Detail: detail) }.Concat(rows).ToArray();
+        }
         var viewport = ElementBounds.Fixed(0, 140, Width - 20, Math.Max(100, StatusY - 150));
         var content = ElementBounds.Fixed(0, 0, Width - 30, 1);
         composer.BeginClip(viewport).BeginChildElements(content);
         var y = 0d;
+        var rowIndex = 0;
         foreach (var row in rows)
         {
             var lines = row.Detail.Split('\n').Sum(line => Math.Max(1, (int)Math.Ceiling(line.Length / Math.Max(30, (Width - 30) / 8))));
             var detailHeight = Math.Max(36, lines * 22);
-            composer.AddRichtext(VtmlUtils.EscapeVtml(row.Title), CairoFont.WhiteSmallText().WithFontSize(16).WithWeight(FontWeight.Bold), ElementBounds.Fixed(0, y, Width - 30, 22));
-            composer.AddRichtext(VtmlUtils.EscapeVtml(row.Detail).Replace("\n", "<br>"), CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(0, y + 24, Width - 30, detailHeight));
+            composer.AddInteractiveElement(new SetupWizardViewportRichtext(capi, VtmlUtils.EscapeVtml(row.Title), CairoFont.WhiteSmallText().WithFontSize(16).WithWeight(FontWeight.Bold), ElementBounds.Fixed(0, y, Width - 30, 22)), "review-title-" + rowIndex);
+            composer.AddInteractiveElement(new SetupWizardViewportRichtext(capi, VtmlUtils.EscapeVtml(row.Detail).Replace("\n", "<br>"), CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(0, y + 24, Width - 30, detailHeight)), "review-detail-" + rowIndex);
+            rowIndex++;
             y += detailHeight + 38;
         }
         if (rows.Length == 0) Text(composer, NeedsRestart ? "No new changes. Restart the server to apply your saved settings." : "No changes to save.", 0, y, Width - 30, 60);
         content.fixedHeight = Math.Max(viewport.fixedHeight, y + 60);
         composer.EndChildElements().EndClip();
-        composer.AddVerticalScrollbar(value =>
+        void ScrollReview(float value)
         {
+            _reviewScroll = value;
             content.fixedY = -value; content.MarkDirtyRecursive(); content.CalcWorldBounds();
-        }, ElementBounds.Fixed(Width - 14, 140, 12, viewport.fixedHeight), "review-scroll");
-        composer.OnComposed += () => composer.GetScrollbar("review-scroll").SetHeights((float)viewport.fixedHeight, (float)content.fixedHeight);
+        }
+        composer.AddVerticalScrollbar(ScrollReview, ElementBounds.Fixed(Width - 14, 140, 12, viewport.fixedHeight), "review-scroll");
+        composer.OnComposed += () =>
+        {
+            var scroll = composer.GetScrollbar("review-scroll");
+            scroll.SetHeights((float)viewport.fixedHeight, (float)content.fixedHeight);
+            scroll.CurrentYPosition = Math.Clamp(_reviewScroll, 0, (float)(content.fixedHeight - viewport.fixedHeight));
+            ScrollReview(scroll.CurrentYPosition);
+        };
     }
     internal static IReadOnlyList<(string Title, string Detail)> LanguageReviewRows(
         IReadOnlyList<LanguageConfigEntryMessage> originals, IReadOnlyList<LanguageConfigEntryMessage> current)

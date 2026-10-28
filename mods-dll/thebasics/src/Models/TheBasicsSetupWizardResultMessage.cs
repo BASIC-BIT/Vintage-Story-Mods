@@ -10,7 +10,8 @@ public enum SetupWizardResultKind
     SaveResult,
     Denied,
     MaintenanceResult,
-    RequestFailed
+    RequestFailed,
+    ReloadPartiallyApplied
 }
 
 [ProtoContract]
