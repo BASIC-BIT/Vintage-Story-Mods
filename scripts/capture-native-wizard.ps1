@@ -20,20 +20,12 @@ $scenes = @(
     'wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-map-managed', 'wizard-map-hidden', 'wizard-characters-sheets',
     'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats', 'wizard-privileges'
 )
-# Extra comparison poses are opt-in so the default set stays within the 32-job session limit.
-$availableScenes = $scenes + @(
-    'wizard-chat-obscured', 'wizard-chat-clear', 'wizard-chat-signing-visible', 'wizard-chat-signing-blocked',
-    'wizard-chat-language-enabled', 'wizard-chat-language-disabled', 'wizard-travel-damage-cancels', 'wizard-travel-damage-continues',
-    'wizard-roleplay-markers-enabled', 'wizard-roleplay-markers-disabled',
-    'wizard-appearance-bubbles-visible', 'wizard-appearance-bubbles-expired', 'wizard-appearance-typing-active', 'wizard-appearance-typing-thinking',
-    'wizard-appearance-names-targeted', 'wizard-appearance-names-untargeted', 'wizard-appearance-names-blocked', 'wizard-appearance-names-distant',
-    'wizard-characters-autoopen', 'wizard-characters-manual', 'wizard-characters-slots-first', 'wizard-characters-slots-second',
-    'wizard-notes-entries', 'wizard-notes-notebook', 'wizard-personal-notebook',
-    'wizard-chat-focus-switches', 'wizard-chat-focus-stays', 'wizard-chat-focus-remembers', 'wizard-chat-focus-default',
-    'wizard-language-configured', 'wizard-language-edited', 'wizard-language-invalid', 'wizard-language-grants',
-    'wizard-language-color-palette', 'wizard-language-color-custom', 'wizard-language-color-selected',
-    'wizard-chat-colors', 'wizard-chat-colors-custom', 'wizard-nametag-colors', 'wizard-nametag-colors-alpha', 'wizard-nametag-colors-custom'
-)
+# Extra scenes are opt-in so the default set stays within the 32-job session limit.
+$registryPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'mods-dll/thebasics/src/ModSystems/ChatUiSystem/SetupWizardCaptureScenes.cs'
+$registry = [regex]::Match((Get-Content -LiteralPath $registryPath -Raw), '(?s)public static readonly string\[\] Names\s*=\s*\[(.*?)\];')
+if (!$registry.Success) { throw 'Cannot read the production wizard capture scene registry.' }
+$availableScenes = @([regex]::Matches($registry.Groups[1].Value, '"(wizard-[a-z0-9-]+)"') | ForEach-Object { $_.Groups[1].Value })
+if (!$availableScenes.Count) { throw 'The production wizard capture scene registry is empty.' }
 if ($Scenarios) {
     foreach ($scene in $Scenarios) { if ($scene -notin $availableScenes) { throw "Unknown wizard capture scene: $scene" } }
     $scenes = @($Scenarios)

@@ -271,6 +271,18 @@ $colorDirectory = Join-Path $root 'native-colors'
 $colors = Get-Content -LiteralPath (Join-Path $colorDirectory 'captures.json') -Raw | ConvertFrom-Json
 Assert-True (($colors.captures.scenario -join ',') -ceq ($colorScenes -join ',')) 'Color captures use a separate five-scene batch within the session limit.'
 Assert-True (@(@($defaultSet.captures.scenario) + $newScenes + $lifecycleScenes + $colorScenes | Sort-Object -Unique).Count -eq 67) 'The native consumer accepts all 67 distinct wizard scenes.'
+$recentArguments = $nativeArguments.Clone()
+$recentArguments.Scenarios = @('wizard-sheet-builder', 'wizard-voices', 'wizard-wording', 'wizard-diagnostics')
+$recentDirectory = Join-Path $root 'native-current-registry'
+& $nativeScript @recentArguments -OutputDirectory $recentDirectory
+$recent = Get-Content -LiteralPath (Join-Path $recentDirectory 'captures.json') -Raw | ConvertFrom-Json
+Assert-True (($recent.captures.scenario -join ',') -ceq ($recentArguments.Scenarios -join ',')) 'Current sheet, voice, wording and diagnostics scenes are selectable without expanding the default batch.'
+$unknownDirectory = Join-Path $root 'native-reject-unknown'
+$unknownArguments = $nativeArguments.Clone()
+$unknownArguments.Scenarios = @('wizard-not-a-scene')
+$callsBeforeUnknown = $global:nativeVisualCalls
+Assert-Throws { & $nativeScript @unknownArguments -OutputDirectory $unknownDirectory } 'Unknown wizard capture scene'
+Assert-True ($global:nativeVisualCalls -eq $callsBeforeUnknown -and !(Test-Path -LiteralPath $unknownDirectory)) 'Unknown scenes are rejected before bridge calls or output creation.'
 $explicitDirectory = Join-Path $root 'native-explicit-time'
 & $nativeScript -ExpectedSourceTreeHash ('a' * 64) -Vsctl $fakeVsctl -DataPath $profile -Scenarios 'wizard-chat-signing-blocked' -PreviewTime 0 -OutputDirectory $explicitDirectory
 $explicitManifest = Get-Content -LiteralPath (Join-Path $explicitDirectory 'wizard-chat-signing-blocked.json') -Raw | ConvertFrom-Json
