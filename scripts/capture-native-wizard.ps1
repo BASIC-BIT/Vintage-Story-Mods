@@ -67,7 +67,7 @@ $captures = @()
 foreach ($scene in $scenes) {
     $scenePreviewTime = if ($PSBoundParameters.ContainsKey('PreviewTime')) { $PreviewTime }
         elseif ($scene -in @('wizard-chat-obscured', 'wizard-chat-clear', 'wizard-chat-language-enabled', 'wizard-chat-language-disabled')) { 5 }
-        elseif ($scene -in @('wizard-chat-signing-visible', 'wizard-chat-signing-blocked')) { 8.5 }
+        elseif ($scene -in @('wizard-chat-signing-visible', 'wizard-chat-signing-blocked', 'wizard-occlusion', 'wizard-occlusion-bottom', 'wizard-occlusion-custom')) { 8.5 }
         elseif ($scene -in @('wizard-travel-damage-cancels', 'wizard-travel-damage-continues')) { 7 }
         elseif ($scene -eq 'wizard-notifications-sleep') { 4.5 }
         elseif ($scene -in @('wizard-appearance-bubbles-visible', 'wizard-appearance-names-targeted')) { 0.5 }

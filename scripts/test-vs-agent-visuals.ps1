@@ -272,11 +272,15 @@ $colors = Get-Content -LiteralPath (Join-Path $colorDirectory 'captures.json') -
 Assert-True (($colors.captures.scenario -join ',') -ceq ($colorScenes -join ',')) 'Color captures use a separate five-scene batch within the session limit.'
 Assert-True (@(@($defaultSet.captures.scenario) + $newScenes + $lifecycleScenes + $colorScenes | Sort-Object -Unique).Count -eq 67) 'The native consumer accepts all 67 distinct wizard scenes.'
 $recentArguments = $nativeArguments.Clone()
-$recentArguments.Scenarios = @('wizard-sheet-builder', 'wizard-voices', 'wizard-wording', 'wizard-diagnostics')
+$recentArguments.Scenarios = @('wizard-sheet-builder', 'wizard-voices', 'wizard-wording', 'wizard-diagnostics', 'wizard-occlusion', 'wizard-occlusion-bottom', 'wizard-occlusion-custom')
 $recentDirectory = Join-Path $root 'native-current-registry'
 & $nativeScript @recentArguments -OutputDirectory $recentDirectory
 $recent = Get-Content -LiteralPath (Join-Path $recentDirectory 'captures.json') -Raw | ConvertFrom-Json
 Assert-True (($recent.captures.scenario -join ',') -ceq ($recentArguments.Scenarios -join ',')) 'Current sheet, voice, wording and diagnostics scenes are selectable without expanding the default batch.'
+foreach ($scene in @('wizard-occlusion', 'wizard-occlusion-bottom', 'wizard-occlusion-custom')) {
+    $manifest = Get-Content -LiteralPath (Join-Path $recentDirectory "$scene.json") -Raw | ConvertFrom-Json
+    Assert-True ($manifest.previewTime -eq 8.5) "Occlusion capture $scene uses the production behind-wall pose."
+}
 $unknownDirectory = Join-Path $root 'native-reject-unknown'
 $unknownArguments = $nativeArguments.Clone()
 $unknownArguments.Scenarios = @('wizard-not-a-scene')
