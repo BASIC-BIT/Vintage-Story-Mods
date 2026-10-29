@@ -23,6 +23,8 @@ Keep the session grant and kill switches: `Ctrl+Alt+F9` cancels controls and pen
 
 ## Evidence and completion
 
+Use the named effect pairs and their default sample times when comparing settings. The native collector keeps a bounded default set; select the extra effect scenes explicitly in a fresh session. Standalone wizard capture includes every named scene and needs no running client.
+
 Record source and package hashes, profile/pipe identity, current operation discovery, action receipts, screenshot manifests and restoration receipts. Outputs belong in fresh artifact directories; script implementations belong in Git.
 
 Image review establishes the appearance of captured samples. A sampled-pose clip does not establish real-time smoothness. Human observation, approved screenshot baselines, gameplay isolation, save/restart behavior and PostHog ingestion remain separate checks. Use the existing `human-qa` skill for owner observations.

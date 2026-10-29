@@ -119,7 +119,8 @@ internal sealed class ConfigSearchDialog : GuiDialog
                 (result.Unsaved ? " | " + Lang.Get("thebasics:config-search-unsaved") : "") + "\n" + result.Description;
             var font = CairoFont.WhiteSmallText().WithFontSize(13).WithOrientation(EnumTextOrientation.Left);
             var height = Math.Max(35, new TextDrawUtil().GetMultilineTextHeight(font, text, (Width - 40) * RuntimeEnv.GUIScale) / RuntimeEnv.GUIScale + 6);
-            var button = new GuiElementTextButton(capi, result.Label, font, font.Clone().WithColor(GuiStyle.ActiveButtonTextColor),
+            var titleFont = font.Clone().WithFontSize(15).WithWeight(Cairo.FontWeight.Bold);
+            var button = new GuiElementTextButton(capi, result.Label, titleFont, titleFont.Clone().WithColor(GuiStyle.ActiveButtonTextColor),
                 () => { TryClose(); _onSelect(result); return true; }, ElementBounds.Fixed(4, y, Width - 40, 26), EnumButtonStyle.Small);
             button.SetOrientation(EnumTextOrientation.Left);
             _results.Add(button);

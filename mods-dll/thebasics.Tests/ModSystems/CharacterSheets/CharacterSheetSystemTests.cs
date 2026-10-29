@@ -20,6 +20,30 @@ namespace thebasics.Tests.ModSystems.CharacterSheets;
 public class CharacterSheetSystemTests
 {
     [Fact]
+    public void BuilderRemoveSaveAndReaddInAnotherSessionDoesNotReconnectStoredAnswer()
+    {
+        EnsureLangInitialized();
+        var player = CreatePlayer();
+        var original = thebasics.ModSystems.AdminConfig.CharacterSheetFieldConfigAdmin.CreateBuilderEntry();
+        original.Label = "First Impression";
+        var config = CreateConfig();
+        thebasics.ModSystems.AdminConfig.CharacterSheetFieldConfigAdmin.TryApplyEntries(config, new[] { original }, out _).Should().BeTrue();
+        CreateSystem(player, config).SaveClientFields(player, CreateSaveRequest(original.Id, "Old answer")).Success.Should().BeTrue();
+        var retained = thebasics.ModSystems.AdminConfig.CharacterSheetFieldConfigAdmin.CreateBuilderEntry();
+        retained.Label = "Other field";
+        thebasics.ModSystems.AdminConfig.CharacterSheetFieldConfigAdmin.TryApplyEntries(config, new[] { retained }, out _).Should().BeTrue();
+        CreateSystem(player, config).SaveClientFields(player, CreateSaveRequest(retained.Id, "Other answer")).Success.Should().BeTrue();
+        var newSession = thebasics.ModSystems.AdminConfig.CharacterSheetFieldConfigAdmin.BuildEntries(config);
+        var recreated = thebasics.ModSystems.AdminConfig.CharacterSheetFieldConfigAdmin.CreateBuilderEntry();
+        recreated.Label = original.Label;
+        newSession.Add(recreated);
+        thebasics.ModSystems.AdminConfig.CharacterSheetFieldConfigAdmin.TryApplyEntries(config, newSession, out _).Should().BeTrue();
+        var view = CreateSystem(player, config).BuildClientView(player, new CharacterSheetOpenRequest { Mode = CharacterSheetOpenRequest.ModeOwn });
+        view.Fields.Should().ContainSingle(field => field.FieldId == recreated.Id && field.Value == "");
+        GetStoredSheetData(player).Fields.Should().Contain(field => field.FieldId == original.Id && field.Value == "Old answer");
+    }
+
+    [Fact]
     public void AutoOpenSubcommandChangesPreferenceWithoutUsingThePlayerLookup()
     {
         EnsureLangInitialized();

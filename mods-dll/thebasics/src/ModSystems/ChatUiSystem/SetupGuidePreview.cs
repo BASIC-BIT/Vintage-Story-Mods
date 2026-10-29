@@ -8,12 +8,13 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 namespace thebasics.ModSystems.ChatUiSystem;
 
 /// <summary>A native character owned only by the setup panel, never registered in the world.</summary>
-public sealed class SetupGuidePreview : IDisposable
+public sealed class SetupGuidePreview : ISetupGuidePreview
 {
     private const float FrameStep = 1f / 60f;
     private const float DefaultYaw = -1.2707963f;
@@ -37,10 +38,16 @@ public sealed class SetupGuidePreview : IDisposable
 
     public bool IsReady => !disposed && renderer?.IsReady == true && actor.AnimManager.Animator != null;
 
-    public SetupGuidePreview(ICoreClientAPI api)
+    public SetupGuidePreview(ICoreClientAPI api, string identity = "Pip")
     {
         this.api = api ?? throw new ArgumentNullException(nameof(api));
-        fixture = api.Assets.Get(new AssetLocation("thebasics:config/setup-guide.json")).ToObject<GuideFixture>();
+        string fixturePath = identity switch
+        {
+            "Pip" => "thebasics:config/setup-guide.json",
+            "Mara" => "thebasics:config/setup-guide-mara.json",
+            _ => throw new ArgumentException("Unknown setup guide identity.", nameof(identity))
+        };
+        fixture = api.Assets.Get(new AssetLocation(fixturePath)).ToObject<GuideFixture>();
         if (fixture?.SkinParts == null || fixture.Gear == null || fixture.Animations == null ||
             !fixture.Animations.Contains("idle", StringComparer.Ordinal))
         {
@@ -183,7 +190,13 @@ public sealed class SetupGuidePreview : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         ValidateAnimationCode(code);
-        if (!namedTime && animationCode == code) return;
+        if (animationCode == code)
+        {
+            // The pinned animator has already consumed its fractional frame.
+            if (namedTime) frameRemainder = 0;
+            namedTime = false;
+            return;
+        }
         animationCode = code;
         previewTime = 0;
         frameRemainder = 0;
@@ -291,12 +304,15 @@ public sealed class SetupGuidePreview : IDisposable
         }
     }
 
-    public void Render(float dt, ElementBounds bounds)
+    public void Render(float dt, ElementBounds bounds, float opacity = 1, float yawOffset = 0)
     {
         if (disposed || bounds == null)
         {
             return;
         }
+        if (!float.IsFinite(opacity)) throw new ArgumentOutOfRangeException(nameof(opacity));
+        if (!float.IsFinite(yawOffset)) throw new ArgumentOutOfRangeException(nameof(yawOffset));
+        if (renderer != null) renderer.Opacity = Math.Clamp(opacity, 0, 1);
         if (actor.AnimManager.Animator != previewAnimator)
         {
             ResetAnimation();
@@ -327,10 +343,17 @@ public sealed class SetupGuidePreview : IDisposable
             try
             {
                 float size = (float)Math.Min(bounds.InnerWidth * 1.1, bounds.InnerHeight * 0.46);
-                api.Render.RenderEntityToGui(0, actor,
-                    bounds.renderX + bounds.InnerWidth / 2 - size,
-                    bounds.renderY + bounds.InnerHeight * 0.96 - 2 * size,
-                    100, rotationYaw, size, -1);
+                var x = bounds.renderX + bounds.InnerWidth / 2 - size;
+                var y = bounds.renderY + bounds.InnerHeight * 0.96 - 2 * size;
+                var yaw = rotationYaw + yawOffset;
+                if (animationCode == "sleep" && renderer != null && renderer.TryGetPoseBounds(yaw, out var pose))
+                {
+                    var fit = FitPoseBounds(pose, bounds.InnerWidth, bounds.InnerHeight, actor.Properties.Client.Size);
+                    x = bounds.renderX + fit.X;
+                    y = bounds.renderY + fit.Y;
+                    size = fit.Size;
+                }
+                api.Render.RenderEntityToGui(0, actor, x, y, 100, yaw, size, -1);
             }
             finally
             {
@@ -341,6 +364,54 @@ public sealed class SetupGuidePreview : IDisposable
         {
             api.Render.GlPopMatrix();
         }
+    }
+
+    internal readonly record struct PoseBounds(double MinX, double MinY, double MaxX, double MaxY);
+    internal readonly record struct GuiPoseTransform(double X, double Y, float Size);
+
+    internal static bool TryGetPoseBounds(MeshData mesh, float[] joints, float yaw, out PoseBounds bounds,
+        float rotateX = 0, float rotateY = 0, float rotateZ = 0)
+    {
+        bounds = default;
+        if (mesh?.xyz == null || mesh.VerticesCount <= 0 || mesh.xyz.Length < mesh.VerticesCount * 3 ||
+            mesh.CustomInts?.Values == null || mesh.CustomInts.Count < mesh.VerticesCount || joints == null || !float.IsFinite(yaw))
+            return false;
+        double minX = double.PositiveInfinity, minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity, maxY = double.NegativeInfinity;
+        // Match EntityShapeRenderer's GUI orientation and its final centered Z reflection.
+        var orientation = Mat4f.Create();
+        const float radians = MathF.PI / 180;
+        Mat4f.RotateX(orientation, orientation, MathF.PI + rotateX * radians);
+        Mat4f.RotateY(orientation, orientation, yaw + rotateY * radians);
+        Mat4f.RotateZ(orientation, orientation, rotateZ * radians);
+        Mat4f.Scale(orientation, orientation, [1, 1, -1]);
+        Mat4f.Translate(orientation, orientation, -0.5f, 0, -0.5f);
+        for (var vertex = 0; vertex < mesh.VerticesCount; vertex++)
+        {
+            var jointId = mesh.CustomInts.Values[vertex];
+            if (jointId < 0 || jointId >= joints.Length / 16) return false;
+            var joint = jointId * 16;
+            var point = vertex * 3;
+            double x = mesh.xyz[point], y = mesh.xyz[point + 1], z = mesh.xyz[point + 2];
+            var posedX = joints[joint] * x + joints[joint + 4] * y + joints[joint + 8] * z + joints[joint + 12];
+            var posedY = joints[joint + 1] * x + joints[joint + 5] * y + joints[joint + 9] * z + joints[joint + 13];
+            var posedZ = joints[joint + 2] * x + joints[joint + 6] * y + joints[joint + 10] * z + joints[joint + 14];
+            var projectedX = orientation[0] * posedX + orientation[4] * posedY + orientation[8] * posedZ + orientation[12];
+            var projectedY = orientation[1] * posedX + orientation[5] * posedY + orientation[9] * posedZ + orientation[13];
+            if (!double.IsFinite(projectedX) || !double.IsFinite(projectedY)) return false;
+            minX = Math.Min(minX, projectedX); maxX = Math.Max(maxX, projectedX);
+            minY = Math.Min(minY, projectedY); maxY = Math.Max(maxY, projectedY);
+        }
+        bounds = new(minX, minY, maxX, maxY);
+        return maxX - minX > 0.000001 && maxY - minY > 0.000001;
+    }
+
+    internal static GuiPoseTransform FitPoseBounds(PoseBounds pose, double width, double height, float clientSize)
+    {
+        var scale = 0.9 * Math.Min(width / (pose.MaxX - pose.MinX), height / (pose.MaxY - pose.MinY));
+        var size = (float)(scale / clientSize);
+        return new(width / 2 - size - scale * (pose.MinX + pose.MaxX) / 2,
+            height / 2 - 2 * size - scale * (pose.MinY + pose.MaxY) / 2, size);
     }
 
     public void Dispose()
@@ -424,7 +495,9 @@ public sealed class SetupGuidePreview : IDisposable
     private sealed class GuideRenderer : EntityShapeRenderer
     {
         private bool disposed;
+        private MeshData poseMesh;
         public bool IsReady => meshRefOpaque != null;
+        public float Opacity { get; set; } = 1;
 
         public GuideRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
         {
@@ -445,7 +518,16 @@ public sealed class SetupGuidePreview : IDisposable
 
         protected override void onMeshReady(MeshData meshData)
         {
-            if (!disposed) base.onMeshReady(meshData);
+            if (disposed) return;
+            poseMesh = meshData.Clone();
+            base.onMeshReady(meshData);
+        }
+
+        internal bool TryGetPoseBounds(float yaw, out PoseBounds bounds)
+        {
+            var shape = entity.Properties.Client.Shape;
+            return SetupGuidePreview.TryGetPoseBounds(poseMesh, entity.AnimManager.Animator?.Matrices, yaw, out bounds,
+                shape?.rotateX ?? 0, shape?.rotateY ?? 0, shape?.rotateZ ?? 0);
         }
 
         public override void RenderToGui(float dt, double x, double y, double z, float yaw, float size)
@@ -455,6 +537,8 @@ public sealed class SetupGuidePreview : IDisposable
             var originalMatrix = (float[])ModelMat.Clone();
             try
             {
+                // InventoryItemRenderer resets rgbaIn before calling this renderer.
+                shader.Uniform("rgbaIn", 1f, 1f, 1f, Opacity);
                 var animator = entity.AnimManager.Animator;
                 if (animator != null)
                 {
@@ -465,8 +549,15 @@ public sealed class SetupGuidePreview : IDisposable
             }
             finally
             {
-                shader.Uniform("applyAnimation", 0);
                 ModelMat = originalMatrix;
+                try
+                {
+                    shader.Uniform("applyAnimation", 0);
+                }
+                finally
+                {
+                    shader.Uniform("rgbaIn", 1f, 1f, 1f, 1f);
+                }
             }
         }
 
@@ -474,6 +565,7 @@ public sealed class SetupGuidePreview : IDisposable
         {
             if (disposed) return;
             disposed = true;
+            poseMesh = null;
             base.Dispose();
         }
     }

@@ -70,7 +70,7 @@ public static class Program
                         height,
                         scale,
                         fixture = scene?.Fixture ?? fixture,
-                        previewTime = scene?.Coverage == "layout-only" ? 0.75 : 0,
+                        previewTime = scenario.StartsWith("wizard-", StringComparison.Ordinal) ? thebasics.ModSystems.ChatUiSystem.SetupWizardCaptureScenes.DefaultPreviewTime(scenario) : 0,
                         coverage = scene?.Coverage ?? "standalone-gui",
                         omissions = scene?.Omissions ?? Array.Empty<string>(),
                         sourceTreeHash,
@@ -95,7 +95,7 @@ public static class Program
                 }
             }
             File.WriteAllText(Path.Combine(output, "captures.json"), JsonSerializer.Serialize(new
-            { schema = 1, sourceTreeHash, coverage = selected == "wizard-all" || scenarios.All(s => s.StartsWith("wizard-", StringComparison.Ordinal)) ? "layout-only" : "standalone-gui", captures }, new JsonSerializerOptions { WriteIndented = true }));
+            { schema = 1, sourceTreeHash, coverage = selected == "wizard-all" || scenarios.All(s => s.StartsWith("wizard-", StringComparison.Ordinal)) ? "standalone-gui-and-seraph" : "standalone-gui", captures }, new JsonSerializerOptions { WriteIndented = true }));
             return failed ? 1 : 0;
         }
         catch (Exception exception)

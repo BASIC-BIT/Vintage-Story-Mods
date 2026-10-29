@@ -19,7 +19,7 @@ public class ConfigAdminPrivilegePickerTests
         using var host = CreateHost(scale);
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
         using var wizard = new SetupWizardDialog(host.Api, draft, "privilege-test", true,
-            () => { }, (_, _, _) => { }, () => { }, layoutOnly: true);
+            () => { }, (_, _, _) => { }, () => { }, layoutOnly: true, actorFactory: host.CreateGuide);
         var session = new TheBasicsSetupWizardResultMessage
         {
             Kind = SetupWizardResultKind.Open,

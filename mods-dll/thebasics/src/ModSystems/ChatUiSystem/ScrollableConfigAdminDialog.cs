@@ -17,6 +17,7 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
     private readonly IReadOnlyList<ConfigAdminPrivilegeSuggestion> _privilegeSuggestions;
     private readonly Dictionary<string, (string Control, double Y)> _controls = new();
     private readonly Dictionary<string, GuiElementPrivilegePicker> _privilegePickers = new();
+    private readonly Dictionary<string, GuiElementColorPicker> _colorPickers = new();
     private ElementBounds _content;
     private double _viewport;
 
@@ -37,6 +38,7 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
         Composers.ClearComposers();
         _controls.Clear();
         _privilegePickers.Clear();
+        _colorPickers.Clear();
         var rows = _settings.Rows;
         var first = Array.FindIndex(rows, row => row.Elements.Any(element => element.Type == EnumDialogElementType.Text && element.Code?.StartsWith("group-", StringComparison.Ordinal) == true));
         var last = Array.FindIndex(rows, row => row.Elements.Any(element => element.Code == "save"));
@@ -65,6 +67,35 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
             .GetField("interactiveElements", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(composer);
         foreach (var control in _controls)
         {
+            if (interactive.TryGetValue(control.Value.Control, out var booleanWidget) && booleanWidget is GuiElementSwitch)
+            {
+                var booleanKey = control.Key;
+                var bounds = booleanWidget.Bounds.FlatCopy();
+                bounds.fixedWidth = 112;
+                bounds.fixedHeight = 28;
+                var toggle = new GuiElementSetupToggle(capi, _settings.OnGet?.Invoke(booleanKey) == "1",
+                    value => _settings.OnSet?.Invoke(booleanKey, value ? "1" : "0"), bounds)
+                    { TabIndex = booleanWidget.TabIndex, InsideClipBounds = booleanWidget.InsideClipBounds };
+                elements[control.Value.Control] = interactive[control.Value.Control] = toggle;
+                booleanWidget.Dispose();
+                continue;
+            }
+            if (interactive.TryGetValue(control.Value.Control, out var colorWidget) && colorWidget is GuiElementTextInput input &&
+                ColorMode(control.Key) is { } mode)
+            {
+                var colorKey = control.Key;
+                var bounds = input.Bounds.FlatCopy();
+                bounds.fixedX += bounds.fixedWidth - 32;
+                bounds.fixedWidth = 32;
+                input.Bounds.fixedWidth -= 40;
+                var colorPicker = new GuiElementColorPicker(capi, bounds, _settings.OnGet?.Invoke(colorKey), value => input.SetValue(value), mode)
+                    { InsideClipBounds = input.InsideClipBounds };
+                var onTextChanged = input.OnTextChanged;
+                input.OnTextChanged = value => { colorPicker.SetValue(value); onTextChanged?.Invoke(value); };
+                composer.AddInteractiveElement(colorPicker, "color-picker-" + colorKey);
+                _colorPickers[colorKey] = colorPicker;
+                continue;
+            }
             if (!ConfigAdminSettingRegistry.TryGet(control.Key, out var definition) || !definition.IsPrivilege ||
                 !interactive.TryGetValue(control.Value.Control, out var widget)) continue;
             var font = ((GuiElementTextBase)widget).Font.Clone();
@@ -75,9 +106,10 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
             _privilegePickers[key] = picker;
             widget.Dispose();
         }
+        var colorControls = _controls.Where(pair => ColorMode(pair.Key) != null).Select(pair => pair.Value.Control).ToHashSet();
         foreach (var pair in elements.Where(pair => pair.Value.Bounds.ParentBounds == _content).ToList())
         {
-            var widget = new ScrollingWidget(capi, pair.Value, clip);
+            var widget = new ScrollingWidget(capi, pair.Value, clip, colorControls.Contains(pair.Key) || pair.Value is GuiElementColorPicker or GuiElementSetupToggle);
             if (interactive.ContainsKey(pair.Key))
             {
                 elements[pair.Key] = interactive[pair.Key] = widget;
@@ -129,29 +161,47 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
     internal bool JumpTo(string key)
     {
         if (!_controls.TryGetValue(key, out var target)) return false;
-        var scrollbar = SingleComposer.GetScrollbar("settings-scrollbar");
-        var y = Math.Clamp(target.Y - 12, 0, Math.Max(0, _content.fixedHeight - _viewport));
-        scrollbar.CurrentYPosition = (float)y;
-        Scroll((float)y);
+        ScrollTo(target.Y);
         SingleComposer.FocusElement(SingleComposer.GetElement(target.Control).TabIndex);
         return true;
     }
 
     public override void OnKeyDown(KeyEvent args)
     {
+        OpenColorPicker()?.OnKeyDown(capi, args);
+        if (args.Handled) return;
         base.OnKeyDown(args);
         // Keyboard tabbing must keep the focused setting inside the viewport too.
         var focused = _controls.Values.FirstOrDefault(control => SingleComposer.GetElement(control.Control).HasFocus);
-        if (focused.Control != null && (focused.Y < -_content.fixedY || focused.Y + 28 > -_content.fixedY + _viewport))
+        if (focused.Control == null)
         {
-            var key = _controls.First(pair => pair.Value.Control == focused.Control).Key;
-            JumpTo(key);
+            var colorKey = _colorPickers.FirstOrDefault(pair => pair.Value.HasFocus).Key;
+            if (colorKey != null) focused = _controls[colorKey];
         }
+        if (focused.Control != null && (focused.Y < -_content.fixedY / _settings.SizeMultiplier || focused.Y + 28 > -_content.fixedY / _settings.SizeMultiplier + _viewport))
+        {
+            ScrollTo(focused.Y);
+        }
+    }
+
+    public override void OnKeyPress(KeyEvent args)
+    {
+        OpenColorPicker()?.OnKeyPress(capi, args);
+        if (!args.Handled) base.OnKeyPress(args);
+    }
+
+    public override void OnKeyUp(KeyEvent args)
+    {
+        if (OpenColorPicker() != null) { args.Handled = true; return; }
+        base.OnKeyUp(args);
     }
 
     public override void OnRenderGUI(float deltaTime)
     {
-        base.OnRenderGUI(deltaTime);
+        var color = OpenColorPicker();
+        GuiPopupHoverGuard.RenderBackground(SingleComposer, color != null, () => base.OnRenderGUI(deltaTime));
+        color?.RenderPopup(deltaTime);
+        if (color != null) MouseOverCursor = color.MouseOverCursor;
         var picker = OpenPrivilegePicker();
         if (picker?.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY) == true)
             MouseOverCursor = picker.MouseOverCursor;
@@ -159,6 +209,7 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
 
     public override bool OnEscapePressed()
     {
+        if (OpenColorPicker() is { } color) { color.Close(); return true; }
         var picker = OpenPrivilegePicker();
         if (picker == null) return base.OnEscapePressed();
         picker.CloseSuggestions();
@@ -167,44 +218,75 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
 
     public override void OnMouseDown(MouseEvent args)
     {
+        OpenColorPicker()?.OnMouseDown(capi, args);
+        if (args.Handled) return;
         OpenPrivilegePicker()?.OnMouseDown(capi, args);
         if (!args.Handled) base.OnMouseDown(args);
     }
 
+    public override void OnMouseUp(MouseEvent args)
+    {
+        OpenColorPicker()?.OnMouseUp(capi, args);
+        if (!args.Handled) base.OnMouseUp(args);
+    }
+
     public override void OnMouseMove(MouseEvent args)
     {
+        OpenColorPicker()?.OnMouseMove(capi, args);
+        if (args.Handled) return;
         OpenPrivilegePicker()?.OnMouseMove(capi, args);
         if (!args.Handled) base.OnMouseMove(args);
     }
 
     public override void OnMouseWheel(MouseWheelEventArgs args)
     {
+        OpenColorPicker()?.OnMouseWheel(capi, args);
+        if (args.IsHandled) return;
         OpenPrivilegePicker()?.OnMouseWheel(capi, args);
         if (!args.IsHandled) base.OnMouseWheel(args);
     }
 
     private GuiElementPrivilegePicker OpenPrivilegePicker() => _privilegePickers.Values.FirstOrDefault(picker => picker.IsSuggestionsOpen);
+    private GuiElementColorPicker OpenColorPicker() => _colorPickers.Values.FirstOrDefault(picker => picker.IsOpen);
+
+    private static ColorPickerMode? ColorMode(string key) => key switch
+    {
+        "EmoteColor" or "OOCColor" or "GlobalOOCColor" => ColorPickerMode.Rgb,
+        "NametagBackgroundColor" or "NametagBorderColor" => ColorPickerMode.RgbaWithTheme,
+        _ => null
+    };
+
+    private void ScrollTo(double rowY)
+    {
+        var y = Math.Clamp(rowY - 12, 0, Math.Max(0, _content.fixedHeight / _settings.SizeMultiplier - _viewport));
+        SingleComposer.GetScrollbar("settings-scrollbar").CurrentYPosition = (float)y;
+        Scroll((float)y);
+    }
 
     private void Scroll(float value)
     {
         foreach (var picker in _privilegePickers.Values) picker.CloseSuggestions();
-        _content.fixedY = -value;
+        foreach (var picker in _colorPickers.Values) picker.Close();
+        _content.fixedY = -value * _settings.SizeMultiplier;
         _content.MarkDirtyRecursive();
         _content.CalcWorldBounds();
     }
 
     private static double Height(DialogRow row) => row.TopPadding + row.Elements.Max(element => element.Height) + row.BottomPadding;
 
-    private sealed class ScrollingWidget : GuiElement
+    internal sealed class ScrollingWidget : GuiElement
     {
+        internal GuiElement Widget => _widget;
         private readonly GuiElement _widget;
         private readonly ElementBounds _clip;
+        private readonly bool _colorControl;
         private LoadedTexture _background;
 
-        internal ScrollingWidget(ICoreClientAPI api, GuiElement widget, ElementBounds clip) : base(api, widget.Bounds)
+        internal ScrollingWidget(ICoreClientAPI api, GuiElement widget, ElementBounds clip, bool colorControl = false) : base(api, widget.Bounds)
         {
             _widget = widget;
             _clip = clip;
+            _colorControl = colorControl;
             _background = new LoadedTexture(api);
             TabIndex = widget.TabIndex;
             InsideClipBounds = clip;
@@ -233,6 +315,7 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
             if (Bounds.absY >= _clip.absY && Bounds.absY + Bounds.OuterHeight <= _clip.absY + _clip.OuterHeight)
             {
                 if (_widget is GuiElementPrivilegePicker picker) picker.RenderControl(deltaTime);
+                else if (_widget is GuiElementColorPicker color) color.RenderControl(deltaTime);
                 else _widget.RenderInteractiveElements(deltaTime);
                 MouseOverCursor = _widget.MouseOverCursor;
             }
@@ -244,6 +327,8 @@ internal class ScrollableConfigAdminDialog : GuiJsonDialog
         public override void OnFocusLost() { base.OnFocusLost(); _widget.OnFocusLost(); }
         public override void OnMouseDown(ICoreClientAPI api, MouseEvent args)
         {
+            if (_colorControl && (!_clip.PointInside(args.X, args.Y) || Bounds.absY < _clip.absY ||
+                Bounds.absY + Bounds.OuterHeight > _clip.absY + _clip.OuterHeight)) return;
             if (_widget is GuiElementPrivilegePicker picker && !picker.IsSuggestionsOpen && !_clip.PointInside(args.X, args.Y)) return;
             _widget.OnMouseDown(api, args);
         }

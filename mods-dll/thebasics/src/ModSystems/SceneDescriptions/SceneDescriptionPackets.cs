@@ -27,6 +27,7 @@ public sealed class SceneDescriptionEditPacket
     [ProtoMember(13)] public bool UnlimitedTextDistance { get; set; }
     [ProtoMember(14)] public float HeightOffset { get; set; }
     [ProtoMember(15)] public int Color { get; set; }
+    [ProtoMember(24)] public string CustomColorHex { get; set; } = string.Empty;
     [ProtoMember(20)] public float BubbleScale { get; set; } = 1;
     [ProtoMember(21)] public int TitleIcon { get; set; }
     [ProtoMember(22)] public string TitleIconName { get; set; } = string.Empty;

@@ -18,8 +18,8 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     private readonly HashSet<SceneDescriptionBlockEntity> _markers = new();
     internal const int MaxCachedIcons = 128;
     internal const int MaxCachedDescriptions = 32;
-    private readonly HashSet<(string Icon, SceneMarkerColor Color)> _shownIcons = new();
-    private readonly Dictionary<(string Icon, SceneMarkerColor Color), LoadedTexture> _icons = new();
+    private readonly HashSet<(string Icon, string Color)> _shownIcons = new();
+    private readonly Dictionary<(string Icon, string Color), LoadedTexture> _icons = new();
     private readonly List<(SceneDescriptionBlockEntity Marker, Vec3d Position, float Opacity, float TextOpacity, float Focus, double Depth, bool Read)> _visible = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, LoadedTexture Texture)> _descriptions = new();
     private readonly Dictionary<SceneDescriptionBlockEntity, ((string Title, string Body, bool ShowBody, string Icon) Content, float GuiScale, int Width, int Height)> _descriptionSizes = new();
@@ -304,7 +304,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
 
     internal LoadedTexture GetIcon(SceneDescriptionData data, Func<LoadedTexture> create = null)
     {
-        var key = (data.SymbolIconKey, data.Color);
+        var key = IconKey(data);
         if (_icons.TryGetValue(key, out var icon)) return icon;
         icon = create == null ? CreateIcon(data) : create();
         CacheIcon(key, icon);
@@ -315,9 +315,10 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     {
         using var surface = new ImageSurface(Format.Argb32, 128, 128);
         using var ctx = new Context(surface);
+        var rgb = SceneMarkerVisuals.ResolveColor(data);
         // A catalog icon that will not draw falls back to the enum symbol, never to an empty billboard.
-        if (data.SymbolIconName.Length == 0 || !SceneTitleIcons.Draw(_api, ctx, surface, data.SymbolIconName, data.Color))
-            SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, data.Symbol), 0, 0, 128, data.Color, data.Symbol);
+        if (data.SymbolIconName.Length == 0 || !SceneTitleIcons.Draw(_api, ctx, surface, data.SymbolIconName, rgb))
+            SceneMarkerVisuals.Draw(ctx, SceneMarkerVisuals.LoadShape(_api, data.Symbol), 0, 0, 128, rgb, data.Symbol);
         var icon = new LoadedTexture(_api);
         _api.Gui.LoadOrUpdateCairoTexture(surface, true, ref icon);
         return icon;
@@ -326,9 +327,13 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
     internal void BeginIconFrame(IEnumerable<SceneDescriptionData> visibleStyles)
     {
         _shownIcons.Clear();
-        foreach (var data in visibleStyles) _shownIcons.Add((data.SymbolIconKey, data.Color));
+        foreach (var data in visibleStyles) _shownIcons.Add(IconKey(data));
         TrimIcons(MaxCachedIcons);
     }
+
+    private static (string Icon, string Color) IconKey(SceneDescriptionData data) =>
+        (data.SymbolIconKey, !string.IsNullOrEmpty(data.CustomColorHex) && SceneDescriptionData.IsValidCustomColor(data.CustomColorHex)
+            ? data.CustomColorHex.ToUpperInvariant() : "preset:" + (int)data.Color);
 
     // The limit applies to retained textures, not the current frame's working set. Evicting
     // visible keys would re-upload every texture every frame when there are limit + 1 styles.
@@ -341,7 +346,7 @@ internal sealed class SceneMarkerIconRenderer : IRenderer
         }
     }
 
-    internal void CacheIcon((string Icon, SceneMarkerColor Color) key, LoadedTexture icon)
+    internal void CacheIcon((string Icon, string Color) key, LoadedTexture icon)
     {
         TrimIcons(MaxCachedIcons - 1);
         _icons.Add(key, icon);

@@ -94,7 +94,37 @@ For a connected enabled session, first inspect the current capabilities:
 & $vsctl observe --pipe vintage-story-agentcontrol-profile2
 ```
 
-The native runner discovers the three wizard operations, opens a server-authorized capture-only dialog, queues a named scene, and polls its job. It checks the fixed profile capture directory, source identity and native coverage before copying images. Omitting `-Scenarios` captures all 26 scenes, including overhead speech, nametags, map visibility, character sheets, dice, chat history and activity stats. Map fixtures cover management off (`wizard-map-visibility`), distance filtering at 80 blocks (`wizard-map-managed`), and other players hidden (`wizard-map-hidden`). The privilege fixture (`wizard-privileges`) opens the chat history permission picker with registered privilege descriptions. Outputs include action receipts, per-image provenance and `captures.json` with profile and pipe identity.
+The native runner discovers the three wizard operations, opens a server-authorized capture-only dialog, queues a named scene, and polls its job. It checks the fixed profile capture directory, source identity and native coverage before copying images. Omitting `-Scenarios` captures the original 26 scenes, including overhead speech, nametags, map visibility, character sheets, dice, chat history and activity stats. There are 59 named scenes in total. Native batches over 32 are rejected before contacting the bridge. Select the extra effect scenes explicitly in a fresh enabled session because completed jobs also count toward its limit. Map fixtures cover management off (`wizard-map-visibility`), distance filtering at 80 blocks (`wizard-map-managed`), and other players hidden (`wizard-map-hidden`). The privilege fixture (`wizard-privileges`) opens the chat history permission picker with registered privilege descriptions. Outputs include action receipts, per-image provenance and `captures.json` with profile and pipe identity.
+
+These effect pairs hold position and time fixed while changing one setting:
+
+| Comparison | Scene names | Default time |
+| --- | --- | --- |
+| Distance fading | `wizard-chat-obscured`, `wizard-chat-clear` | 5 s |
+| Signing sightline | `wizard-chat-signing-visible`, `wizard-chat-signing-blocked` | 8.5 s |
+| Language system | `wizard-chat-language-enabled`, `wizard-chat-language-disabled` | 5 s |
+| Damage cancels travel | `wizard-travel-damage-cancels`, `wizard-travel-damage-continues` | 7 s |
+| Scene markers | `wizard-roleplay-markers-enabled`, `wizard-roleplay-markers-disabled` | 0.75 s |
+
+Additional lifecycle comparisons:
+
+| Comparison | Scene names | Default time |
+| --- | --- | --- |
+| Bubble expiry | `wizard-appearance-bubbles-visible`, `wizard-appearance-bubbles-expired` | 0.5 s, 5 s |
+| Typing and Thinking | `wizard-appearance-typing-active`, `wizard-appearance-typing-thinking` | 1 s, 5.1 s |
+| Nametag targeting | `wizard-appearance-names-targeted`, `wizard-appearance-names-untargeted` | 0.5 s, 3.5 s |
+| Nametag distance and wall | `wizard-appearance-names-distant`, `wizard-appearance-names-blocked` | 6.5 s, 9.5 s |
+| Sheet auto-open | `wizard-characters-autoopen`, `wizard-characters-manual` | 0.75 s |
+| Character identity | `wizard-characters-slots-first`, `wizard-characters-slots-second` | 0.75 s, 4.75 s |
+| Entries and notebook | `wizard-notes-entries`, `wizard-notes-notebook`, `wizard-personal-notebook` | 0.75 s |
+| Incoming notice switches tab | `wizard-chat-focus-switches`, `wizard-chat-focus-stays` | 1.25 s |
+| Reopening remembers a tab | `wizard-chat-focus-remembers`, `wizard-chat-focus-default` | 7.25 s |
+
+The language editor scenes are `wizard-language-configured`, `wizard-language-edited`, `wizard-language-invalid` and `wizard-language-grants`. They use custom Dock Cant and Quayside definitions to check selected colors, syllables, validation feedback and starting-language grants. Other scenes keep the language definitions supplied when their draft opens. Standalone drafts start with the initialized mod defaults. Manifests record both setting values and language definitions in `fixture`.
+
+Omit `-PreviewTime` to use each scene's default. An explicit finite value from 0 through 10, including zero, overrides it. The sleep fixture uses 4.5 seconds to show two of four players asleep. Audible speech uses open ground, and the signing scene supplies one blocking wall. For standalone work, `./scripts/preview-gui.ps1 -Wizard -Output <fresh-directory>` renders all 59 scenes at both GUI scales without launching a client. Add `-Width 1280 -Height 720` for the compact layout. Add `-Scenario wizard-language-configured` to render one named scene. Keep standalone output separate from native evidence.
+
+Replay, Pause and the time slider affect only the local example. Interactive scrubbing can reach long warmups, while the native capture operation keeps its separate bounded 0..10-second contract. Typing timeout leads to Thinking before the example closes chat. Sheet and note miniatures use native widgets with local records. No actual inventory, record or saved setting is changed.
 
 ```powershell
 $sourceHash = ./scripts/gui-source-identity.ps1
@@ -134,7 +164,7 @@ $firstScale = Get-Content -Raw -LiteralPath (Join-Path $run 'scale-1/scale-recei
     -OutputDirectory (Join-Path $run 'restore-original-scale')
 ```
 
-For standalone layout renders and sticky PR differences, use [GuiPreview](../../../../tools/GuiPreview/README.md), `scripts/collect-gui-captures.ps1`, and the tracked `GUI Captures` / `GUI Capture Report` workflows. These omit native Pip and world rendering. The generated PR base is separate from a human-approved screenshot baseline.
+For standalone renders and sticky PR differences, use [GuiPreview](../../../../tools/GuiPreview/README.md), `scripts/collect-gui-captures.ps1`, and the tracked `GUI Captures` / `GUI Capture Report` workflows. The standalone backend renders real seraph shapes, skins, clothing and native skeletal poses through a software mesh renderer. It does not launch the client or exercise live world rendering and GPU shaders. Capture manifests distinguish `standalone-gui-and-seraph` from `native-client` evidence. The generated PR base is separate from a human-approved screenshot baseline.
 
 For optional model review of the clip, follow the tracked [video rubric and adapter reproduction](../../../../docs/agent-context/2026-10-06-wizard-video-rubric.md). It pins the original review helper and applies the saved adapter patch in a disposable directory. Verify the original helper hash and current provider/model availability before an authorized paid call. Do not convert a model's visual assessment into human acceptance or baseline approval.
 

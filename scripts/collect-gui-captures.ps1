@@ -40,6 +40,7 @@ try {
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         $sourceHash = & (Join-Path $PSScriptRoot 'gui-source-identity.ps1') -Repo $repo
         $captures = [Collections.Generic.List[object]]::new()
+        $coverage = $null
         $hasScenes = Test-Path -LiteralPath (Join-Path $repo 'mods-dll/thebasics/src/ModSystems/ChatUiSystem/SetupWizardCaptureScenes.cs')
         if ($hasScenes) {
             $project = Join-Path $repo 'tools/GuiPreview/GuiPreview.csproj'
@@ -50,8 +51,13 @@ try {
                 & $DotNet (Join-Path $repo 'tools/GuiPreview/bin/Debug/net10.0/TheBasics.GuiPreview.dll') render --game $game --assets (Join-Path $repo 'mods-dll/thebasics/assets') --output $scaleDirectory --scenario wizard-all --scale $scale --width 1600 --height 1000 --source-tree-hash $sourceHash
                 if ($LASTEXITCODE -ne 0) { throw "$($side.Name) GUI render failed at scale $scale." }
                 $index = Get-Content -LiteralPath (Join-Path $scaleDirectory 'captures.json') -Raw | ConvertFrom-Json
+                if ($index.coverage -notin @('layout-only', 'standalone-gui-and-seraph') -or ($coverage -and $coverage -ne $index.coverage)) {
+                    throw 'Standalone wizard renders must have consistent layout-only or standalone-gui-and-seraph coverage.'
+                }
+                $coverage = $index.coverage
                 foreach ($entry in $index.captures) {
                     $manifest = Get-Content -LiteralPath (Join-Path $scaleDirectory $entry.manifest) -Raw | ConvertFrom-Json
+                    if ($manifest.coverage -ne $coverage) { throw 'Capture coverage does not match its standalone render index.' }
                     $scenario = 'scale-' + $scale + '/' + $entry.scenario
                     $manifest | Add-Member -NotePropertyName sceneId -NotePropertyValue $entry.scenario
                     $manifest.scenario = $scenario
@@ -60,7 +66,7 @@ try {
             }
         }
         # A pre-wizard base has no wizard screenshots. Current scenes are then reported as added.
-        @{ schema = 1; sourceTreeHash = $sourceHash; coverage = 'layout-only'; captures = $captures.ToArray();
+        @{ schema = 1; sourceTreeHash = $sourceHash; coverage = $(if ($coverage) { $coverage } else { 'layout-only' }); captures = $captures.ToArray();
             reference = 'Regenerated source commit, not a human-approved screenshot baseline'; wizardScenesAvailable = $hasScenes } |
             ConvertTo-Json -Depth 100 | Set-Content -LiteralPath (Join-Path $directory 'captures.json') -Encoding utf8
     }

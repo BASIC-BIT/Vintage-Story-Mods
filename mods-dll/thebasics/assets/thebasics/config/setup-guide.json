@@ -20,5 +20,5 @@
     { "slot": 7, "code": "game:clothes-emblem-silver-star" },
     { "slot": 9, "code": "game:clothes-waist-moss-embroidered-belt" }
   ],
-  "animations": ["idle", "wave", "nod", "cheer"]
+  "animations": ["idle", "wave", "nod", "cheer", "sleep"]
 }

@@ -79,7 +79,7 @@ public class SetupGuidePreviewTests
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
             Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1000);
         using var wizard = new SetupWizardDialog(host.Api, new(SetupWizardCaptureScenes.DefaultValues()), "qa-run",
-            connectedHostIsDedicated, null!, null!, null!, layoutOnly: true, captureOnly: true);
+            connectedHostIsDedicated, null!, null!, null!, layoutOnly: true, captureOnly: true, actorFactory: host.CreateGuide);
         SetupWizardCaptureScenes.Show(wizard, scenario, 0.75);
         var elements = (Dictionary<string, GuiElement>)typeof(GuiComposer)
             .GetField("staticElements", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(wizard.SingleComposer)!;
@@ -95,7 +95,7 @@ public class SetupGuidePreviewTests
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
         draft.Set("Teleportation.RegisterHomeCommands", "0");
         draft.Set("Teleportation.RegisterSpawnCommands", "1");
-        using var wizard = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true);
+        using var wizard = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         wizard.ShowPage("teleport.spawn");
         Assert.NotNull(wizard.SingleComposer.GetElement("HomeSpawnRequireTemporalGear"));
     }
@@ -110,13 +110,18 @@ public class SetupGuidePreviewTests
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
         foreach (var key in new[] { "TpaRequireTemporalGear", "TpaUseCooldown", "TpaUseTimeout" })
             draft.Set(key, enabled ? "1" : "0");
-        using var wizard = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true);
+        using var wizard = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         wizard.ShowPage("teleport.requests");
         var text = (string)typeof(SetupWizardDialog).GetMethod("BuildPreviewText", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(wizard, null)!;
-        Assert.Contains(enabled ? "Sending a request costs one temporal gear" : "No temporal gear is required", text);
-        Assert.Contains(enabled ? "in-game hours between requests" : "No wait between requests", text);
-        Assert.Contains(enabled ? "Requests expire after" : "Requests do not expire", text);
+        Assert.Contains("Teleport request has been sent to Mara", text);
+        if (enabled) Assert.Contains("One temporal gear paid with the request", text);
+        else Assert.DoesNotContain("gear", text);
+        wizard.ShowPage("teleport.requesttiming");
+        text = (string)typeof(SetupWizardDialog).GetMethod("BuildPreviewText", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(wizard, null)!;
+        Assert.Contains(enabled ? "in-game hours" : "No request cooldown", text);
+        Assert.Contains(enabled ? "Expires in" : "This request has no expiry", text);
     }
 
     [Fact]
@@ -167,7 +172,8 @@ public class SetupGuidePreviewTests
         preview.Render(0.25f, bounds);
         Assert.Equal(0.75, GetField(preview, "previewTime"));
         preview.PlayAnimation("idle");
-        Assert.NotSame(pinnedAnimator, actor.AnimManager.Animator);
+        Assert.Same(pinnedAnimator, actor.AnimManager.Animator);
+        Assert.Equal(0.75, GetField(preview, "previewTime"));
         var resumedAnimator = actor.AnimManager.Animator;
         preview.PlayAnimation("idle");
         Assert.Same(resumedAnimator, actor.AnimManager.Animator);
@@ -281,7 +287,8 @@ public class SetupGuidePreviewTests
         // ResumePreview uses this same transition from a named frame into live native animation.
         preview.PlayAnimation("wave");
         var liveAnimator = actor.AnimManager.Animator;
-        Assert.NotSame(pinnedAnimator, liveAnimator);
+        Assert.Same(pinnedAnimator, liveAnimator);
+        Assert.True(pinnedMatrices.SequenceEqual(liveAnimator.Matrices));
         for (int frame = 0; frame < Math.Ceiling(liveSeconds * 60); frame++) preview.Render(1f / 60, bounds);
         Assert.Same(liveAnimator, actor.AnimManager.Animator);
         Assert.DoesNotContain("wave", actor.AnimManager.ActiveAnimationsByAnimCode.Keys);
@@ -313,12 +320,23 @@ public class SetupGuidePreviewTests
             var manifest = JsonSerializer.SerializeToElement(host.Manifest);
             foreach (var control in manifest.GetProperty("controls").EnumerateArray())
             {
-                var x = control.GetProperty("x").GetDouble();
-                var y = control.GetProperty("y").GetDouble();
-                Assert.InRange(x, 0, width);
-                Assert.InRange(y, 0, height);
-                Assert.InRange(x + control.GetProperty("width").GetDouble(), 0, width);
-                Assert.InRange(y + control.GetProperty("height").GetDouble(), 0, height);
+                // Native child parents describe scrollable content, not a rendered control.
+                if (control.GetProperty("type").GetString() == typeof(GuiElementParent).FullName) continue;
+                var bounds = control.GetProperty("clip").ValueKind == JsonValueKind.Null ? control : control.GetProperty("clip");
+                var x = bounds.GetProperty("x").GetDouble();
+                var y = bounds.GetProperty("y").GetDouble();
+                var right = x + bounds.GetProperty("width").GetDouble();
+                var bottom = y + bounds.GetProperty("height").GetDouble();
+                Assert.True(x >= 0 && y >= 0 && right <= width && bottom <= height,
+                    $"{scenario}: {control.GetProperty("key").GetString()} has control or clip bounds ({x}, {y}) to ({right}, {bottom}) outside {width}x{height}.");
+            }
+            if (scenario == "wizard-sheet-builder-invalid" && width == 1280 && height == 720 && scale == 1.25)
+            {
+                Assert.Contains(manifest.GetProperty("controls").EnumerateArray(), control =>
+                    control.GetProperty("type").GetString() == typeof(GuiElementParent).FullName && control.GetProperty("y").GetDouble() < 0);
+                Assert.Contains(manifest.GetProperty("controls").EnumerateArray(), control =>
+                    control.GetProperty("type").GetString() != typeof(GuiElementParent).FullName &&
+                    control.GetProperty("y").GetDouble() < 0 && control.GetProperty("clip").ValueKind != JsonValueKind.Null);
             }
         }
         using var rangesScene = PreviewScene.Create("wizard-chat-ranges", host);

@@ -24,7 +24,9 @@ MAX_DIMENSION = 4096
 MAX_PNG_BYTES = 128 * 1024 * 1024
 ENVIRONMENT_FIELDS = ("viewport", "locale", "scale", "fonts", "gameBinaries", "gameAssets", "nativeGuide")
 SCENE_FIELDS = ("scale", "previewTime", "fixture", "coverage", "omissions")
-COVERAGE = ("layout-only", "native-client")
+SOFTWARE_SERAPH_COVERAGE = "standalone-gui-and-seraph"
+COVERAGE = ("layout-only", SOFTWARE_SERAPH_COVERAGE, "native-client")
+SERAPH_PREVIEW_IDENTITY = {"renderer": "software", "geometry": "native-game-shapes", "animation": "native-client-animator"}
 
 
 def chunk(kind, data):
@@ -191,6 +193,25 @@ def load_index(root):
     return index, captures
 
 
+def software_asset_identities(assets):
+    if not isinstance(assets, list):
+        raise ValueError("invalid environment.assets for software seraph")
+    identities = {}
+    for asset in assets:
+        if not isinstance(asset, dict) or not isinstance(asset.get("path"), str) or not asset["path"].strip() or not isinstance(asset.get("sha256"), str) or not re.fullmatch(r"[0-9a-fA-F]{64}", asset["sha256"]):
+            raise ValueError("invalid environment.assets for software seraph")
+        path = asset["path"].replace("\\", "/")
+        _, marker, relative = path.rpartition("/mods-dll/thebasics/assets/")
+        # Only this repository's asset root moves between the two capture checkouts.
+        key = ("mod", relative) if marker else ("file", path)
+        if marker and any(part in ("", ".", "..") for part in relative.split("/")):
+            raise ValueError("invalid software seraph logical asset path")
+        if key in identities:
+            raise ValueError("duplicate software seraph logical asset identity")
+        identities[key] = asset["sha256"].lower()
+    return identities
+
+
 def validate_capture(root, index, entry, expected_hash):
     result = {"manifest": None, "image": None, "missing": [], "stale": []}
     try:
@@ -217,8 +238,8 @@ def validate_capture(root, index, entry, expected_hash):
         result["stale"].append("invalid previewTime")
     if "fixture" not in manifest or not isinstance(manifest.get("omissions"), list):
         result["stale"].append("fixture or omissions missing")
-    if manifest.get("coverage") == "layout-only" and not manifest.get("omissions"):
-        result["stale"].append("layout-only capture must state omissions")
+    if manifest.get("coverage") in ("layout-only", SOFTWARE_SERAPH_COVERAGE) and not manifest.get("omissions"):
+        result["stale"].append("standalone capture must state omissions")
     if not isinstance(manifest.get("environment"), dict) or not manifest["environment"]:
         result["stale"].append("full environment provenance missing")
     environment = manifest.get("environmentIdentity")
@@ -256,7 +277,36 @@ def validate_capture(root, index, entry, expected_hash):
         if isinstance(guide_assets, list) and any(type(item.get("patched")) is not bool for item in guide_assets if isinstance(item, dict)):
             result["stale"].append("invalid environmentIdentity.nativeGuide asset patch provenance")
     elif guide and (guide.get("loadedAssemblies") != [] or guide.get("assets") != [] or not guide.get("omissions")):
-        result["stale"].append("layout-only nativeGuide must state its omission")
+        result["stale"].append("standalone nativeGuide must state its renderer omission")
+    if manifest.get("coverage") == SOFTWARE_SERAPH_COVERAGE:
+        if environment.get("seraphPreview") != SERAPH_PREVIEW_IDENTITY:
+            result["stale"].append("invalid environmentIdentity.seraphPreview")
+        details = manifest.get("environment")
+        details = details if isinstance(details, dict) else {}
+        commands = details.get("commands")
+        if not isinstance(commands, list) or any(not isinstance(command, dict) for command in commands):
+            result["stale"].append("invalid environment.commands")
+            commands = []
+        seraph_commands = [command for command in commands if command.get("op") == "seraph"]
+        if seraph_commands:
+            assets = details.get("assets")
+            if not assets:
+                result["stale"].append("invalid environment.assets for software seraph")
+            else:
+                try:
+                    software_asset_identities(assets)
+                except ValueError as error:
+                    result["stale"].append(str(error))
+            models = details.get("seraphs")
+            if not isinstance(models, list) or not models or any(not isinstance(model, dict) or not isinstance(model.get("identity"), str) or not model["identity"].strip() or any(type(model.get(field)) is not int or model[field] <= 0 for field in ("vertices", "indices", "textures")) for model in models):
+                result["stale"].append("invalid environment.seraphs")
+                models = []
+            identities = {model["identity"] for model in models}
+            for command in seraph_commands:
+                if not isinstance(command.get("identity"), str) or command["identity"] not in identities or not isinstance(command.get("animation"), str) or not command["animation"].strip() or any(type(command.get(field)) not in (int, float) or not math.isfinite(command[field]) for field in ("time", "yaw", "opacity")):
+                    result["stale"].append("invalid software seraph pose")
+                elif command["time"] < 0 or not 0 < command["opacity"] <= 1:
+                    result["stale"].append("software seraph pose outside render bounds")
     try:
         result["image"] = decode_png(input_path(root, entry["file"]))
         if result["image"][:2] != (manifest.get("width"), manifest.get("height")):
@@ -326,6 +376,15 @@ def make_report(baseline, current, output, baseline_hash, current_hash):
             for field in ENVIRONMENT_FIELDS:
                 if left["environmentIdentity"][field] != right["environmentIdentity"][field]:
                     row["reasons"].append("environmentIdentity." + field + " mismatch")
+            if left["coverage"] == SOFTWARE_SERAPH_COVERAGE and right["coverage"] == SOFTWARE_SERAPH_COVERAGE:
+                if left["environmentIdentity"]["seraphPreview"] != right["environmentIdentity"]["seraphPreview"]:
+                    row["reasons"].append("environmentIdentity.seraphPreview mismatch")
+                if any(command.get("op") == "seraph" for manifest in (left, right) for command in manifest["environment"]["commands"]):
+                    try:
+                        if software_asset_identities(left["environment"].get("assets", [])) != software_asset_identities(right["environment"].get("assets", [])):
+                            row["reasons"].append("software seraph asset provenance mismatch")
+                    except ValueError as error:
+                        row["reasons"].append(str(error))
             if row["reasons"]:
                 row["status"] = "stale"
             else:
@@ -349,9 +408,14 @@ def make_report(baseline, current, output, baseline_hash, current_hash):
 def render_reports(output, report):
     intro = ("GUI capture comparison. Reference provenance is recorded; this report does not approve a baseline. "
              "Pixel differences require review; this report does not approve captures or certify gameplay. "
-             "Layout-only evidence does not certify native character or animation appearance.")
+             "Layout-only evidence omits character appearance. Software seraph evidence uses game shapes and skeletal poses, "
+             "without native client GPU or live world rendering.")
+    baseline_coverage = report["baselineCoverage"] if report["baselineCoverage"] in COVERAGE else "invalid"
+    current_coverage = report["currentCoverage"] if report["currentCoverage"] in COVERAGE else "invalid"
+    coverage = "Baseline coverage: " + baseline_coverage + ". Current coverage: " + current_coverage + "."
     markdown = ["<!-- gui-capture-report -->", "[AGENT]", "", intro, "",
                 "Evidence: **" + ("compatible" if report["evidenceValid"] else "missing or stale") + "**.", "",
+                coverage, "",
                 "Baseline source: `" + report["baselineSourceTreeHash"] + "`. Current source: `" + report["currentSourceTreeHash"] + "`.", "",
                 "| Scenario | Status | Changed pixels | Artifacts |", "| --- | --- | ---: | --- |"]
     sections, details = [], []
@@ -368,7 +432,7 @@ def render_reports(output, report):
     if not report["captures"]:
         markdown.extend(["", "No captures were supplied; evidence is missing."])
     (output / "report.md").write_text("\n".join(markdown) + "\n", encoding="utf-8")
-    (output / "report.html").write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>GUI capture comparison</title><style>body{font:16px sans-serif;max-width:1400px;margin:2em auto;padding:0 1em}.images{display:flex;flex-wrap:wrap;gap:1em}figure{margin:0;flex:1;min-width:240px}img{max-width:100%;height:auto}section{border-top:1px solid #aaa;margin-top:2em}</style><h1>GUI capture comparison</h1><p>' + html.escape(intro) + '</p><p>Evidence: ' + ("compatible" if report["evidenceValid"] else "missing or stale") + '</p><p>Baseline: <code>' + report["baselineSourceTreeHash"] + '</code><br>Current: <code>' + report["currentSourceTreeHash"] + '</code></p>' + "".join(sections) + "</html>", encoding="utf-8")
+    (output / "report.html").write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>GUI capture comparison</title><style>body{font:16px sans-serif;max-width:1400px;margin:2em auto;padding:0 1em}.images{display:flex;flex-wrap:wrap;gap:1em}figure{margin:0;flex:1;min-width:240px}img{max-width:100%;height:auto}section{border-top:1px solid #aaa;margin-top:2em}</style><h1>GUI capture comparison</h1><p>' + html.escape(intro) + '</p><p>Evidence: ' + ("compatible" if report["evidenceValid"] else "missing or stale") + '</p><p>' + coverage + '</p><p>Baseline: <code>' + report["baselineSourceTreeHash"] + '</code><br>Current: <code>' + report["currentSourceTreeHash"] + '</code></p>' + "".join(sections) + "</html>", encoding="utf-8")
 
 
 def source_hash(value):

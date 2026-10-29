@@ -25,7 +25,8 @@ public static class AnalyticsService
     {
         "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",
         "advanced", "close", "closed", "save_requested", "save_timeout", "save_failed",
-        "saved", "conflict", "failed", "validation_failed", "completed"
+        "saved", "conflict", "failed", "validation_failed", "completed",
+        "sheet_select", "sheet_add", "sheet_remove", "sheet_move", "sheet_preview", "sheet_reset"
     };
     private static readonly HashSet<string> SetupWizardChoices = new(StringComparer.Ordinal)
     {

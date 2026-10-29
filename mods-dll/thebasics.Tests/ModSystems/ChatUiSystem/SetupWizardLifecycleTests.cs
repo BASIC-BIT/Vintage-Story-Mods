@@ -47,7 +47,7 @@ public class SetupWizardLifecycleTests
         using GuiDialog dialog = invitation
             ? new SetupWizardInvitationDialog(host.Api, null!, null!)
             : new SetupWizardDialog(host.Api, new(SetupWizardCaptureScenes.DefaultValues()), "run", true,
-                null!, null!, null!, layoutOnly: true);
+                null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         dialog.TryOpen();
         Assert.Contains(dialog, host.Api.Gui.LoadedGuis);
 
@@ -70,7 +70,7 @@ public class SetupWizardLifecycleTests
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
         draft.Set("EnableChatter", draft.Get("EnableChatter") == "1" ? "0" : "1");
         using var wizard = new SetupWizardDialog(host.Api, draft, "run", true,
-            null!, null!, null!, layoutOnly: true);
+            null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
         wizard.TryOpen();
         var confirmField = typeof(SetupWizardDialog).GetField("_closeConfirm", BindingFlags.Instance | BindingFlags.NonPublic)!;
 

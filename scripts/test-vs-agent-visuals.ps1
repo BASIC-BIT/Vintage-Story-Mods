@@ -148,13 +148,15 @@ if ($realEncoder -and $realProbe) {
     $realClip = Get-Content -LiteralPath (Join-Path $realDirectory 'clip.json') -Raw | ConvertFrom-Json
     Assert-True ($realClip.frames.Count -eq 2 -and $realClip.encodedWidth -eq 4 -and $realClip.encodedHeight -eq 4) 'Actual ffmpeg/ffprobe encode and inspect the tiny odd-size pose fixture.'
 } else { Write-Warning 'Actual encoder integration skipped because ffmpeg/ffprobe are unavailable; fake tool behavior checks passed.' }
-# Exercise the real native runner against a disposable bridge, including newly added branches.
+# Exercise the real native runner with a fake bridge and a disposable profile directory.
 $nativeScript = Join-Path $PSScriptRoot 'capture-native-wizard.ps1'
 $fakeVsctl = Join-Path $fixtureScripts 'vsctl.ps1'
 $global:nativeVisualProfile = $profile
 $global:nativeVisualFailure = ''
+$global:nativeVisualCalls = 0
 @'
 param($Command)
+$global:nativeVisualCalls++
 $global:LASTEXITCODE = 0
 switch ($Command) {
     'hello' {
@@ -194,20 +196,108 @@ switch ($Command) {
 }
 @{ok = $true; result = $result} | ConvertTo-Json -Depth 15
 '@ | Set-Content -LiteralPath $fakeVsctl -Encoding utf8
-$newScenes = @('wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-map-managed', 'wizard-map-hidden', 'wizard-characters-sheets', 'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats', 'wizard-privileges')
+$newScenes = @(
+    'wizard-appearance-bubbles', 'wizard-appearance-names', 'wizard-map-visibility', 'wizard-map-managed', 'wizard-map-hidden', 'wizard-characters-sheets',
+    'wizard-roleplay-dice', 'wizard-server-history', 'wizard-server-stats', 'wizard-privileges', 'wizard-notifications-sleep',
+    'wizard-chat-obscured', 'wizard-chat-clear', 'wizard-chat-signing-visible', 'wizard-chat-signing-blocked',
+    'wizard-chat-language-enabled', 'wizard-chat-language-disabled', 'wizard-travel-damage-cancels', 'wizard-travel-damage-continues',
+    'wizard-roleplay-markers-enabled', 'wizard-roleplay-markers-disabled',
+    'wizard-language-configured', 'wizard-language-edited', 'wizard-language-invalid', 'wizard-language-grants',
+    'wizard-language-color-palette', 'wizard-language-color-custom', 'wizard-language-color-selected'
+)
 $nativeArguments = @{ExpectedSourceTreeHash = ('a' * 64); Vsctl = $fakeVsctl; DataPath = $profile; Scenarios = $newScenes}
 $nativeDirectory = Join-Path $root 'native-new-branches'
 & $nativeScript @nativeArguments -OutputDirectory $nativeDirectory
 $native = Get-Content -LiteralPath (Join-Path $nativeDirectory 'captures.json') -Raw | ConvertFrom-Json
 Assert-True (($native.captures.scenario -join ',') -ceq ($newScenes -join ',')) 'The native runner accepts every new branch fixture in the selected order.'
 Assert-True ($native.coverage -eq 'native-client' -and $native.sourceTreeHash -ceq ('a' * 64) -and $native.dataPath -eq $profile -and $native.pipeName -eq 'vintage-story-agentcontrol-profile2') 'New branches retain source, profile, coverage and pipe provenance.'
+foreach ($scene in $newScenes) {
+    $expectedTime = switch -Wildcard ($scene) {
+        'wizard-chat-signing-*' { 8.5; break }
+        'wizard-chat-obscured' { 5; break }
+        'wizard-chat-clear' { 5; break }
+        'wizard-chat-language-*' { 5; break }
+        'wizard-travel-damage-*' { 7; break }
+        'wizard-notifications-sleep' { 4.5; break }
+        default { 0.75 }
+    }
+    $manifest = Get-Content -LiteralPath (Join-Path $nativeDirectory "$scene.json") -Raw | ConvertFrom-Json
+    Assert-True ($manifest.previewTime -eq $expectedTime) 'Capture fixtures use their deterministic comparison pose by default.'
+}
+$lifecycleScenes = @(
+    'wizard-appearance-bubbles-visible', 'wizard-appearance-bubbles-expired', 'wizard-appearance-typing-active', 'wizard-appearance-typing-thinking',
+    'wizard-appearance-names-targeted', 'wizard-appearance-names-untargeted', 'wizard-appearance-names-blocked', 'wizard-appearance-names-distant',
+    'wizard-characters-autoopen', 'wizard-characters-manual', 'wizard-characters-slots-first', 'wizard-characters-slots-second',
+    'wizard-notes-entries', 'wizard-notes-notebook', 'wizard-personal-notebook',
+    'wizard-chat-focus-switches', 'wizard-chat-focus-stays', 'wizard-chat-focus-remembers', 'wizard-chat-focus-default'
+)
+$lifecycleArguments = $nativeArguments.Clone()
+$lifecycleArguments.Scenarios = $lifecycleScenes
+$lifecycleDirectory = Join-Path $root 'native-lifecycles'
+& $nativeScript @lifecycleArguments -OutputDirectory $lifecycleDirectory
+$lifecycles = Get-Content -LiteralPath (Join-Path $lifecycleDirectory 'captures.json') -Raw | ConvertFrom-Json
+Assert-True (($lifecycles.captures.scenario -join ',') -ceq ($lifecycleScenes -join ',')) 'All 19 lifecycle captures are opt-in and retain their selected order.'
+foreach ($scene in $lifecycleScenes) {
+    $expectedTime = switch ($scene) {
+        'wizard-appearance-bubbles-visible' { 0.5; break }
+        'wizard-appearance-bubbles-expired' { 5; break }
+        'wizard-appearance-typing-active' { 1; break }
+        'wizard-appearance-typing-thinking' { 5.1; break }
+        'wizard-appearance-names-targeted' { 0.5; break }
+        'wizard-appearance-names-untargeted' { 3.5; break }
+        'wizard-appearance-names-distant' { 6.5; break }
+        'wizard-appearance-names-blocked' { 9.5; break }
+        'wizard-characters-slots-second' { 4.75; break }
+        'wizard-chat-focus-switches' { 1.25; break }
+        'wizard-chat-focus-stays' { 1.25; break }
+        'wizard-chat-focus-remembers' { 7.25; break }
+        'wizard-chat-focus-default' { 7.25; break }
+        default { 0.75 }
+    }
+    $manifest = Get-Content -LiteralPath (Join-Path $lifecycleDirectory "$scene.json") -Raw | ConvertFrom-Json
+    Assert-True ($manifest.previewTime -eq $expectedTime) "Lifecycle capture $scene uses its deterministic default time."
+}
+$defaultArguments = $nativeArguments.Clone()
+$defaultArguments.Remove('Scenarios')
+$defaultDirectory = Join-Path $root 'native-legacy-default'
+& $nativeScript @defaultArguments -OutputDirectory $defaultDirectory
+$defaultSet = Get-Content -LiteralPath (Join-Path $defaultDirectory 'captures.json') -Raw | ConvertFrom-Json
+Assert-True ($defaultSet.captures.Count -eq 26 -and @($defaultSet.captures.scenario | Where-Object { $_ -in $lifecycleScenes }).Count -eq 0) 'The native default remains the 26 legacy captures.'
+$colorScenes = @('wizard-chat-colors', 'wizard-chat-colors-custom', 'wizard-nametag-colors', 'wizard-nametag-colors-alpha', 'wizard-nametag-colors-custom')
+$colorArguments = $nativeArguments.Clone()
+$colorArguments.Scenarios = $colorScenes
+$colorDirectory = Join-Path $root 'native-colors'
+& $nativeScript @colorArguments -OutputDirectory $colorDirectory
+$colors = Get-Content -LiteralPath (Join-Path $colorDirectory 'captures.json') -Raw | ConvertFrom-Json
+Assert-True (($colors.captures.scenario -join ',') -ceq ($colorScenes -join ',')) 'Color captures use a separate five-scene batch within the session limit.'
+Assert-True (@(@($defaultSet.captures.scenario) + $newScenes + $lifecycleScenes + $colorScenes | Sort-Object -Unique).Count -eq 67) 'The native consumer accepts all 67 distinct wizard scenes.'
+$explicitDirectory = Join-Path $root 'native-explicit-time'
+& $nativeScript -ExpectedSourceTreeHash ('a' * 64) -Vsctl $fakeVsctl -DataPath $profile -Scenarios 'wizard-chat-signing-blocked' -PreviewTime 0 -OutputDirectory $explicitDirectory
+$explicitManifest = Get-Content -LiteralPath (Join-Path $explicitDirectory 'wizard-chat-signing-blocked.json') -Raw | ConvertFrom-Json
+Assert-True ($explicitManifest.previewTime -eq 0) 'An explicit zero pose overrides a scene default for sampled clips.'
+$lastPoseDirectory = Join-Path $root 'native-last-valid-time'
+& $nativeScript -ExpectedSourceTreeHash ('a' * 64) -Vsctl $fakeVsctl -DataPath $profile -Scenarios 'wizard-appearance-typing-thinking' -PreviewTime 10 -OutputDirectory $lastPoseDirectory
+$lastPoseManifest = Get-Content -LiteralPath (Join-Path $lastPoseDirectory 'wizard-appearance-typing-thinking.json') -Raw | ConvertFrom-Json
+Assert-True ($lastPoseManifest.previewTime -eq 10) 'An explicit ten-second pose remains valid and overrides lifecycle defaults.'
+$oversizedDirectory = Join-Path $root 'native-reject-session-limit'
+$oversizedArguments = $nativeArguments.Clone()
+$oversizedArguments.Scenarios = $newScenes + $newScenes
+$callsBeforeRejection = $global:nativeVisualCalls
+Assert-Throws { & $nativeScript @oversizedArguments -OutputDirectory $oversizedDirectory } 'at most 32'
+Assert-True (!(Test-Path -LiteralPath $oversizedDirectory)) 'Oversized native sets are rejected before bridge calls or output creation.'
+Assert-True ($global:nativeVisualCalls -eq $callsBeforeRejection) 'The 32-scene limit rejects the request before any bridge command.'
+foreach ($invalidTime in @(10.1, -0.1, [double]::NaN, [double]::PositiveInfinity)) {
+    $invalidDirectory = Join-Path $root ('native-reject-time-' + [Guid]::NewGuid().ToString('N'))
+    Assert-Throws { & $nativeScript @nativeArguments -PreviewTime $invalidTime -OutputDirectory $invalidDirectory } 'validate argument|0\.\.10'
+    Assert-True ($global:nativeVisualCalls -eq $callsBeforeRejection -and !(Test-Path -LiteralPath $invalidDirectory)) 'Nonfinite and out-of-range fixture times never reach the bridge or create output.'
+}
 foreach ($case in @('protocol', 'source', 'unverified')) {
     $global:nativeVisualFailure = $case
     $rejectedDirectory = Join-Path $root "native-reject-$case"
     Assert-Throws { & $nativeScript @nativeArguments -OutputDirectory $rejectedDirectory } 'protocol|enabled Agent Control session|source identity or native coverage mismatch'
     Assert-True (@(Get-ChildItem -LiteralPath $rejectedDirectory -Filter '*.png').Count -eq 0) 'Unsupported protocols and mismatched source identity never export native screenshots.'
 }
-foreach ($variable in @('nativeVisualProfile','nativeVisualFailure','nativeVisualJob','nativeVisualDirectory')) { Remove-Variable -Name $variable -Scope Global -ErrorAction SilentlyContinue }
+foreach ($variable in @('nativeVisualProfile','nativeVisualFailure','nativeVisualJob','nativeVisualDirectory','nativeVisualCalls')) { Remove-Variable -Name $variable -Scope Global -ErrorAction SilentlyContinue }
 Remove-Variable visualFailure -Scope Global -ErrorAction SilentlyContinue
 Remove-Variable visualTestProcesses -Scope Global -ErrorAction SilentlyContinue
 Write-Host "$checks visual workflow assertions passed; disposable fixtures: $root"

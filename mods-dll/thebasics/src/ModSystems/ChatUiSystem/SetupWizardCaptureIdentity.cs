@@ -37,11 +37,11 @@ public static class SetupWizardCaptureIdentity
     private static object NativeGuideIdentity(IAssetManager assets)
     {
         var prefixes = new[] { "entities/humanoid/player.json", "shapes/entity/humanoid/", "textures/entity/humanoid/",
-            "itemtypes/wearable/seraph/", "shaders/entity", "shaderincludes/", "config/setup-guide.json" };
+            "itemtypes/wearable/seraph/", "shaders/entity", "shaderincludes/", "config/setup-guide.json", "config/setup-guide-mara.json" };
         return new
         {
             rendered = assets != null,
-            scope = assets == null ? "Native guide omitted from standalone composition."
+            scope = assets == null ? "Native client renderer not exercised in standalone composition."
                 : "Loaded native guide assemblies and effective asset bytes in player, humanoid shape/skin/clothing, seraph wearable, entity shader/include and guide fixture families.",
             loadedAssemblies = assets == null ? Array.Empty<object>() : AppDomain.CurrentDomain.GetAssemblies()
                 .Where(assembly => assembly.GetName().Name is "VSSurvivalMod" or "VSEssentials")
@@ -50,7 +50,7 @@ public static class SetupWizardCaptureIdentity
             assets = assets == null ? Array.Empty<object>() : prefixes.SelectMany(prefix => assets.GetMany(prefix, null, true))
                 .DistinctBy(asset => asset.Location.ToString()).OrderBy(asset => asset.Location.ToString(), StringComparer.Ordinal)
                 .Select(asset => (object)new { path = asset.Location.ToString(), sha256 = HashBytes(asset.Data), patched = asset.IsPatched }).ToArray(),
-            omissions = assets == null ? new[] { "Native 3D guide is not rendered." }
+            omissions = assets == null ? new[] { "Native client rendering and GPU shaders are not exercised." }
                 : new[] { "Runtime object mutations and code patches are not hashed; assets referenced outside the listed native families are not hashed." }
         };
     }

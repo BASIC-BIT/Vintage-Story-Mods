@@ -78,6 +78,109 @@ class CaptureReportTests(unittest.TestCase):
     def run_report(self):
         return reporter.make_report(self.before, self.after, self.output, BASE_HASH, CURRENT_HASH)
 
+    def software_seraph(self, root, actor=True):
+        self.capture(root)
+        def software(manifest):
+            manifest.update(coverage="standalone-gui-and-seraph", omissions=["Live world rendering and GPU shader calibration are not exercised."])
+            manifest["environmentIdentity"]["seraphPreview"] = {
+                "renderer": "software", "geometry": "native-game-shapes", "animation": "native-client-animator"}
+            manifest["environmentIdentity"]["nativeGuide"].update(
+                scope="Native client renderer not exercised in standalone composition.",
+                omissions=["Native client rendering and GPU shaders are not exercised."])
+            manifest["environment"].update(commands=[], seraphs=[], assets=[])
+            if actor:
+                manifest["environment"].update(
+                    seraphs=[{"identity": "Pip", "vertices": 24, "indices": 36, "textures": 1}],
+                    commands=[{"op": "seraph", "identity": "Pip", "animation": "idle", "time": 0.75,
+                               "yaw": -1.27, "opacity": 1, "width": 100, "height": 200}],
+                    assets=[{"path": "assets/game/shapes/entity/humanoid/seraph.json", "sha256": "f" * 64}])
+        self.change_manifest(root, software)
+        index = reporter.read_json(root / "captures.json")
+        index["coverage"] = "standalone-gui-and-seraph"
+        reporter.write_json(root / "captures.json", index)
+
+    def test_software_seraph_coverage_preserves_models_assets_and_poses_without_claiming_native_gpu(self):
+        for actor in (False, True):
+            with self.subTest(actor=actor):
+                for root in (self.before, self.after):
+                    self.software_seraph(root, actor)
+                report = self.run_report()
+                self.assertTrue(report["evidenceValid"])
+                self.assertEqual(report["counts"], {"unchanged": 1})
+                self.assertEqual(report["currentCoverage"], "standalone-gui-and-seraph")
+                saved = reporter.read_json(self.output / report["captures"][0]["artifacts"]["afterManifest"])
+                self.assertFalse(saved["environmentIdentity"]["nativeGuide"]["rendered"])
+                self.assertEqual(len(saved["environment"]["seraphs"]), int(actor))
+                for filename in ("report.md", "report.html"):
+                    text = (self.output / filename).read_text()
+                    self.assertIn("standalone-gui-and-seraph", text)
+                    self.assertIn("native client GPU", text)
+                self.reset_case()
+
+    def test_software_seraph_provenance_is_required_when_an_actor_is_drawn(self):
+        updates = [
+            lambda manifest: manifest["environmentIdentity"]["seraphPreview"].update(renderer="native"),
+            lambda manifest: manifest["environmentIdentity"]["nativeGuide"].update(rendered=True),
+            lambda manifest: manifest.update(omissions=[]),
+            lambda manifest: manifest["environment"].update(assets=[]),
+            lambda manifest: manifest["environment"]["assets"][0].update(sha256="invalid"),
+            lambda manifest: manifest["environment"].update(seraphs=[]),
+            lambda manifest: manifest["environment"]["seraphs"][0].update(vertices=0),
+            lambda manifest: manifest["environment"]["commands"][0].update(identity="unknown"),
+            lambda manifest: manifest["environment"]["commands"][0].update(animation=""),
+            lambda manifest: manifest["environment"]["commands"][0].update(time="invalid"),
+            lambda manifest: manifest["environment"]["commands"][0].update(opacity=2),
+        ]
+        for update in updates:
+            with self.subTest(update=update):
+                for root in (self.before, self.after):
+                    self.software_seraph(root)
+                self.change_manifest(self.after, update)
+                self.assertEqual(self.run_report()["counts"], {"stale": 1})
+                self.reset_case()
+
+    def test_software_seraph_asset_changes_are_stale_but_pose_changes_are_scene_output(self):
+        for root in (self.before, self.after):
+            self.software_seraph(root)
+        self.change_manifest(self.after, lambda manifest: manifest["environment"]["assets"][0].update(sha256="e" * 64))
+        self.assertEqual(self.run_report()["counts"], {"stale": 1})
+        self.reset_case()
+        for root in (self.before, self.after):
+            self.software_seraph(root)
+        self.change_manifest(self.after, lambda manifest: manifest["environment"]["commands"][0].update(yaw=0.5))
+        self.assertTrue(self.run_report()["evidenceValid"])
+
+    def test_layout_and_software_seraph_coverage_are_not_comparable(self):
+        self.capture(self.before)
+        self.software_seraph(self.after)
+        report = self.run_report()
+        self.assertEqual(report["counts"], {"stale": 1})
+        self.assertIn("coverage mismatch", report["captures"][0]["reasons"])
+
+    def test_software_seraph_assets_compare_across_checkouts_without_losing_identity(self):
+        for case in ("same", "hash", "domain", "unknown", "duplicate"):
+            with self.subTest(case=case):
+                self.reset_case()
+                for root in (self.before, self.after):
+                    self.software_seraph(root)
+                    path = str(root / "mods-dll/thebasics/assets/thebasics/config/setup-guide.json")
+                    self.change_manifest(root, lambda manifest, path=path: manifest["environment"]["assets"].append(
+                        {"path": path, "sha256": "a" * 64}))
+                if case == "hash":
+                    self.change_manifest(self.after, lambda manifest: manifest["environment"]["assets"][1].update(sha256="b" * 64))
+                elif case == "domain":
+                    self.change_manifest(self.after, lambda manifest: manifest["environment"]["assets"][1].update(
+                        path=str(self.after / "mods-dll/thebasics/assets/other/config/setup-guide.json")))
+                elif case == "unknown":
+                    self.change_manifest(self.after, lambda manifest: manifest["environment"]["assets"][1].update(
+                        path=str(self.after / "other/assets/thebasics/config/setup-guide.json")))
+                elif case == "duplicate":
+                    self.change_manifest(self.after, lambda manifest: manifest["environment"]["assets"].append(
+                        {"path": "C:/other/mods-dll/thebasics/assets/thebasics/config/setup-guide.json", "sha256": "a" * 64}))
+                report = self.run_report()
+                self.assertEqual(report["counts"], {"unchanged" if case == "same" else "stale": 1})
+                self.assertEqual(report["evidenceValid"], case == "same")
+
     def test_all_png_filters_rgb_and_rgba(self):
         path = self.root / "fixture.png"
         for channels in (3, 4):

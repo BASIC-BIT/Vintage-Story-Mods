@@ -71,7 +71,7 @@ public class StandaloneDialogTests
         if (scenario.StartsWith("language-", StringComparison.Ordinal))
             Assert.Equal("Common", ((GuiElementTextInput)scene.Dialog.SingleComposer["input-Name"]).GetText());
         if (scenario == "language-focus") Assert.True(scene.Dialog.SingleComposer["input-Name"].HasFocus);
-        if (scenario == "language-dropdown") Assert.True(((GuiElementDropDown)scene.Dialog.SingleComposer["dropdown-Default"]).listMenu.IsOpened);
+        if (scenario == "language-dropdown") Assert.True(((GuiElementDropDown)scene.Dialog.SingleComposer["language-selector"]).listMenu.IsOpened);
         var first = host.Canvas.GetRgbaPixels();
         host.RenderGuiDialog(scene.Dialog, 0);
         Assert.Equal(first, host.Canvas.GetRgbaPixels());
@@ -158,7 +158,7 @@ public class StandaloneDialogTests
         Assert.Equal("Draft name", language.SingleComposer.GetTextInput("input-Name").GetText());
 
         using var fields = new thebasics.ModSystems.ChatUiSystem.CharacterSheetFieldConfigDialog(host.Api,
-            new() { new() { OriginalId = "bio", Id = "bio", Label = "Bio", Type = "string" }, new() { OriginalId = "trade", Id = "trade", Label = "Trade", Type = "select", Options = "Scribe, Glassblower" } }, _ => { }, () => { }, () => { });
+            new() { new() { OriginalId = "bio", Id = "bio", Label = "Bio", Type = "string" }, new() { OriginalId = "trade", Id = "trade", Label = "Trade", Type = "option", Options = "Scribe, Glassblower" } }, _ => { }, () => { }, () => { });
         Assert.True(fields.JumpTo("trade", "Options"));
         Assert.True(fields.SingleComposer["input-Options"].HasFocus);
         Assert.Empty(host.UnsupportedCalls);

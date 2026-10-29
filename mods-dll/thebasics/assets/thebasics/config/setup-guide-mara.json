@@ -1,0 +1,22 @@
+{
+  "name": "Mara",
+  "skinParts": {
+    "baseskin": "skin8",
+    "eyecolor": "goldenrod",
+    "underwear": "breeches",
+    "voicetype": "altoflute",
+    "voicepitch": "medium",
+    "hairbase": "short",
+    "hairextra": "ponytail",
+    "facialexpression": "kind",
+    "mustache": "none",
+    "beard": "none",
+    "haircolor": "russet"
+  },
+  "gear": [
+    { "slot": 2, "code": "game:clothes-upperbody-hunters-green" },
+    { "slot": 3, "code": "game:clothes-lowerbody-hunter-leggings" },
+    { "slot": 4, "code": "game:clothes-foot-hunter-boots" }
+  ],
+  "animations": ["idle", "wave", "nod", "cheer", "sleep"]
+}

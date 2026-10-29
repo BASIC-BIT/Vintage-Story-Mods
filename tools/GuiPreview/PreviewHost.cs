@@ -8,6 +8,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.Common;
+using thebasics.ModSystems.ChatUiSystem;
 
 namespace TheBasics.GuiPreview;
 
@@ -38,6 +39,15 @@ public sealed class PreviewHost : IDisposable
     private TextTextureUtil text = null!;
     private IconUtil icons = null!;
     private readonly Dictionary<string, object> services = new();
+    private readonly Dictionary<string, SeraphModel> seraphModels = new(StringComparer.Ordinal);
+
+    public ISetupGuidePreview CreateGuide(ICoreClientAPI api, string identity)
+    {
+        if (!ReferenceEquals(api, Api)) throw new ArgumentException("The actor must use this preview host.", nameof(api));
+        if (!seraphModels.TryGetValue(identity, out var model))
+            seraphModels.Add(identity, model = SeraphModel.Load(Api, identity));
+        return new SoftwareSeraphPreview(Api, Canvas, model.NewPoseInstance(), identity);
+    }
 
     public PreviewHost(string gamePath, string modAssetsPath, int width, int height, double scale = 1)
     {
@@ -115,7 +125,10 @@ public sealed class PreviewHost : IDisposable
         if (m.Name is "Get" or "TryGet")
         {
             var loc = a[0] as AssetLocation ?? new AssetLocation((string)a[0]!);
-            var path = Path.GetFullPath(Path.Combine(loc.Domain == "game" ? Path.Combine(gamePath, "assets") : modAssetsPath, loc.Domain, loc.Path));
+            var path = loc.Domain == "game"
+                ? new[] { "game", "survival", "creative" }.Select(domain => Path.GetFullPath(Path.Combine(gamePath, "assets", domain, loc.Path)))
+                    .FirstOrDefault(File.Exists) ?? Path.GetFullPath(Path.Combine(gamePath, "assets", "game", loc.Path))
+                : Path.GetFullPath(Path.Combine(modAssetsPath, loc.Domain, loc.Path));
             if (!File.Exists(path)) throw new FileNotFoundException("Required preview asset missing", path);
             AssetFiles.Add(path); return new Asset(File.ReadAllBytes(path), loc, null!);
         }
@@ -215,8 +228,17 @@ public sealed class PreviewHost : IDisposable
     public void SetMouse(int x, int y) { mouseX = x; mouseY = y; }
     public void SetClock(long milliseconds) => elapsed = milliseconds;
     public void RenderGuiDialog(GuiDialog dialog, float deltaTime = 1f / 60) { Canvas.Clear(30, 30, 30, 255); dialog.OnRenderGUI(deltaTime); dialog.OnFinalizeFrame(deltaTime); }
-    public object EnvironmentIdentity => thebasics.ModSystems.ChatUiSystem.SetupWizardCaptureIdentity.EnvironmentIdentity(
-        gamePath, Canvas.Width, Canvas.Height, RuntimeEnv.GUIScale, Lang.CurrentLocale ?? "en", GuiStyle.StandardFontName, GuiStyle.DecorativeFontName);
+    public object EnvironmentIdentity
+    {
+        get
+        {
+            var identity = System.Text.Json.JsonSerializer.SerializeToNode(SetupWizardCaptureIdentity.EnvironmentIdentity(
+                gamePath, Canvas.Width, Canvas.Height, RuntimeEnv.GUIScale, Lang.CurrentLocale ?? "en", GuiStyle.StandardFontName, GuiStyle.DecorativeFontName))!;
+            identity["seraphPreview"] = System.Text.Json.JsonSerializer.SerializeToNode(new
+                { renderer = "software", geometry = "native-game-shapes", animation = "native-client-animator" });
+            return identity;
+        }
+    }
     private object[] ControlBounds() => loaded.SelectMany(dialog => dialog.Composers.SelectMany(composer =>
         ((Dictionary<string, GuiElement>)(typeof(GuiComposer).GetField("staticElements", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new MissingFieldException("Game composer elements changed")).GetValue(composer.Value)!)
@@ -229,7 +251,14 @@ public sealed class PreviewHost : IDisposable
             x = element.Value.Bounds.renderX,
             y = element.Value.Bounds.renderY,
             width = element.Value.Bounds.OuterWidth,
-            height = element.Value.Bounds.OuterHeight
+            height = element.Value.Bounds.OuterHeight,
+            clip = element.Value.InsideClipBounds is { } clip ? new
+            {
+                x = clip.renderX,
+                y = clip.renderY,
+                width = clip.InnerWidth,
+                height = clip.InnerHeight
+            } : null
         }))).ToArray();
 
     public object Manifest => new
@@ -245,6 +274,8 @@ public sealed class PreviewHost : IDisposable
         os = RuntimeInformation.OSDescription,
         locale = Lang.CurrentLocale,
         RecordedEffects,
+        seraphs = seraphModels.Select(pair => new { identity = pair.Key, vertices = pair.Value.Mesh.VerticesCount,
+            indices = pair.Value.Mesh.IndicesCount, textures = pair.Value.Textures.Count }),
         elapsed,
         mouseX,
         mouseY,

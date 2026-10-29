@@ -56,7 +56,7 @@ public sealed class GuiElementSetupSidebar : GuiElementControl
         var changed = new HashSet<string>(changedKeys ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
         foreach (var page in SetupWizardCatalog.Pages)
         {
-            if (!page.SettingKeys.Any(changed.Contains)) continue;
+            if (!page.SettingKeys.Any(changed.Contains) && !(page.Id == "chat.languageeditor" && changed.Contains("Languages"))) continue;
             dirtyPages.Add(page.Id);
             dirtyTopics.Add(page.TopicId);
         }

@@ -1655,18 +1655,15 @@ public class ChatUiSystem : ModSystem
 
     private static void AddConfigAdminActionRows(List<DialogRow> rows)
     {
+        var close = CreateButton("close", Lang.Get("thebasics:config-admin-close"), Lang.Get("thebasics:config-admin-close-tooltip"));
+        close.PaddingLeft = 60;
         rows.Add(new DialogRow(
-            CreateButton("save", Lang.Get("thebasics:config-admin-save"), Lang.Get("thebasics:config-admin-save-tooltip")),
             CreateButton("mark-reviewed", Lang.Get("thebasics:config-admin-mark-reviewed"), Lang.Get("thebasics:config-admin-mark-reviewed-tooltip")),
-            CreateButton("reload", Lang.Get("thebasics:config-admin-reload"), Lang.Get("thebasics:config-admin-reload-tooltip")))
+            CreateButton("reload", Lang.Get("thebasics:config-admin-reload"), Lang.Get("thebasics:config-admin-reload-tooltip")),
+            close,
+            CreateButton("save", Lang.Get("thebasics:config-admin-save"), Lang.Get("thebasics:config-admin-save-tooltip")))
         {
             TopPadding = 12
-        });
-
-        rows.Add(new DialogRow(
-            CreateButton("close", Lang.Get("thebasics:config-admin-close"), Lang.Get("thebasics:config-admin-close-tooltip")))
-        {
-            TopPadding = 4
         });
     }
 

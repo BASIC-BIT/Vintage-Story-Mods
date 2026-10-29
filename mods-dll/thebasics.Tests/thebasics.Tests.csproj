@@ -44,6 +44,14 @@
   <ItemGroup>
     <ProjectReference Include="..\thebasics\thebasics.csproj" />
     <ProjectReference Include="..\..\tools\GuiPreview\GuiPreview.csproj" />
+    <Reference Include="OpenTK.Windowing.Common">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.Common.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="OpenTK.Windowing.GraphicsLibraryFramework">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.GraphicsLibraryFramework.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- VS game DLLs needed for interface types used in tests.

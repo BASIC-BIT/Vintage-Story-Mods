@@ -121,7 +121,7 @@ public sealed class SetupWizardCaptureAdapter : IRenderer
         cancellation.ThrowIfCancellationRequested();
         CheckArguments(arguments, "scenario", "previewTime");
         var scenario = arguments.GetProperty("scenario").GetString();
-        var previewTime = arguments.TryGetProperty("previewTime", out var time) ? time.GetDouble() : 0.75;
+        var previewTime = arguments.TryGetProperty("previewTime", out var time) ? time.GetDouble() : SetupWizardCaptureScenes.DefaultPreviewTime(scenario);
         SetupWizardCaptureScenes.Validate(scenario, previewTime);
         if (pending != null) throw new InvalidOperationException("A capture is already queued.");
         if (!openedForCapture) throw new InvalidOperationException("Open a fresh capture-only wizard before each scene.");
@@ -204,7 +204,7 @@ public sealed class SetupWizardCaptureAdapter : IRenderer
         var manifest = new
         {
             schema = 1, scenario = job.Scenario, width = raw.Width, height = raw.Height, scale = (double)RuntimeEnv.GUIScale,
-            previewTime = job.PreviewTime, fixture = job.Dialog.Draft.Values, coverage = "native-client", omissions = Array.Empty<string>(), sourceTreeHash,
+            previewTime = job.PreviewTime, fixture = new { values = job.Dialog.Draft.Values, languages = job.Dialog.Draft.Languages }, coverage = "native-client", omissions = Array.Empty<string>(), sourceTreeHash,
             environmentIdentity = SetupWizardCaptureIdentity.EnvironmentIdentity(gamePath, raw.Width, raw.Height, RuntimeEnv.GUIScale,
                 Lang.CurrentLocale ?? "en", GuiStyle.StandardFontName, GuiStyle.DecorativeFontName, api.Assets),
             environment = new { gameVersion = GameVersion.ShortGameVersion, modBinaryHash = SetupWizardCaptureIdentity.HashFile(typeof(SetupWizardDialog).Assembly.Location),

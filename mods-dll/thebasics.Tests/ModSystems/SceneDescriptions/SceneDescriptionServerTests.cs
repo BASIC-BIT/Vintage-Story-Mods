@@ -12,7 +12,7 @@ using Vintagestory.GameContent;
 namespace thebasics.Tests.ModSystems.SceneDescriptions;
 
 [Collection(AnalyticsServiceTestCollection.Name)]
-public class SceneDescriptionServerTests
+public partial class SceneDescriptionServerTests
 {
     [Fact]
     public void CreativePickCopiesContentWithoutTheOriginalLock()
