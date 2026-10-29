@@ -1042,6 +1042,7 @@ const wizardActions = [
   "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",
   "advanced", "close", "closed", "save_requested", "save_timeout", "save_failed",
   "saved", "conflict", "failed", "validation_failed", "completed",
+  "sheet_select", "sheet_add", "sheet_remove", "sheet_move", "sheet_preview", "sheet_reset",
 ];
 const wizardChoices = [
   "on", "off", "chat", "popup", "edited",
@@ -1125,12 +1126,12 @@ test("setup journey rejects missing order fields and arbitrary content", () => {
   assert.equal(validatePayload(payloadForEvent("feature used", { feature_name: "dice", ...wizardProperties() })).events.length, 0);
 });
 
-test("expanded setup page contract requires relay revision 10", () => {
-  assert.ok(CONTRACT_REVISION >= 10);
+test("expanded setup page and sheet action contract requires relay revision 11", () => {
+  assert.ok(CONTRACT_REVISION >= 11);
   const source = readFileSync(new URL("ModSystems/Analytics/RelayAnalyticsSink.cs", sourceRoot), "utf8");
   const requiredRevision = source.match(/RequiredRelayContractRevision\s*=\s*(\d+)/);
   assert.ok(requiredRevision);
-  assert.ok(Number(requiredRevision[1]) >= 10, "expanded producers must require the expanded relay contract");
+  assert.ok(Number(requiredRevision[1]) >= 11, "expanded producers must require the expanded relay contract");
 });
 
 test("relay accepts every setup label registered by the C# producer", () => {

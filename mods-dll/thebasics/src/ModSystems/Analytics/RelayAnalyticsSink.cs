@@ -14,7 +14,7 @@ namespace thebasics.ModSystems.Analytics;
 
 public sealed class RelayAnalyticsSink : IAnalyticsSink
 {
-    public const int RequiredRelayContractRevision = 10;
+    public const int RequiredRelayContractRevision = 11;
     private const int MaxOnlinePlayerCount = 10_000;
 
     private readonly ICoreServerAPI _api;

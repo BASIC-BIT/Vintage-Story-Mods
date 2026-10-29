@@ -6,7 +6,7 @@ const MAX_STRING_LENGTH = 256;
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_EVENT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 const MAX_ONLINE_PLAYER_COUNT = 10_000;
-export const CONTRACT_REVISION = 10;
+export const CONTRACT_REVISION = 11;
 
 const ACCEPTED_PATH = "/v1/events/batch";
 
@@ -111,19 +111,26 @@ const WIZARD_STEPS = new Set([
   "invitation", "start", "hub", "review", "finish", "advanced",
   "chat.basics", "chat.language", "chat.ranges", "chat.obfuscation", "chat.tabs",
   "chat.languageaccess", "chat.signlanguage",
+  "chat.wording", "chat.shortcuts", "chat.colors", "chat.languageeditor",
+  "chat.textappearance", "chat.occlusion", "chat.voices", "chat.tts",
   "teleport.tools", "teleport.utilities", "teleport.requests", "teleport.requesttiming",
   "teleport.homes", "teleport.spawn", "teleport.top", "teleport.back", "teleport.stuck",
   "teleport.stuckpolicy", "teleport.warmup",
   "notifications.savestart", "notifications.savefinish", "notifications.sleep",
+  "notifications.deaths",
   "appearance.bubbles", "appearance.typing", "appearance.names", "appearance.nametagcolors",
   "map.visibility", "characters.sheets", "characters.access", "characters.slots",
+  "characters.builder",
   "roleplay.dice", "roleplay.scenemarkers", "roleplay.spectators", "roleplay.nicknamechanges", "roleplay.nicknamerules",
+  "roleplay.descriptions",
   "server.history", "server.retention", "server.staffnotes", "server.personalnotes", "server.notelimits", "server.stats",
+  "server.integrations", "server.diagnostics",
 ]);
 const WIZARD_ACTIONS = new Set([
   "offered", "dismissed", "started", "opened", "viewed", "choice", "back", "skip",
   "advanced", "close", "closed", "save_requested", "save_timeout", "save_failed",
   "saved", "conflict", "failed", "validation_failed", "completed",
+  "sheet_select", "sheet_add", "sheet_remove", "sheet_move", "sheet_preview", "sheet_reset",
 ]);
 const WIZARD_CHOICES = new Set([
   "on", "off", "chat", "popup", "edited", "StandardRoleplay", "SimpleSpeech", "PlainProximity", "Prose",
