@@ -148,15 +148,20 @@ public sealed class GuiElementColorPicker : GuiElementControl
         popup.AddInteractiveElement(new CurrentSwatch(this, ElementBounds.Fixed(130, footer + 3, 28, 24)), "current-swatch");
         popup.Compose(focusFirstElement: false);
         popup.GetTextInput("hex").SetMaxLength(mode == ColorPickerMode.RgbaWithTheme ? 9 : 7);
+        InitializeChannels(popup);
+        popupDirty = false;
+        SyncControls();
+        if (restoreCustomFocus) popup.FocusElement(popup["custom"].TabIndex);
+    }
+
+    private void InitializeChannels(GuiComposer popup)
+    {
         for (var i = 0; i < 4; i++)
         {
             if (i < 3 && !IsCustomExpanded || i == 3 && mode != ColorPickerMode.RgbaWithTheme) continue;
             popup.GetSlider("channel-" + i).SetValues(Channel(i), 0, i == 0 ? 360 : 100, 1, i == 0 ? "°" : "%");
             popup.GetTextInput("number-" + i).SetMaxLength(3);
         }
-        popupDirty = false;
-        SyncControls();
-        if (restoreCustomFocus) popup.FocusElement(popup["custom"].TabIndex);
     }
 
     private void AddChannel(GuiComposer popup, int channel, string label, double top)

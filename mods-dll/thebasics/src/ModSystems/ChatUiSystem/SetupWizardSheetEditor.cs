@@ -208,6 +208,16 @@ internal sealed class SetupWizardSheetEditor : IDisposable
         _inspectorContent = ElementBounds.Fixed(0, -_inspectorScroll, width, 1500);
         var clip = ElementBounds.Fixed(x, y + 72, width, height - 112);
         composer.BeginClip(clip).BeginChildElements(_inspectorContent);
+        var row = AddInspectorFields(composer, field, width);
+        Richtext(composer,"", Font(12).WithColor(new[] { 1d, .72, .56, 1d }), ElementBounds.Fixed(0, row, width, 0), "sheet-editor-errors"); row += 8;
+        _inspectorContent.fixedHeight = row;
+        composer.EndChildElements().EndClip();
+        Scrollbar(composer, "inspector", _inspectorContent, clip, _inspectorScroll, value => _inspectorScroll = value);
+        Button(composer, "Remove field", "remove", x + Math.Max(0, width - 160), y + height - 32, Math.Min(width, 160), ConfirmRemove, CanEdit && _draft.SheetFields.Count > 1);
+    }
+
+    private double AddInspectorFields(GuiComposer composer, CharacterSheetFieldConfigEntryMessage field, double width)
+    {
         var row = 0d;
         if (InspectorTab == 0)
         {
@@ -253,25 +263,21 @@ internal sealed class SetupWizardSheetEditor : IDisposable
         }
         else
         {
-        SelectRow("Placement", "Placement", new[] { "Beside portrait", "Main sheet" }, new[] { "header-side", "body" }, field.LayoutSection,
-            value => Recompose(() => SetPlacement(value)));
-        SelectRow("Width", "Width", new[] { "Full row", "Half row" }, new[] { "full", "half" }, field.Width,
-            value => { field.Width = value; Changed(); }, field.LayoutSection != "header-side");
-        Help(field.LayoutSection == "header-side" ? "Fields beside the portrait use the portrait grid width." : "Consecutive half-width fields pair on a row.", 38);
-        if (field.Type == "longstring")
-        {
-            Input(composer, "EditorRows", "Text box height", field.EditorRows, width, ref row, text => field.EditorRows = text);
-            Help("0 uses six rows. Other values use 2-16 rows in the player's answer editor.", 40);
+            SelectRow("Placement", "Placement", new[] { "Beside portrait", "Main sheet" }, new[] { "header-side", "body" }, field.LayoutSection,
+                value => Recompose(() => SetPlacement(value)));
+            SelectRow("Width", "Width", new[] { "Full row", "Half row" }, new[] { "full", "half" }, field.Width,
+                value => { field.Width = value; Changed(); }, field.LayoutSection != "header-side");
+            Help(field.LayoutSection == "header-side" ? "Fields beside the portrait use the portrait grid width." : "Consecutive half-width fields pair on a row.", 38);
+            if (field.Type == "longstring")
+            {
+                Input(composer, "EditorRows", "Text box height", field.EditorRows, width, ref row, text => field.EditorRows = text);
+                Help("0 uses six rows. Other values use 2-16 rows in the player's answer editor.", 40);
+            }
+            Button(composer, "Move up", "up", 0, row, (width - 10) / 2, () => Recompose(() => MoveSelected(-1)), CanMove(-1));
+            Button(composer, "Move down", "down", (width + 10) / 2, row, (width - 10) / 2, () => Recompose(() => MoveSelected(1)), CanMove(1));
+            row += 36;
         }
-        Button(composer, "Move up", "up", 0, row, (width - 10) / 2, () => Recompose(() => MoveSelected(-1)), CanMove(-1));
-        Button(composer, "Move down", "down", (width + 10) / 2, row, (width - 10) / 2, () => Recompose(() => MoveSelected(1)), CanMove(1));
-        row += 36;
-        }
-        Richtext(composer,"", Font(12).WithColor(new[] { 1d, .72, .56, 1d }), ElementBounds.Fixed(0, row, width, 0), "sheet-editor-errors"); row += 8;
-        _inspectorContent.fixedHeight = row;
-        composer.EndChildElements().EndClip();
-        Scrollbar(composer, "inspector", _inspectorContent, clip, _inspectorScroll, value => _inspectorScroll = value);
-        Button(composer, "Remove field", "remove", x + Math.Max(0, width - 160), y + height - 32, Math.Min(width, 160), ConfirmRemove, CanEdit && _draft.SheetFields.Count > 1);
+        return row;
 
         void SelectRow(string key, string label, string[] names, string[] values, string value, Action<string> update, bool enabled = true)
         { Select(composer, key, label, names, values, value, 0, row, width, update, enabled && CanEdit); row += 58; }
@@ -366,6 +372,39 @@ internal sealed class SetupWizardSheetEditor : IDisposable
         _preview?.Refresh(_draft.SheetFields, SelectedId, Context, Filled, int.TryParse(_draft.Get("MaxNicknameLength"), out var nicknameLimit) ? nicknameLimit : new thebasics.Configs.ModConfig().MaxNicknameLength);
         var errors = CharacterSheetFieldConfigAdmin.ValidateEntries(SetupWizardState.NormalizeSheetDraft(_draft.SheetFields), out _).ToList();
         errors.AddRange(SetupWizardState.ValidateSheetChoices(_draft.SheetFields));
+        RefreshChoiceErrors();
+        RefreshGeneralErrors(errors);
+        var status = new List<string>();
+        if (!_draft.CanEditSheetFields) status.Add(_draft.SheetFieldsUnavailableReason);
+        else if (!Bool("EnableCharacterSheets")) status.Add("Character sheets are off.");
+        if (_preview?.ShowingLastValid == true || errors.Count > 0) status.Add("Preview keeps the last valid sheet.");
+        if (SelectionHidden) status.Add("Selected field is hidden in this preview.");
+        var statusText = status.Count == 0 && !(_compact && _inspecting) ? "Fictional preview. Select a field to edit." : string.Join(" ", status);
+        _composer?.GetRichtext("sheet-editor-status")?.SetNewText(VtmlUtils.EscapeVtml(statusText), Font(12));
+        var staff = _composer?.GetButton("sheet-editor-staff"); if (staff != null) staff.Enabled = SelectionHidden;
+        var reset = _composer?.GetButton("sheet-editor-reset"); if (reset != null) reset.Enabled = CanReset;
+    }
+
+    private void RefreshGeneralErrors(List<string> errors)
+    {
+        var generalErrors = _composer?.GetRichtext("sheet-editor-errors");
+        if (generalErrors != null && _inspectorContent != null)
+        {
+            generalErrors.SetNewText(VtmlUtils.EscapeVtml(string.Join(" ", errors.Take(3))), Font(12).WithColor(new[] { 1d, .72, .56, 1d }));
+            generalErrors.Bounds.fixedHeight = errors.Count == 0 ? 0 : generalErrors.TotalHeight / RuntimeEnv.GUIScale;
+            _inspectorContent.fixedHeight = generalErrors.Bounds.fixedY + generalErrors.Bounds.fixedHeight + 8;
+            _inspectorContent.MarkDirtyRecursive(); _inspectorContent.CalcWorldBounds();
+            var scrollbar = _composer.GetScrollbar("sheet-editor-inspector-scroll") as BuilderScrollbar;
+            if (scrollbar != null)
+            {
+                scrollbar.SetHeights((float)scrollbar.Bounds.fixedHeight, (float)_inspectorContent.fixedHeight);
+                scrollbar.MoveTo(scrollbar.CurrentYPosition);
+            }
+        }
+    }
+
+    private void RefreshChoiceErrors()
+    {
         if (Selected?.Type == "option")
         {
             var choices = (Selected.Options ?? "").Split(',').Select(value => value.Trim()).ToArray();
@@ -394,30 +433,8 @@ internal sealed class SetupWizardSheetEditor : IDisposable
                 _composer?.GetRichtext("sheet-editor-option-error-" + index)?.SetNewText(error, Font(12).WithColor(new[] { 1d, .72, .56, 1d }));
             }
         }
-        var generalErrors = _composer?.GetRichtext("sheet-editor-errors");
-        if (generalErrors != null && _inspectorContent != null)
-        {
-            generalErrors.SetNewText(VtmlUtils.EscapeVtml(string.Join(" ", errors.Take(3))), Font(12).WithColor(new[] { 1d, .72, .56, 1d }));
-            generalErrors.Bounds.fixedHeight = errors.Count == 0 ? 0 : generalErrors.TotalHeight / RuntimeEnv.GUIScale;
-            _inspectorContent.fixedHeight = generalErrors.Bounds.fixedY + generalErrors.Bounds.fixedHeight + 8;
-            _inspectorContent.MarkDirtyRecursive(); _inspectorContent.CalcWorldBounds();
-            var scrollbar = _composer.GetScrollbar("sheet-editor-inspector-scroll") as BuilderScrollbar;
-            if (scrollbar != null)
-            {
-                scrollbar.SetHeights((float)scrollbar.Bounds.fixedHeight, (float)_inspectorContent.fixedHeight);
-                scrollbar.MoveTo(scrollbar.CurrentYPosition);
-            }
-        }
-        var status = new List<string>();
-        if (!_draft.CanEditSheetFields) status.Add(_draft.SheetFieldsUnavailableReason);
-        else if (!Bool("EnableCharacterSheets")) status.Add("Character sheets are off.");
-        if (_preview?.ShowingLastValid == true || errors.Count > 0) status.Add("Preview keeps the last valid sheet.");
-        if (SelectionHidden) status.Add("Selected field is hidden in this preview.");
-        var statusText = status.Count == 0 && !(_compact && _inspecting) ? "Fictional preview. Select a field to edit." : string.Join(" ", status);
-        _composer?.GetRichtext("sheet-editor-status")?.SetNewText(VtmlUtils.EscapeVtml(statusText), Font(12));
-        var staff = _composer?.GetButton("sheet-editor-staff"); if (staff != null) staff.Enabled = SelectionHidden;
-        var reset = _composer?.GetButton("sheet-editor-reset"); if (reset != null) reset.Enabled = CanReset;
     }
+
     internal void SelectInspectorTab(int index)
     {
         if (_disposed || index is < 0 or > 2 || InspectorTab == index) return;

@@ -116,19 +116,7 @@ public static class SetupWizardRecordsPreview
             }
             else
             {
-                Background(composer, "character-screen-background", 5, top, showSheet ? 112 : 300, bottom - top);
-                Text(composer, "Character (C)", "character-screen-title", 13, top + 9, showSheet ? 96 : 280, 22, 12, true);
-                var portraitX = showSheet ? 37d : 130;
-                composer.AddInset(ElementBounds.Fixed(portraitX, top + 42, 49, 92), 2);
-                Portrait(composer, portraitX + 2, top + 44, 45, 88);
-                Text(composer, "PipPlayer", "account-name", showSheet ? 17 : 100, top + 145, showSheet ? 90 : 100, 20, 12);
-                Text(composer, "Commoner", "account-class", showSheet ? 17 : 100, top + 167, showSheet ? 90 : 100, 20, 12);
-                // The character screen uses native inset slots; no live inventory or player is needed.
-                for (var index = 0; index < 5; index++)
-                {
-                    composer.AddInset(ElementBounds.Fixed(portraitX - 22, top + 41 + index * 20, 15, 15), 2);
-                    composer.AddInset(ElementBounds.Fixed(portraitX + 55, top + 41 + index * 20, 15, 15), 2);
-                }
+                AddAccountScreen(composer, top, bottom, showSheet);
             }
 
             if (showSheet)
@@ -156,6 +144,23 @@ public static class SetupWizardRecordsPreview
                 : _frame.AutoOpen ? "Opens beside Character (C). Players can override this." : "Open the sheet manually. Players can override this.";
             Text(composer, status, "records-status", slotsPage ? 140 : 6, bottom + 6,
                 slotsPage ? 164 : 298, 38, 11);
+        }
+
+        private void AddAccountScreen(GuiComposer composer, double top, double bottom, bool showSheet)
+        {
+            Background(composer, "character-screen-background", 5, top, showSheet ? 112 : 300, bottom - top);
+            Text(composer, "Character (C)", "character-screen-title", 13, top + 9, showSheet ? 96 : 280, 22, 12, true);
+            var portraitX = showSheet ? 37d : 130;
+            composer.AddInset(ElementBounds.Fixed(portraitX, top + 42, 49, 92), 2);
+            Portrait(composer, portraitX + 2, top + 44, 45, 88);
+            Text(composer, "PipPlayer", "account-name", showSheet ? 17 : 100, top + 145, showSheet ? 90 : 100, 20, 12);
+            Text(composer, "Commoner", "account-class", showSheet ? 17 : 100, top + 167, showSheet ? 90 : 100, 20, 12);
+            // The character screen uses native inset slots; no live inventory or player is needed.
+            for (var index = 0; index < 5; index++)
+            {
+                composer.AddInset(ElementBounds.Fixed(portraitX - 22, top + 41 + index * 20, 15, 15), 2);
+                composer.AddInset(ElementBounds.Fixed(portraitX + 55, top + 41 + index * 20, 15, 15), 2);
+            }
         }
 
         private void AddNotes(GuiComposer composer)

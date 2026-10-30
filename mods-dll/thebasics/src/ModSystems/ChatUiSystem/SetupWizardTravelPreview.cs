@@ -72,23 +72,28 @@ public static class SetupWizardTravelPreview
             if (pageId == "teleport.homes") Homes(context, draft, floor);
             if (pageId == "teleport.stuckpolicy") Staff(context, frame.Phase == Phase.Blocked, 155, 29);
             if (pageId == "teleport.warmup") Interrupt(context, (int)(Time(time) / 4 % 3), 65, floor - 61, frame.Phase == Phase.Cancelled);
-            var arrived = frame.Phase == Phase.Arrived;
-            var warp = frame.Phase == Phase.Warp;
-            var x = arrived ? 244 : 65;
-            var y = arrived ? destinationY : floor;
-            if (frame.Phase == Phase.Cancelled) x += 8;
-            if (frame.Phase is Phase.Warmup or Phase.Warp)
-            {
-                Portal(context, 65, floor - 3, frame.Time, warp ? 1 : 0.5);
-                if (warp) Portal(context, 244, destinationY - 3, frame.Time + 0.8, 0.8);
-            }
-            if (arrived) Celebration(context, x, y - 66, frame.Time);
-            if (frame.Phase == Phase.Warmup) Badge(context, Math.Ceiling(frame.Remaining).ToString(CultureInfo.InvariantCulture) + " s", 109, height - 24, false);
-            if (frame.Gear && !blocked) Gear(context, 144, height - 40, frame.Paid);
-            if (frame.Phase is Phase.Disabled or Phase.Blocked or Phase.Expired) Badge(context, frame.Phase == Phase.Disabled ? "Off" : frame.Phase == Phase.Expired ? "Expired" : "Staff online", 106, height - 23, true);
-            if (frame.Phase == Phase.Cancelled) Badge(context, "Cancelled", 109, height - 23, true);
+            DrawPhaseEffects(context, frame, height, floor, destinationY, blocked);
         }
         finally { context.Restore(); }
+    }
+
+    private static void DrawPhaseEffects(Context context, Frame frame, double height, double floor, double destinationY, bool blocked)
+    {
+        var arrived = frame.Phase == Phase.Arrived;
+        var warp = frame.Phase == Phase.Warp;
+        var x = arrived ? 244 : 65;
+        var y = arrived ? destinationY : floor;
+        if (frame.Phase == Phase.Cancelled) x += 8;
+        if (frame.Phase is Phase.Warmup or Phase.Warp)
+        {
+            Portal(context, 65, floor - 3, frame.Time, warp ? 1 : 0.5);
+            if (warp) Portal(context, 244, destinationY - 3, frame.Time + 0.8, 0.8);
+        }
+        if (arrived) Celebration(context, x, y - 66, frame.Time);
+        if (frame.Phase == Phase.Warmup) Badge(context, Math.Ceiling(frame.Remaining).ToString(CultureInfo.InvariantCulture) + " s", 109, height - 24, false);
+        if (frame.Gear && !blocked) Gear(context, 144, height - 40, frame.Paid);
+        if (frame.Phase is Phase.Disabled or Phase.Blocked or Phase.Expired) Badge(context, frame.Phase == Phase.Disabled ? "Off" : frame.Phase == Phase.Expired ? "Expired" : "Staff online", 106, height - 23, true);
+        if (frame.Phase == Phase.Cancelled) Badge(context, "Cancelled", 109, height - 23, true);
     }
 
     private static Frame Sample(string pageId, SetupWizardDraft draft, double time)
@@ -142,6 +147,11 @@ public static class SetupWizardTravelPreview
                 elapsed < 2 ? "Stand still for " + Math.Ceiling(2 - elapsed) + " seconds to teleport." : elapsed < 2.5 ? "Teleporting..." : "Teleported to home 'orchard'.", 2 - elapsed, false, false, elapsed, ArrivalTime: 2.5);
         }
 
+        return SampleTeleport(pageId, draft, time, command, gear);
+    }
+
+    private static Frame SampleTeleport(string pageId, SetupWizardDraft draft, double time, string command, bool gear)
+    {
         var prefix = "Teleportation." + char.ToUpperInvariant(command[0]) + command[1..];
         var warmup = Number(draft, prefix + "WarmupSeconds");
         var request = command == "tpa" ? 1d : 0d;

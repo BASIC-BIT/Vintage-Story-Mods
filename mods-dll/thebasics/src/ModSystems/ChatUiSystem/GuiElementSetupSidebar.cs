@@ -241,35 +241,22 @@ public sealed class GuiElementSetupSidebar : GuiElementControl
         double textX;
         if (row.Destination.StartsWith("topic:", StringComparison.Ordinal))
         {
-            context.Save();
-            context.Translate(scaled(15), scaled(y + 6));
-            context.Scale(scaled(0.53), scaled(0.53));
-            context.SetSourceRGBA(color);
-            context.LineWidth = 1.8;
-            context.LineCap = LineCap.Round;
-            context.LineJoin = LineJoin.Round;
-            GuiElementSetupTopicCard.DrawIcon(context, TopicIcon(row.Destination[6..]));
-            context.Restore();
+            DrawTopicIcon(context, row, y, color, categorySelected);
             textX = 41;
-            // The chevron keeps expandable categories distinct from their pages.
-            var arrowX = LogicalWidth - 19;
-            context.SetSourceRGBA(color[0], color[1], color[2], 0.7);
-            context.LineWidth = scaled(1.3);
-            if (categorySelected)
-            {
-                context.MoveTo(scaled(arrowX - 3), scaled(y + 13));
-                context.LineTo(scaled(arrowX), scaled(y + 16));
-                context.LineTo(scaled(arrowX + 3), scaled(y + 13));
-            }
-            else
-            {
-                context.MoveTo(scaled(arrowX - 1), scaled(y + 11));
-                context.LineTo(scaled(arrowX + 2), scaled(y + 14));
-                context.LineTo(scaled(arrowX - 1), scaled(y + 17));
-            }
-            context.Stroke();
         }
         else textX = row.IsPage ? 37 : 17;
+        DrawRowLabel(context, row, x, y, width, textX, color);
+        if (HasFocus && focused == row.Destination)
+        {
+            context.SetSourceRGBA(0.91, 0.76, 0.47, 0.95);
+            context.LineWidth = scaled(1);
+            RoundRectangle(context, scaled(x + 1.5), scaled(y + 1.5), scaled(width - 3), scaled(row.Height - 3), scaled(2));
+            context.Stroke();
+        }
+    }
+
+    private void DrawRowLabel(Context context, NavigationRow row, double x, double y, double width, double textX, double[] color)
+    {
         var font = row.IsPage ? pageFont : categoryFont;
         font.SetupContext(context);
         if (row.IsPage) pageFontReady = true;
@@ -286,13 +273,36 @@ public sealed class GuiElementSetupSidebar : GuiElementControl
             context.Arc(scaled(x + width - (row.IsPage ? 8 : 27)), scaled(y + row.Height / 2), scaled(2.5), 0, Math.PI * 2);
             context.Fill();
         }
-        if (HasFocus && focused == row.Destination)
+    }
+
+    private void DrawTopicIcon(Context context, NavigationRow row, double y, double[] color, bool categorySelected)
+    {
+        context.Save();
+        context.Translate(scaled(15), scaled(y + 6));
+        context.Scale(scaled(0.53), scaled(0.53));
+        context.SetSourceRGBA(color);
+        context.LineWidth = 1.8;
+        context.LineCap = LineCap.Round;
+        context.LineJoin = LineJoin.Round;
+        GuiElementSetupTopicCard.DrawIcon(context, TopicIcon(row.Destination[6..]));
+        context.Restore();
+        // The chevron keeps expandable categories distinct from their pages.
+        var arrowX = LogicalWidth - 19;
+        context.SetSourceRGBA(color[0], color[1], color[2], 0.7);
+        context.LineWidth = scaled(1.3);
+        if (categorySelected)
         {
-            context.SetSourceRGBA(0.91, 0.76, 0.47, 0.95);
-            context.LineWidth = scaled(1);
-            RoundRectangle(context, scaled(x + 1.5), scaled(y + 1.5), scaled(width - 3), scaled(row.Height - 3), scaled(2));
-            context.Stroke();
+            context.MoveTo(scaled(arrowX - 3), scaled(y + 13));
+            context.LineTo(scaled(arrowX), scaled(y + 16));
+            context.LineTo(scaled(arrowX + 3), scaled(y + 13));
         }
+        else
+        {
+            context.MoveTo(scaled(arrowX - 1), scaled(y + 11));
+            context.LineTo(scaled(arrowX + 2), scaled(y + 14));
+            context.LineTo(scaled(arrowX - 1), scaled(y + 17));
+        }
+        context.Stroke();
     }
 
     private static string Fit(Context context, string text, double width)
