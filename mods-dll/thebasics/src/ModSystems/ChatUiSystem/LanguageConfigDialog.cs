@@ -16,18 +16,20 @@ public class LanguageConfigDialog : GuiDialog
     private const double DialogWidth = 900;
     private const double ContentWidth = DialogWidth - 48;
     private const double PanelHeight = 392;
-    private const double StatusHeight = 56;
+    private const double StatusHeight = 40;
     private const double FieldHeight = 28;
     private const double FieldRowHeight = 55;
     private readonly Action<List<LanguageConfigEntryMessage>> _onSave;
     private readonly Action _onReload;
     private readonly Action _onClose;
     private readonly Dictionary<string, GuiElementTextInput> _textInputs = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, GuiElementDropDown> _dropDowns = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, GuiElementSetupToggle> _toggles = new(StringComparer.OrdinalIgnoreCase);
+    private GuiElementColorPicker _colorPicker;
     private List<LanguageConfigEntryMessage> _languages;
     private string _message;
     private bool _success;
     private int _selectedIndex;
+    private bool _showGrants;
     private bool _closing;
     private readonly DialogDraftState _draftState;
     private Dictionary<LanguageConfigEntryMessage, string> _submittedNames;
@@ -91,6 +93,21 @@ public class LanguageConfigDialog : GuiDialog
 
     public override double DrawOrder => 0.26;
 
+    internal bool JumpTo(string name, string field)
+    {
+        CaptureSelectedInputToDraft();
+        var index = _languages.FindIndex(entry => string.Equals(entry.OriginalName, name, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) return false;
+        _selectedIndex = index;
+        _showGrants = field.StartsWith("GrantedTo", StringComparison.Ordinal);
+        ComposeDialog();
+        GuiElement control = _textInputs.GetValueOrDefault(field);
+        control ??= _toggles.GetValueOrDefault(field);
+        if (control == null) return false;
+        SingleComposer.FocusElement(control.TabIndex);
+        return true;
+    }
+
     public void SetView(List<LanguageConfigEntryMessage> languages, string message, bool success)
     {
         CaptureSelectedInputToDraft();
@@ -120,6 +137,7 @@ public class LanguageConfigDialog : GuiDialog
 
     public override bool TryClose()
     {
+        _colorPicker?.Close();
         var closed = base.TryClose();
         if (closed && !_closing)
         {
@@ -133,15 +151,17 @@ public class LanguageConfigDialog : GuiDialog
     private void ComposeDialog()
     {
         SingleComposer?.Dispose();
+        _colorPicker = null;
         _textInputs.Clear();
-        _dropDowns.Clear();
+        _toggles.Clear();
         _selectedIndex = ClampSelectedIndex(_selectedIndex);
 
         var contentTop = GuiStyle.TitleBarHeight + 10;
-        var helpHeight = 52;
+        var compact = capi.Render.FrameHeight / (double)RuntimeEnv.GUIScale < 650;
+        var helpHeight = compact ? 0 : 32;
         var helpBounds = ElementBounds.Fixed(0, contentTop, ContentWidth, helpHeight);
-        var statusBounds = ElementBounds.Fixed(0, helpBounds.fixedY + helpHeight + 6, ContentWidth, StatusHeight);
-        var panelY = statusBounds.fixedY + StatusHeight + 10;
+        var statusBounds = ElementBounds.Fixed(0, helpBounds.fixedY + helpHeight + (compact ? 0 : 6), ContentWidth, StatusHeight);
+        var panelY = statusBounds.fixedY + StatusHeight + (compact ? 6 : 10);
         var leftPanelWidth = 240;
         var panelGap = 15;
         var rightPanelX = leftPanelWidth + panelGap;
@@ -161,14 +181,14 @@ public class LanguageConfigDialog : GuiDialog
             .AddInset(leftPanelBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3), 3)
             .AddInset(rightPanelBounds.FlatCopy().FixedGrow(3).WithFixedOffset(-3, -3), 3);
 
-        AddRichtext(composer, VtmlUtils.EscapeVtml(Lang.Get("thebasics:language-config-help")), helpBounds);
+        if (!compact) AddRichtext(composer, VtmlUtils.EscapeVtml(Lang.Get("thebasics:language-config-help")), helpBounds);
         AddStatus(composer, statusBounds);
         AddLanguageList(composer, leftPanelBounds);
         AddSelectedLanguageFields(composer, rightPanelBounds);
 
         AddButton(composer, "reload", Lang.Get("thebasics:language-config-reload"), OnReload, ElementBounds.Fixed(0, buttonY, 118, buttonHeight), Lang.Get("thebasics:language-config-reload-tooltip"));
-        AddButton(composer, "save", Lang.Get("thebasics:language-config-save"), OnSave, ElementBounds.Fixed(ContentWidth - 250, buttonY, 118, buttonHeight), Lang.Get("thebasics:language-config-save-tooltip"));
-        AddButton(composer, "close", Lang.Get("thebasics:language-config-close"), OnCancel, ElementBounds.Fixed(ContentWidth - 122, buttonY, 110, buttonHeight), Lang.Get("thebasics:language-config-close-tooltip"));
+        AddButton(composer, "close", Lang.Get("thebasics:language-config-close"), OnCancel, ElementBounds.Fixed(ContentWidth - 250, buttonY, 110, buttonHeight), Lang.Get("thebasics:language-config-close-tooltip"));
+        AddButton(composer, "save", Lang.Get("thebasics:language-config-save"), OnSave, ElementBounds.Fixed(ContentWidth - 130, buttonY, 118, buttonHeight), Lang.Get("thebasics:language-config-save-tooltip"));
 
         SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
     }
@@ -195,13 +215,13 @@ public class LanguageConfigDialog : GuiDialog
         var values = Enumerable.Range(0, _languages.Count).Select(index => index.ToString()).ToArray();
         var names = _languages.Select((language, index) => $"{index + 1}. {DisplayName(language)}").ToArray();
         var selectedBounds = ElementBounds.Fixed(x, y + 26, width, FieldHeight);
-        var selectedLanguageDropDown = new GuiElementDropDown(capi, values, names, _selectedIndex, OnSelectedLanguageChanged, selectedBounds, CairoFont.WhiteSmallText(), multiSelect: false);
+        var selectedLanguageDropDown = new LanguageSelector(capi, values, names, _selectedIndex, OnSelectedLanguageChanged, selectedBounds);
         composer.AddInteractiveElement(selectedLanguageDropDown, "language-selector");
         AddTooltip(composer, "language-selector", selectedBounds, Lang.Get("thebasics:language-config-selected-tooltip"));
 
         y += 68;
         AddButton(composer, "add", Lang.Get("thebasics:language-config-add"), OnAddLanguage, ElementBounds.Fixed(x, y, 104, 28), Lang.Get("thebasics:language-config-add-tooltip"));
-        AddButton(composer, "delete", Lang.Get("thebasics:language-config-delete"), OnDeleteSelectedLanguage, ElementBounds.Fixed(x + 114, y, 104, 28), Lang.Get("thebasics:language-config-delete-tooltip"));
+        AddButton(composer, "delete", Lang.Get("thebasics:language-config-delete"), OnDeleteSelectedLanguage, ElementBounds.Fixed(x, panelBounds.fixedY + panelBounds.fixedHeight - 40, width, 28), Lang.Get("thebasics:language-config-delete-tooltip"));
         y += 36;
         AddButton(composer, "up", Lang.Get("thebasics:language-config-up"), OnMoveSelectedLanguageUp, ElementBounds.Fixed(x, y, 104, 28), Lang.Get("thebasics:language-config-up-tooltip"));
         AddButton(composer, "down", Lang.Get("thebasics:language-config-down"), OnMoveSelectedLanguageDown, ElementBounds.Fixed(x + 114, y, 104, 28), Lang.Get("thebasics:language-config-down-tooltip"));
@@ -233,23 +253,39 @@ public class LanguageConfigDialog : GuiDialog
         var columnGap = 18;
         var columnWidth = (width - columnGap) / 2;
         var rightColumnX = x + columnWidth + columnGap;
-        var headerBounds = ElementBounds.Fixed(x, y, width, 24);
-        AddLabel(composer, Lang.Get("thebasics:language-config-editing", _selectedIndex + 1, DisplayName(language)), headerBounds, bold: true, Lang.Get("thebasics:language-config-editing-tooltip"));
+        AddLabel(composer, Lang.Get("thebasics:language-config-section"), ElementBounds.Fixed(x, y, width, 20));
+        composer.AddDynamicText(DisplayName(language), CairoFont.WhiteSmallText().WithFontSize(18).WithColor(new[] { .95, .72, .3, 1d }),
+            ElementBounds.Fixed(x, y + 22, width, 27), "language-title");
+        composer.AddHorizontalTabs(new[] { new GuiTab { Name = Lang.Get("thebasics:language-config-details"), DataInt = 0 }, new GuiTab { Name = Lang.Get("thebasics:language-config-grants"), DataInt = 1 } },
+            ElementBounds.Fixed(x, y + 56, width, 28), index =>
+            {
+                if (_showGrants == (index == 1)) return;
+                CaptureSelectedInputToDraft();
+                _showGrants = index == 1;
+                ComposeDialog();
+            }, CairoFont.WhiteSmallText(), CairoFont.WhiteSmallText(), "language-tabs");
+        composer.GetHorizontalTabs("language-tabs").SetValue(_showGrants ? 1 : 0, false);
+        if (_showGrants)
+        {
+            AddLabel(composer, Lang.Get("thebasics:language-config-grants-help"), ElementBounds.Fixed(x, y + 96, width, 22));
+            var grantsY = y + 130;
+            AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToClasses), Lang.Get("thebasics:language-config-classes"), language.GrantedToClasses, ElementBounds.Fixed(x, grantsY, width, FieldHeight), 512, Lang.Get("thebasics:language-config-classes-tooltip"));
+            AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToTraits), Lang.Get("thebasics:language-config-traits"), language.GrantedToTraits, ElementBounds.Fixed(x, grantsY + FieldRowHeight, width, FieldHeight), 512, Lang.Get("thebasics:language-config-traits-tooltip"));
+            AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToModels), Lang.Get("thebasics:language-config-models"), language.GrantedToModels, ElementBounds.Fixed(x, grantsY + FieldRowHeight * 2, width, FieldHeight), 512, Lang.Get("thebasics:language-config-models-tooltip"));
+            AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToModelGroups), Lang.Get("thebasics:language-config-model-groups"), language.GrantedToModelGroups, ElementBounds.Fixed(x, grantsY + FieldRowHeight * 3, width, FieldHeight), 512, Lang.Get("thebasics:language-config-model-groups-tooltip"));
+            return;
+        }
 
-        var leftY = y + 34;
+        var leftY = y + 96;
         leftY = AddTextInput(composer, nameof(LanguageConfigEntryMessage.Name), Lang.Get("thebasics:language-config-name"), language.Name, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), 64, Lang.Get("thebasics:language-config-name-tooltip"));
         leftY = AddTextInput(composer, nameof(LanguageConfigEntryMessage.Prefix), Lang.Get("thebasics:language-config-prefix"), language.Prefix, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), 32, Lang.Get("thebasics:language-config-prefix-tooltip"));
         leftY = AddColorInput(composer, language, x, leftY, columnWidth);
-        leftY = AddBoolDropDown(composer, nameof(LanguageConfigEntryMessage.Default), Lang.Get("thebasics:language-config-default"), language.Default, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:language-config-default-tooltip"));
-        AddBoolDropDown(composer, nameof(LanguageConfigEntryMessage.Hidden), Lang.Get("thebasics:language-config-hidden"), language.Hidden, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:language-config-hidden-tooltip"));
+        leftY = AddBoolToggle(composer, nameof(LanguageConfigEntryMessage.Default), Lang.Get("thebasics:language-config-default"), language.Default, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:language-config-default-tooltip"));
+        AddBoolToggle(composer, nameof(LanguageConfigEntryMessage.Hidden), Lang.Get("thebasics:language-config-hidden"), language.Hidden, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:language-config-hidden-tooltip"));
 
-        var rightY = y + 34;
+        var rightY = y + 96;
         rightY = AddTextInput(composer, nameof(LanguageConfigEntryMessage.Description), Lang.Get("thebasics:language-config-description"), language.Description, ElementBounds.Fixed(rightColumnX, rightY, columnWidth, FieldHeight), 256, Lang.Get("thebasics:language-config-description-tooltip"));
         rightY = AddTextInput(composer, nameof(LanguageConfigEntryMessage.Syllables), Lang.Get("thebasics:language-config-syllables"), language.Syllables, ElementBounds.Fixed(rightColumnX, rightY, columnWidth, FieldHeight), 512, Lang.Get("thebasics:language-config-syllables-tooltip"));
-        rightY = AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToClasses), Lang.Get("thebasics:language-config-classes"), language.GrantedToClasses, ElementBounds.Fixed(rightColumnX, rightY, columnWidth, FieldHeight), 512, Lang.Get("thebasics:language-config-classes-tooltip"));
-        rightY = AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToTraits), Lang.Get("thebasics:language-config-traits"), language.GrantedToTraits, ElementBounds.Fixed(rightColumnX, rightY, columnWidth, FieldHeight), 512, Lang.Get("thebasics:language-config-traits-tooltip"));
-        rightY = AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToModels), Lang.Get("thebasics:language-config-models"), language.GrantedToModels, ElementBounds.Fixed(rightColumnX, rightY, columnWidth, FieldHeight), 512, Lang.Get("thebasics:language-config-models-tooltip"));
-        AddTextInput(composer, nameof(LanguageConfigEntryMessage.GrantedToModelGroups), Lang.Get("thebasics:language-config-model-groups"), language.GrantedToModelGroups, ElementBounds.Fixed(rightColumnX, rightY, columnWidth, FieldHeight), 512, Lang.Get("thebasics:language-config-model-groups-tooltip"));
     }
 
     private double AddColorInput(GuiComposer composer, LanguageConfigEntryMessage language, double x, double y, double columnWidth)
@@ -257,18 +293,94 @@ public class LanguageConfigDialog : GuiDialog
         var labelBounds = ElementBounds.Fixed(x, y, columnWidth, 20);
         AddLabel(composer, Lang.Get("thebasics:language-config-color"), labelBounds, tooltip: Lang.Get("thebasics:language-config-color-tooltip"));
 
-        var inputWidth = columnWidth - 94;
-        var inputBounds = ElementBounds.Fixed(x, y + 22, inputWidth, FieldHeight);
-        var input = new GuiElementTextInput(capi, inputBounds, null, CairoFont.TextInput());
+        var originalColor = language.Color;
+        var inputWidth = columnWidth - 133;
+        var inputBounds = ElementBounds.Fixed(x + 39, y + 22, inputWidth, FieldHeight);
+        var input = new GuiElementTextInput(capi, inputBounds, value =>
+        {
+            _colorPicker?.SetValue(value);
+            if (composer.GetElement("color-preview") is GuiElementDynamicText preview)
+            {
+                preview.Font = GetColorPreviewFont(value).WithOrientation(EnumTextOrientation.Center);
+                preview.RecomposeText();
+            }
+        }, CairoFont.TextInput());
         input.SetValue(language.Color ?? string.Empty);
         input.SetMaxLength(16);
         _textInputs[nameof(LanguageConfigEntryMessage.Color)] = input;
         composer.AddInteractiveElement(input, "input-color");
 
-        var previewBounds = ElementBounds.Fixed(x + inputWidth + 8, y + 24, 82, 22);
-        composer.AddStaticText(Lang.Get("thebasics:language-config-color-preview"), GetColorPreviewFont(language.Color), EnumTextOrientation.Center, previewBounds);
+        _colorPicker = new GuiElementColorPicker(capi, ElementBounds.Fixed(x, y + 22, 32, FieldHeight), language.Color, color =>
+        {
+            // Keep the stored spelling when a user restores the original color.
+            if (string.Equals(color, originalColor, StringComparison.OrdinalIgnoreCase)) color = originalColor;
+            input.SetValue(color ?? string.Empty);
+        });
+        composer.AddInteractiveElement(_colorPicker, "color-picker");
+        var previewBounds = ElementBounds.Fixed(x + columnWidth - 86, y + 24, 82, 22);
+        composer.AddDynamicText(Lang.Get("thebasics:language-config-color-preview"), GetColorPreviewFont(language.Color).WithOrientation(EnumTextOrientation.Center), previewBounds, "color-preview");
         AddTooltip(composer, "input-color", labelBounds, Lang.Get("thebasics:language-config-color-tooltip"));
         return y + FieldRowHeight;
+    }
+
+    public override void OnRenderGUI(float deltaTime)
+    {
+        GuiPopupHoverGuard.RenderBackground(SingleComposer, _colorPicker?.IsOpen == true, () => base.OnRenderGUI(deltaTime));
+        if (_colorPicker?.IsOpen != true) return;
+        _colorPicker.RenderPopup(deltaTime);
+        if (_colorPicker.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY))
+            MouseOverCursor = _colorPicker.MouseOverCursor;
+    }
+
+    public override bool OnEscapePressed()
+    {
+        if (_colorPicker?.IsOpen != true) return base.OnEscapePressed();
+        _colorPicker.Close();
+        SingleComposer.FocusElement(_colorPicker.TabIndex);
+        return true;
+    }
+
+    public override void OnMouseDown(MouseEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseDown(capi, args);
+        if (!args.Handled) base.OnMouseDown(args);
+    }
+
+    public override void OnMouseMove(MouseEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseMove(capi, args);
+        if (!args.Handled) base.OnMouseMove(args);
+    }
+
+    public override void OnMouseUp(MouseEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseUp(capi, args);
+        if (!args.Handled) base.OnMouseUp(args);
+    }
+
+    public override void OnMouseWheel(MouseWheelEventArgs args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseWheel(capi, args);
+        if (!args.IsHandled) base.OnMouseWheel(args);
+    }
+
+    public override void OnKeyDown(KeyEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnKeyDown(capi, args);
+        if (!args.Handled) base.OnKeyDown(args);
+    }
+
+    public override void OnKeyPress(KeyEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnKeyPress(capi, args);
+        if (!args.Handled) base.OnKeyPress(args);
+    }
+
+    private sealed class LanguageSelector : GuiElementDropDown
+    {
+        internal LanguageSelector(ICoreClientAPI api, string[] values, string[] names, int index, SelectionChangedDelegate changed, ElementBounds bounds)
+            : base(api, values, names, index, changed, bounds, CairoFont.WhiteSmallText(), false)
+        { MouseOverCursor = "linkselect"; }
     }
 
     private double AddTextInput(GuiComposer composer, string field, string label, string value, ElementBounds inputBounds, int maxLength, string tooltip)
@@ -277,8 +389,9 @@ public class LanguageConfigDialog : GuiDialog
         AddLabel(composer, label, labelBounds, tooltip: tooltip);
 
         var actualInputBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY + 22, inputBounds.fixedWidth, inputBounds.fixedHeight);
-        var input = new GuiElementTextInput(capi, actualInputBounds, null, CairoFont.TextInput());
-        input.SetValue(value ?? string.Empty);
+        var input = new GuiElementTextInput(capi, actualInputBounds, field == nameof(LanguageConfigEntryMessage.Name)
+            ? value => composer.GetDynamicText("language-title")?.SetNewText(string.IsNullOrWhiteSpace(value) ? Lang.Get("thebasics:language-config-unnamed") : value) : null, CairoFont.TextInput());
+        input.SetValue(value ?? string.Empty, setCaretPosToEnd: false);
         if (maxLength > 0)
         {
             input.SetMaxLength(maxLength);
@@ -290,16 +403,16 @@ public class LanguageConfigDialog : GuiDialog
         return inputBounds.fixedY + FieldRowHeight;
     }
 
-    private double AddBoolDropDown(GuiComposer composer, string field, string label, bool value, ElementBounds inputBounds, string tooltip)
+    private double AddBoolToggle(GuiComposer composer, string field, string label, bool value, ElementBounds inputBounds, string tooltip)
     {
         var labelBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY, inputBounds.fixedWidth, 20);
         AddLabel(composer, label, labelBounds, tooltip: tooltip);
 
-        var actualInputBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY + 22, inputBounds.fixedWidth, inputBounds.fixedHeight);
-        var dropDown = new GuiElementDropDown(capi, ["0", "1"], [Lang.Get("No"), Lang.Get("Yes")], value ? 1 : 0, null, actualInputBounds, CairoFont.WhiteSmallText(), multiSelect: false);
-        _dropDowns[field] = dropDown;
-        composer.AddInteractiveElement(dropDown, "dropdown-" + field);
-        AddTooltip(composer, "dropdown-" + field, labelBounds, tooltip);
+        var actualInputBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY + 22, 112, inputBounds.fixedHeight);
+        var toggle = new GuiElementSetupToggle(capi, value, _ => { }, actualInputBounds);
+        _toggles[field] = toggle;
+        composer.AddInteractiveElement(toggle, "toggle-" + field);
+        AddTooltip(composer, "toggle-" + field, labelBounds, tooltip);
         return inputBounds.fixedY + FieldRowHeight;
     }
 
@@ -311,6 +424,14 @@ public class LanguageConfigDialog : GuiDialog
         }
 
         var language = _languages[_selectedIndex];
+        if (_showGrants)
+        {
+            language.GrantedToClasses = GetText(nameof(LanguageConfigEntryMessage.GrantedToClasses));
+            language.GrantedToTraits = GetText(nameof(LanguageConfigEntryMessage.GrantedToTraits));
+            language.GrantedToModels = GetText(nameof(LanguageConfigEntryMessage.GrantedToModels));
+            language.GrantedToModelGroups = GetText(nameof(LanguageConfigEntryMessage.GrantedToModelGroups));
+            return;
+        }
         language.Name = GetText(nameof(LanguageConfigEntryMessage.Name));
         language.Prefix = GetText(nameof(LanguageConfigEntryMessage.Prefix));
         language.Description = GetText(nameof(LanguageConfigEntryMessage.Description));
@@ -318,10 +439,6 @@ public class LanguageConfigDialog : GuiDialog
         language.Default = GetBool(nameof(LanguageConfigEntryMessage.Default));
         language.Hidden = GetBool(nameof(LanguageConfigEntryMessage.Hidden));
         language.Syllables = GetText(nameof(LanguageConfigEntryMessage.Syllables));
-        language.GrantedToClasses = GetText(nameof(LanguageConfigEntryMessage.GrantedToClasses));
-        language.GrantedToTraits = GetText(nameof(LanguageConfigEntryMessage.GrantedToTraits));
-        language.GrantedToModels = GetText(nameof(LanguageConfigEntryMessage.GrantedToModels));
-        language.GrantedToModelGroups = GetText(nameof(LanguageConfigEntryMessage.GrantedToModelGroups));
     }
 
     private bool OnAddLanguage()
@@ -337,6 +454,7 @@ public class LanguageConfigDialog : GuiDialog
             Syllables = "na, la, ra"
         });
         _selectedIndex = _languages.Count - 1;
+        _showGrants = false;
         _message = Lang.Get("thebasics:language-config-added-draft");
         _success = true;
         ComposeDialog();
@@ -447,7 +565,7 @@ public class LanguageConfigDialog : GuiDialog
 
     private bool GetBool(string field)
     {
-        return _dropDowns.TryGetValue(field, out var dropDown) && dropDown.SelectedValue == "1";
+        return _toggles.TryGetValue(field, out var toggle) && toggle.Value;
     }
 
     private int ClampSelectedIndex(int index)
@@ -477,7 +595,7 @@ public class LanguageConfigDialog : GuiDialog
 
     private List<(string Text, bool IsSelected)> BuildOrderSummaryLines()
     {
-        const int maxLines = 12;
+        const int maxLines = 7; // Leave room for the overflow count and Delete below the order summary.
         var lines = new List<(string Text, bool IsSelected)>();
         for (var index = 0; index < Math.Min(maxLines, _languages.Count); index++)
         {

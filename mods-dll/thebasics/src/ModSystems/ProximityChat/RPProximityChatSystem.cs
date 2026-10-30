@@ -29,7 +29,7 @@ using Vintagestory.Server;
 
 namespace thebasics.ModSystems.ProximityChat;
 
-public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChatApi
+public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChatApi
 {
     public int ProximityChatId { get; set; }
     public LanguageSystem LanguageSystem { get; set; }
@@ -55,6 +55,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     protected override void BasicStartServerSide()
     {
+        _setupWizardState = new SetupWizardState(Config);
         VisibilityUtils.ConfigureSightBlockOverrides(API.World, Config);
         HookEvents();
         RegisterCommands();
@@ -375,6 +376,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                 .WithDescription("Open The BASICs config panel")
                 .RequiresPrivilege(Privilege.root)
                 .RequiresPlayer()
+                .BeginSubCommand("advanced")
+                    .WithDescription("Open the legacy configuration panel")
+                    .RequiresPrivilege(Privilege.root)
+                    .RequiresPlayer()
+                    .HandleWith(HandleOpenConfigCommand)
+                .EndSubCommand()
                 .BeginSubCommand("languages")
                     .WithAlias("language")
                     .WithDescription("Open The BASICs language config editor")
@@ -390,6 +397,26 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
                     .HandleWith(HandleOpenCharacterSheetFieldConfigCommand)
                 .EndSubCommand()
                 .HandleWith(HandleOpenConfigCommand)
+            .EndSubCommand()
+            .BeginSubCommand("setup")
+                .WithDescription("Configure chat, teleportation, and notifications")
+                .RequiresPrivilege(Privilege.root)
+                .RequiresPlayer()
+                .BeginSubCommand("languages")
+                    .WithAlias("language")
+                    .WithDescription("Open languages in setup")
+                    .RequiresPrivilege(Privilege.root)
+                    .RequiresPlayer()
+                    .HandleWith(args => OpenSetupWizardPage(args, "chat.languageeditor"))
+                .EndSubCommand()
+                .BeginSubCommand("charsheetfields")
+                    .WithAlias("sheetfields", "biofields")
+                    .WithDescription("Open character sheet fields in setup")
+                    .RequiresPrivilege(Privilege.root)
+                    .RequiresPlayer()
+                    .HandleWith(args => OpenSetupWizardPage(args, "characters.builder"))
+                .EndSubCommand()
+                .HandleWith(HandleOpenSetupWizardCommand)
             .EndSubCommand()
             .BeginSubCommand("charsheetfields")
                 .WithAlias("sheetfields", "biofields")
@@ -629,6 +656,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .RegisterMessageType<TheBasicsChatHistoryResultMessage>()
             .RegisterMessageType<DiceRollSoundMessage>()
             .RegisterMessageType<SceneReadMarksMessage>()
+            .RegisterMessageType<TheBasicsSetupWizardRequestMessage>()
+            .RegisterMessageType<TheBasicsSetupWizardResultMessage>()
             .SetMessageHandler<TheBasicsClientReadyMessage>(OnClientReady)
             .SetMessageHandler<ChannelSelectedMessage>(OnChannelSelected)
             .SetMessageHandler<ChatTypingStateMessage>(OnChatTypingStateMessage)
@@ -644,7 +673,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             .SetMessageHandler<TheBasicsNotesOpenRequest>(OnNotesOpenRequest)
             .SetMessageHandler<TheBasicsNotesSaveMessage>(OnNotesSaveMessage)
             .SetMessageHandler<TheBasicsChatHistoryQueryRequest>(OnChatHistoryQueryRequest)
-            .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage);
+            .SetMessageHandler<TheBasicsConfigAdminSaveMessage>(OnConfigAdminSaveMessage)
+            .SetMessageHandler<TheBasicsSetupWizardRequestMessage>(OnSetupWizardRequest);
     }
 
     /// <summary>
@@ -793,7 +823,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     {
         if (player?.HasPrivilege(Privilege.root) != true)
         {
-            SendConfigAdminResult(player, false, "You do not have permission to edit The BASICs config.", Array.Empty<string>());
+            if (player != null)
+                _serverConfigChannel?.SendPacket(new TheBasicsConfigAdminResultMessage
+                {
+                    Success = false,
+                    Message = "You do not have permission to edit The BASICs config."
+                }, player);
             return;
         }
 
@@ -853,8 +888,11 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private void SaveConfigAdminDraft(IServerPlayer player, ModConfig draft)
     {
         var changedKeys = GetChangedConfigKeys(Config, draft);
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
+        if (!TryPersistConfigDraft(draft, out var error))
+        {
+            SendConfigAdminResult(player, false, error, []);
+            return;
+        }
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
 
@@ -924,10 +962,13 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void SaveLanguageConfigDraft(IServerPlayer player, ModConfig draft, List<LanguageConfigEntryMessage> submittedLanguages, long requestId)
     {
+        if (!TryPersistConfigDraft(draft, out var error))
+        {
+            SendLanguageConfigResult(player, false, error, submittedLanguages, requestId);
+            return;
+        }
         var renameMap = LanguageConfigAdmin.BuildRenameMap(submittedLanguages);
         TrackLanguageRenamesForJoiningPlayers(renameMap);
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
 
         var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.Languages) };
         ReconcileOnlinePlayerLanguages(renameMap);
@@ -1003,8 +1044,11 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void SaveCharacterSheetFieldConfigDraft(IServerPlayer player, ModConfig draft)
     {
-        CopyConfigValues(draft, Config);
-        SaveSharedConfig(API);
+        if (!TryPersistConfigDraft(draft, out var error))
+        {
+            SendCharacterSheetFieldConfigResult(player, false, error, CharacterSheetFieldConfigAdmin.BuildEntries(draft));
+            return;
+        }
 
         var changedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { nameof(Config.CharacterSheetFields) };
         ApplyConfigChangeSideEffects(changedKeys);
@@ -1034,8 +1078,12 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     /// "nothing was reloaded"; conflating them is what let the editors report success on a parse
     /// failure.
     /// </summary>
-    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys)
+    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys) =>
+        TryReloadConfigAndGetChangedKeys(out changedKeys, out _);
+
+    private bool TryReloadConfigAndGetChangedKeys(out HashSet<string> changedKeys, out bool loaded)
     {
+        loaded = false;
         var before = CloneConfig(Config);
         if (!TryReloadSharedConfigFromDisk(API, out _))
         {
@@ -1043,6 +1091,7 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             return false;
         }
 
+        loaded = true;
         changedKeys = GetChangedConfigKeys(before, Config);
         ApplyConfigChangeSideEffects(changedKeys);
         BroadcastClientConfigs();
@@ -1126,6 +1175,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
         }
         SendClientConfig(player);
         _serverConfigChannel.SendPacket(player.GetSceneReadMarks(), player);
+        _setupWizardInvitation.MarkClientReady(player.PlayerUID);
+        TryOfferSetupWizard(player);
     }
 
     private TextCommandResult SetNicknameColorAdmin(TextCommandCallingArgs args)
@@ -1330,7 +1381,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             Config = Config,
             Values = GetConfigAdminValues(Config),
             ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
-            StatusMessage = statusMessage
+            StatusMessage = statusMessage,
+            PrivilegeSuggestions = ConfigAdminPrivilegeSuggestions.Snapshot(API, Config)
         }, player);
     }
 
@@ -1404,7 +1456,8 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
             Values = GetConfigAdminValues(Config),
             ReviewedKeys = (Config.ReviewedConfigSettingKeys ?? Array.Empty<string>()).ToList(),
             LiveAppliedKeys = liveApplied,
-            RestartRequiredKeys = restartRequired
+            RestartRequiredKeys = restartRequired,
+            PrivilegeSuggestions = ConfigAdminPrivilegeSuggestions.Snapshot(API, Config)
         }, player);
     }
 
@@ -1953,11 +2006,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
     private void Event_PlayerNowPlaying(IServerPlayer byPlayer)
     {
         ReconcileChatTypeOnJoin(byPlayer);
+        _setupWizardInvitation.MarkPlaying(byPlayer.PlayerUID);
+        TryOfferSetupWizard(byPlayer);
     }
 
     private void Event_PlayerDisconnect(IServerPlayer player)
     {
         ClearTypingIndicator(player);
+        _setupWizardInvitation.Clear(player.PlayerUID);
+        _setupWizardRuns.Remove(player.PlayerUID);
     }
 
     private void SetupProximityGroup()
@@ -1989,10 +2046,15 @@ public class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProximityChat
 
     private void RemoveProximityGroupIfExists()
     {
-
         var proximityGroup = GetProximityGroup();
         if (proximityGroup != null)
         {
+            // Remove saved memberships too, including players who are currently offline.
+            foreach (var playerData in API.PlayerData.PlayerDataByUid.Values)
+            {
+                playerData.PlayerGroupMemberships.Remove(proximityGroup.Uid);
+            }
+
             API.Groups.RemovePlayerGroup(proximityGroup);
         }
     }

@@ -905,10 +905,7 @@ public class CharacterSheetSystem : BaseBasicModSystem
             }
 
             renderedFields++;
-            message.Append('\n');
-            message.Append(VtmlUtils.EscapeVtml(GetFieldLabel(field)));
-            message.Append(": ");
-            message.Append(string.IsNullOrWhiteSpace(value) ? Lang.Get("thebasics:charsheet-unset") : VtmlUtils.EscapeVtml(value));
+            AppendInspectionField(message, GetFieldLabel(field), value);
         }
 
         return renderedFields;
@@ -1192,25 +1189,24 @@ public class CharacterSheetSystem : BaseBasicModSystem
                                       player.GetNickname(Config).Equals(targetName, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool CanViewField(IServerPlayer viewer, IServerPlayer target, CharacterSheetFieldDefinition field, CharacterSheetViewMode mode)
-    {
-        if (mode == CharacterSheetViewMode.Admin)
-        {
-            return true;
-        }
+    private static bool CanViewField(IServerPlayer viewer, IServerPlayer target, CharacterSheetFieldDefinition field, CharacterSheetViewMode mode) =>
+        CanViewField(field, mode, viewer != null && viewer.PlayerUID == target.PlayerUID);
 
+    internal static bool CanViewField(CharacterSheetFieldDefinition field, CharacterSheetViewMode mode, bool isOwnSheet)
+    {
+        if (mode == CharacterSheetViewMode.Admin) return true;
         var visibility = GetFieldVisibility(field);
         if (mode == CharacterSheetViewMode.Look)
-        {
             return field.ShowInLook && (visibility == CharacterSheetFieldVisibilities.Public || visibility == CharacterSheetFieldVisibilities.Nearby);
-        }
+        return isOwnSheet ? visibility != CharacterSheetFieldVisibilities.Admin : visibility == CharacterSheetFieldVisibilities.Public;
+    }
 
-        if (viewer != null && viewer.PlayerUID == target.PlayerUID)
-        {
-            return visibility != CharacterSheetFieldVisibilities.Admin;
-        }
-
-        return visibility == CharacterSheetFieldVisibilities.Public;
+    internal static void AppendInspectionField(StringBuilder message, string label, string value)
+    {
+        message.Append('\n');
+        message.Append(VtmlUtils.EscapeVtml(label));
+        message.Append(": ");
+        message.Append(string.IsNullOrWhiteSpace(value) ? Lang.Get("thebasics:charsheet-unset") : VtmlUtils.EscapeVtml(value));
     }
 
     private static bool CanEditField(IServerPlayer viewer, IServerPlayer target, CharacterSheetFieldDefinition field, bool isAdminAction)

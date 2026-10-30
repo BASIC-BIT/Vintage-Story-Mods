@@ -1,0 +1,590 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using HarmonyLib;
+using Vintagestory.API.Client;
+using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
+using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
+using Vintagestory.GameContent;
+
+namespace thebasics.ModSystems.ChatUiSystem;
+
+/// <summary>A native character owned only by the setup panel, never registered in the world.</summary>
+public sealed class SetupGuidePreview : ISetupGuidePreview
+{
+    private const float FrameStep = 1f / 60f;
+    private const float DefaultYaw = -1.2707963f;
+    private const float RotationDamping = 6f;
+    private static long nextEntityId = -20000000;
+    private readonly ICoreClientAPI api;
+    private readonly GuideFixture fixture;
+    private readonly DetachedGuideEntity actor;
+    private GuideRenderer renderer;
+    private ClientAnimator previewAnimator;
+    private string animationCode = "idle";
+    private double previewTime;
+    private double frameRemainder;
+    private float rotationYaw = DefaultYaw;
+    private float rotationVelocity;
+    private double dragX;
+    private long dragTime;
+    private bool dragging;
+    private bool namedTime;
+    private bool disposed;
+
+    public bool IsReady => !disposed && renderer?.IsReady == true && actor.AnimManager.Animator != null;
+
+    public SetupGuidePreview(ICoreClientAPI api, string identity = "Pip")
+    {
+        this.api = api ?? throw new ArgumentNullException(nameof(api));
+        string fixturePath = identity switch
+        {
+            "Pip" => "thebasics:config/setup-guide.json",
+            "Mara" => "thebasics:config/setup-guide-mara.json",
+            _ => throw new ArgumentException("Unknown setup guide identity.", nameof(identity))
+        };
+        fixture = api.Assets.Get(new AssetLocation(fixturePath)).ToObject<GuideFixture>();
+        if (fixture?.SkinParts == null || fixture.Gear == null || fixture.Animations == null ||
+            !fixture.Animations.Contains("idle", StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException("The setup guide fixture is incomplete.");
+        }
+
+        actor = new DetachedGuideEntity { EntityId = Interlocked.Decrement(ref nextEntityId) };
+        try
+        {
+            var source = api.World.GetEntityType(new AssetLocation("game:player"))
+                ?? throw new InvalidOperationException("The native player entity is unavailable.");
+            var properties = CopyProperties(source, api);
+            var appliedParts = new TreeAttribute();
+            foreach (var part in fixture.SkinParts)
+            {
+                appliedParts.SetString(part.Key, part.Value);
+            }
+            actor.WatchedAttributes["skinConfig"] = new TreeAttribute { ["appliedParts"] = appliedParts };
+            actor.WatchedAttributes.SetString("voicetype", fixture.SkinParts["voicetype"]);
+            actor.WatchedAttributes.SetString("voicepitch", fixture.SkinParts["voicepitch"]);
+            actor.WatchedAttributes["nametag"] = new TreeAttribute { ["name"] = new StringAttribute(fixture.Name) };
+
+            // A private native gear inventory, with no player UID or inventory-manager lookup.
+            var gear = new InventoryGear("setupguide-" + actor.EntityId, api);
+            foreach (var garment in fixture.Gear)
+            {
+                if (garment.Slot < 0 || garment.Slot >= gear.Count || !gear[garment.Slot].Empty)
+                {
+                    throw new InvalidOperationException("Invalid setup guide gear slot.");
+                }
+                var item = api.World.GetItem(new AssetLocation(garment.Code))
+                    ?? throw new InvalidOperationException("Setup guide garment is unavailable: " + garment.Code);
+                gear[garment.Slot].Itemstack = new ItemStack(item);
+            }
+            var inventoryTree = new TreeAttribute();
+            gear.ToTreeAttributes(inventoryTree);
+            actor.WatchedAttributes["seraphinventory"] = inventoryTree;
+
+            // EntityPlayerBot finds this private behavior after Entity.Initialize fires OnInitialized.
+            actor.OnInitialized += AddPrivateInventory;
+            actor.Initialize(properties, api, 0);
+            actor.OnInitialized -= AddPrivateInventory;
+            ValidateAppearance();
+            renderer = new GuideRenderer(actor, api);
+            properties.Client.Renderer = renderer;
+            actor.OnEntityLoaded();
+            renderer.TesselateShape();
+        }
+        catch
+        {
+            try
+            {
+                Dispose();
+            }
+            catch (Exception cleanupError)
+            {
+                api.Logger.Warning("Setup guide cleanup failed: {0}", cleanupError);
+            }
+            throw;
+        }
+    }
+
+    private void AddPrivateInventory()
+    {
+        var inventory = new GuideInventory(actor);
+        actor.AddBehavior(inventory);
+        inventory.Initialize(actor.Properties, new JsonObject(Newtonsoft.Json.Linq.JObject.FromObject(new { code = "seraphinventory" })));
+    }
+
+    private void ValidateAppearance()
+    {
+        var skin = actor.GetBehavior<EntityBehaviorExtraSkinnable>();
+        foreach (var part in fixture.SkinParts)
+        {
+            if (skin == null || !skin.AvailableSkinPartsByCode.TryGetValue(part.Key, out var available) ||
+                !available.VariantsByCode.ContainsKey(part.Value))
+            {
+                throw new InvalidOperationException("Setup guide skin option is unavailable: " + part.Key + "/" + part.Value);
+            }
+        }
+        foreach (string code in fixture.Animations)
+        {
+            if (!actor.Properties.Client.AnimationsByMetaCode.ContainsKey(code))
+            {
+                throw new InvalidOperationException("Setup guide animation is unavailable: " + code);
+            }
+        }
+    }
+
+    internal static EntityProperties CopyProperties(EntityProperties source, ICoreClientAPI api)
+    {
+        // EntityProperties.Clone changes the source Attributes to read-only; copy without touching it.
+        var client = (EntityClientProperties)source.Client.Clone();
+        // Player model mods can replace this descriptor; the detached guide still uses native skin behavior.
+        var skinBehavior = source.Client.BehaviorsAsJsonObj
+            .Where(behavior => behavior["code"].AsString() == "extraskinnable")
+            .Select(behavior => new JsonObject(behavior.Token.DeepClone())).FirstOrDefault()
+            ?? new JsonObject(Newtonsoft.Json.Linq.JObject.FromObject(new { code = "extraskinnable" }));
+        client.BehaviorsAsJsonObj = [skinBehavior];
+        client.Textures = new Dictionary<string, CompositeTexture>();
+        foreach (var texture in source.Client.Textures)
+        {
+            var copy = texture.Value.Clone();
+            copy.Bake(api.Assets);
+            copy.Baked.TextureSubId = texture.Value.Baked.TextureSubId;
+            client.Textures.Add(texture.Key, copy);
+        }
+        return new EntityProperties
+        {
+            Id = source.Id,
+            Code = source.Code.Clone(),
+            Class = "EntityPlayerBot",
+            Tags = source.Tags,
+            Color = source.Color,
+            Habitat = source.Habitat,
+            CollisionBoxSize = source.CollisionBoxSize?.Clone(),
+            DeadCollisionBoxSize = source.DeadCollisionBoxSize?.Clone(),
+            SelectionBoxSize = source.SelectionBoxSize?.Clone(),
+            DeadSelectionBoxSize = source.DeadSelectionBoxSize?.Clone(),
+            EyeHeight = source.EyeHeight,
+            SwimmingEyeHeight = source.SwimmingEyeHeight,
+            Weight = source.Weight,
+            CanClimb = source.CanClimb,
+            CanClimbAnywhere = source.CanClimbAnywhere,
+            FallDamage = source.FallDamage,
+            FallDamageMultiplier = source.FallDamageMultiplier,
+            ClimbTouchDistance = source.ClimbTouchDistance,
+            RotateModelOnClimb = source.RotateModelOnClimb,
+            KnockbackResistance = source.KnockbackResistance,
+            Attributes = new JsonObject(source.Attributes.Token.DeepClone()),
+            Client = client,
+            Sounds = new Dictionary<string, SoundAttributes>(),
+            IdleSoundChance = 0,
+            Variant = new Vintagestory.API.Datastructures.OrderedDictionary<string, string>(source.Variant)
+        };
+    }
+
+    /// <summary>Plays a live animation. Keeping the same animation does not restart its pose.</summary>
+    public void PlayAnimation(string code)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ValidateAnimationCode(code);
+        if (animationCode == code)
+        {
+            // The pinned animator has already consumed its fractional frame.
+            if (namedTime) frameRemainder = 0;
+            namedTime = false;
+            return;
+        }
+        animationCode = code;
+        previewTime = 0;
+        frameRemainder = 0;
+        namedTime = false;
+        ResetAnimation();
+    }
+
+    /// <summary>Pins a repeatable frame for an explicit capture.</summary>
+    public void SetAnimation(string code, double timeSeconds)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        ValidateAnimationCode(code);
+        if (!double.IsFinite(timeSeconds) || timeSeconds < 0 || timeSeconds > 60)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeSeconds));
+        }
+        animationCode = code;
+        previewTime = timeSeconds;
+        namedTime = true;
+        rotationYaw = DefaultYaw;
+        rotationVelocity = 0;
+        dragging = false;
+        ResetAnimation();
+    }
+
+    public void BeginDrag(double x)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (!double.IsFinite(x)) throw new ArgumentOutOfRangeException(nameof(x));
+        if (namedTime) return;
+        dragging = true;
+        dragX = x;
+        dragTime = api.ElapsedMilliseconds;
+        rotationVelocity = 0;
+    }
+
+    public void DragTo(double x)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (!double.IsFinite(x)) throw new ArgumentOutOfRangeException(nameof(x));
+        if (!dragging) return;
+        long now = api.ElapsedMilliseconds;
+        long elapsed = now - dragTime;
+        // Match the native character editor's direction and one radian per 100 pixels.
+        double delta = -(x - dragX) / 100;
+        if (double.IsFinite(delta))
+        {
+            rotationYaw = (float)Math.IEEERemainder(rotationYaw + delta, Math.Tau);
+            if (elapsed > 0 && elapsed <= 100)
+                rotationVelocity = (float)Math.Clamp(delta * 1000 / elapsed, -12, 12);
+            else if (elapsed != 0)
+                rotationVelocity = 0;
+        }
+        else
+        {
+            rotationVelocity = 0;
+        }
+        dragX = x;
+        dragTime = now;
+    }
+
+    public void EndDrag(bool allowMomentum = true)
+    {
+        if (disposed) return;
+        long elapsed = api.ElapsedMilliseconds - dragTime;
+        if (!allowMomentum || elapsed < 0 || elapsed > 100) rotationVelocity = 0;
+        dragging = false;
+    }
+
+    private void ValidateAnimationCode(string code)
+    {
+        if (!fixture.Animations.Contains(code, StringComparer.Ordinal))
+            throw new ArgumentException("Unknown setup guide animation.", nameof(code));
+    }
+
+    private void ResetAnimation()
+    {
+        if (actor.AnimManager.Animator is not ClientAnimator animator)
+        {
+            return;
+        }
+        // Only private poses and joints are shared here. No animation manager frame, sound, or world tick.
+        previewAnimator = new ClientAnimator(() => 1, animator.Animations.Select(animation => animation.Animation).ToArray(),
+            animator.RootElements, animator.jointsById);
+        actor.AnimManager.Animator = previewAnimator;
+        var active = actor.AnimManager.ActiveAnimationsByAnimCode;
+        active.Clear();
+        var idle = actor.Properties.Client.AnimationsByMetaCode["idle"].Clone();
+        active[idle.Animation] = idle;
+        if (animationCode != "idle")
+        {
+            var selected = actor.Properties.Client.AnimationsByMetaCode[animationCode].Clone();
+            active[selected.Animation] = selected;
+        }
+        // A zero-delta native frame decrements Iterations and prevents EaseOut animations from easing in.
+        int steps = (int)Math.Floor(previewTime * 60);
+        for (int step = 0; step < steps; step++)
+        {
+            previewAnimator.OnFrame(active, FrameStep);
+        }
+        frameRemainder = previewTime - steps / 60d;
+        if (namedTime && frameRemainder > 0)
+        {
+            previewAnimator.OnFrame(active, (float)frameRemainder);
+        }
+    }
+
+    public void Render(float dt, ElementBounds bounds, float opacity = 1, float yawOffset = 0)
+    {
+        if (disposed || bounds == null)
+        {
+            return;
+        }
+        if (!float.IsFinite(opacity)) throw new ArgumentOutOfRangeException(nameof(opacity));
+        if (!float.IsFinite(yawOffset)) throw new ArgumentOutOfRangeException(nameof(yawOffset));
+        if (renderer != null) renderer.Opacity = Math.Clamp(opacity, 0, 1);
+        if (actor.AnimManager.Animator != previewAnimator)
+        {
+            ResetAnimation();
+        }
+        if (!namedTime && previewAnimator != null && float.IsFinite(dt) && dt > 0)
+        {
+            frameRemainder += Math.Min(dt, 0.25f);
+            while (frameRemainder >= FrameStep)
+            {
+                previewAnimator.OnFrame(actor.AnimManager.ActiveAnimationsByAnimCode, FrameStep);
+                previewTime += FrameStep;
+                frameRemainder -= FrameStep;
+            }
+        }
+        if (!namedTime && !dragging && rotationVelocity != 0 && float.IsFinite(dt) && dt > 0)
+        {
+            // Bound a delayed frame, then integrate the decay so coasting is consistent across frame rates.
+            float decay = MathF.Exp(-RotationDamping * Math.Min(dt, 0.05f));
+            rotationYaw = (float)Math.IEEERemainder(
+                rotationYaw + rotationVelocity * (1 - decay) / RotationDamping, Math.Tau);
+            rotationVelocity *= decay;
+            if (MathF.Abs(rotationVelocity) < 0.01f) rotationVelocity = 0;
+        }
+        api.Render.GlPushMatrix();
+        try
+        {
+            api.Render.PushScissor(bounds, api.Render.ScissorStack.Count > 0 && api.Render.ScissorStack.Peek() != null);
+            try
+            {
+                float size = (float)Math.Min(bounds.InnerWidth * 1.1, bounds.InnerHeight * 0.46);
+                var x = bounds.renderX + bounds.InnerWidth / 2 - size;
+                var y = bounds.renderY + bounds.InnerHeight * 0.96 - 2 * size;
+                var yaw = rotationYaw + yawOffset;
+                if (animationCode == "sleep" && renderer != null && renderer.TryGetPoseBounds(yaw, out var pose))
+                {
+                    var fit = FitPoseBounds(pose, bounds.InnerWidth, bounds.InnerHeight, actor.Properties.Client.Size);
+                    x = bounds.renderX + fit.X;
+                    y = bounds.renderY + fit.Y;
+                    size = fit.Size;
+                }
+                api.Render.RenderEntityToGui(0, actor, x, y, 100, yaw, size, -1);
+            }
+            finally
+            {
+                api.Render.PopScissor();
+            }
+        }
+        finally
+        {
+            api.Render.GlPopMatrix();
+        }
+    }
+
+    internal readonly record struct PoseBounds(double MinX, double MinY, double MaxX, double MaxY);
+    internal readonly record struct GuiPoseTransform(double X, double Y, float Size);
+
+    internal static bool TryGetPoseBounds(MeshData mesh, float[] joints, float yaw, out PoseBounds bounds,
+        float rotateX = 0, float rotateY = 0, float rotateZ = 0)
+    {
+        bounds = default;
+        if (mesh?.xyz == null || mesh.VerticesCount <= 0 || mesh.xyz.Length < mesh.VerticesCount * 3 ||
+            mesh.CustomInts?.Values == null || mesh.CustomInts.Count < mesh.VerticesCount || joints == null || !float.IsFinite(yaw))
+            return false;
+        double minX = double.PositiveInfinity, minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity, maxY = double.NegativeInfinity;
+        // Match EntityShapeRenderer's GUI orientation and its final centered Z reflection.
+        var orientation = Mat4f.Create();
+        const float radians = MathF.PI / 180;
+        Mat4f.RotateX(orientation, orientation, MathF.PI + rotateX * radians);
+        Mat4f.RotateY(orientation, orientation, yaw + rotateY * radians);
+        Mat4f.RotateZ(orientation, orientation, rotateZ * radians);
+        Mat4f.Scale(orientation, orientation, [1, 1, -1]);
+        Mat4f.Translate(orientation, orientation, -0.5f, 0, -0.5f);
+        for (var vertex = 0; vertex < mesh.VerticesCount; vertex++)
+        {
+            var jointId = mesh.CustomInts.Values[vertex];
+            if (jointId < 0 || jointId >= joints.Length / 16) return false;
+            var joint = jointId * 16;
+            var point = vertex * 3;
+            double x = mesh.xyz[point], y = mesh.xyz[point + 1], z = mesh.xyz[point + 2];
+            var posedX = joints[joint] * x + joints[joint + 4] * y + joints[joint + 8] * z + joints[joint + 12];
+            var posedY = joints[joint + 1] * x + joints[joint + 5] * y + joints[joint + 9] * z + joints[joint + 13];
+            var posedZ = joints[joint + 2] * x + joints[joint + 6] * y + joints[joint + 10] * z + joints[joint + 14];
+            var projectedX = orientation[0] * posedX + orientation[4] * posedY + orientation[8] * posedZ + orientation[12];
+            var projectedY = orientation[1] * posedX + orientation[5] * posedY + orientation[9] * posedZ + orientation[13];
+            if (!double.IsFinite(projectedX) || !double.IsFinite(projectedY)) return false;
+            minX = Math.Min(minX, projectedX); maxX = Math.Max(maxX, projectedX);
+            minY = Math.Min(minY, projectedY); maxY = Math.Max(maxY, projectedY);
+        }
+        bounds = new(minX, minY, maxX, maxY);
+        return maxX - minX > 0.000001 && maxY - minY > 0.000001;
+    }
+
+    internal static GuiPoseTransform FitPoseBounds(PoseBounds pose, double width, double height, float clientSize)
+    {
+        var scale = 0.9 * Math.Min(width / (pose.MaxX - pose.MinX), height / (pose.MaxY - pose.MinY));
+        var size = (float)(scale / clientSize);
+        return new(width / 2 - size - scale * (pose.MinX + pose.MaxX) / 2,
+            height / 2 - 2 * size - scale * (pose.MinY + pose.MaxY) / 2, size);
+    }
+
+    public void Dispose()
+    {
+        if (disposed)
+        {
+            return;
+        }
+        disposed = true;
+        if (actor != null)
+        {
+            actor.Disposed = true;
+            actor.OnInitialized -= AddPrivateInventory;
+        }
+        try
+        {
+            renderer?.Dispose();
+        }
+        finally
+        {
+            if (actor?.Properties != null)
+            {
+                try
+                {
+                    actor.OnEntityDespawn(new EntityDespawnData { Reason = EnumDespawnReason.Removed });
+                }
+                finally
+                {
+                    actor.Properties.Client.Renderer = null;
+                }
+            }
+        }
+    }
+
+    private sealed class DetachedGuideEntity : EntityPlayerBot
+    {
+        public bool Disposed;
+        public override bool StoreWithChunk => false;
+        public override void OnGameTick(float dt) { }
+        public override void OnTesselated()
+        {
+            if (!Disposed) base.OnTesselated();
+        }
+    }
+
+    private sealed class GuideInventory : EntityBehaviorSeraphInventory
+    {
+        public GuideInventory(Entity entity) : base(entity) { }
+
+        public override void OnTesselation(ref Shape shape, string path, ref bool cloned, ref string[] deleted)
+        {
+            // The native whole-inventory helper writes shared entity-type textures. Its per-slot helper is isolated.
+            foreach (var slot in Inventory)
+            {
+                if (!slot.Empty)
+                {
+                    shape = addGearToShape(shape, slot, "default", path, ref cloned, ref deleted);
+                }
+            }
+            NativeSkin.Reload(this);
+        }
+
+        public override void OnEntityDespawn(EntityDespawnData despawn)
+        {
+            // Native clothing frees slot zero even if no skin space was allocated.
+            if (entity.Properties?.Client?.Renderer is EntityShapeRenderer { skinTexPos: not null })
+                base.OnEntityDespawn(despawn);
+        }
+    }
+
+    [HarmonyPatch(typeof(EntityBehaviorTexturedClothing), nameof(EntityBehaviorTexturedClothing.reloadSkin))]
+    private static class NativeSkin
+    {
+        // Player model mods suppress the global method; this original runs only for our private guide.
+        [HarmonyReversePatch(HarmonyReversePatchType.Original)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void Reload(EntityBehaviorTexturedClothing inventory) =>
+            throw new InvalidOperationException("The setup guide native skin patch was not initialized.");
+    }
+
+    private sealed class GuideRenderer : EntityShapeRenderer
+    {
+        private bool disposed;
+        private MeshData poseMesh;
+        public bool IsReady => meshRefOpaque != null;
+        public float Opacity { get; set; } = 1;
+
+        public GuideRenderer(Entity entity, ICoreClientAPI api) : base(entity, api)
+        {
+            DoRenderHeldItem = false;
+            glitchAffected = false;
+            frostable = false;
+            shouldSwivelFromMotion = false;
+        }
+
+        public override void TesselateShape()
+        {
+            if (disposed) return;
+            // Allocate private skin space before OnTesselation reloads appearance and clothing into it.
+            var handling = EnumHandling.PassThrough;
+            entity.GetBehavior<GuideInventory>().GetTextureSource(ref handling);
+            base.TesselateShape();
+        }
+
+        protected override void onMeshReady(MeshData meshData)
+        {
+            if (disposed) return;
+            poseMesh = meshData.Clone();
+            base.onMeshReady(meshData);
+        }
+
+        internal bool TryGetPoseBounds(float yaw, out PoseBounds bounds)
+        {
+            var shape = entity.Properties.Client.Shape;
+            return SetupGuidePreview.TryGetPoseBounds(poseMesh, entity.AnimManager.Animator?.Matrices, yaw, out bounds,
+                shape?.rotateX ?? 0, shape?.rotateY ?? 0, shape?.rotateZ ?? 0);
+        }
+
+        public override void RenderToGui(float dt, double x, double y, double z, float yaw, float size)
+        {
+            if (disposed) return;
+            var shader = capi.Render.CurrentActiveShader;
+            var originalMatrix = (float[])ModelMat.Clone();
+            try
+            {
+                // InventoryItemRenderer resets rgbaIn before calling this renderer.
+                shader.Uniform("rgbaIn", 1f, 1f, 1f, Opacity);
+                var animator = entity.AnimManager.Animator;
+                if (animator != null)
+                {
+                    shader.UBOs["Animation"].Update((object)animator.Matrices, 0, animator.MaxJointId * 16 * sizeof(float));
+                    shader.Uniform("applyAnimation", 1);
+                }
+                base.RenderToGui(dt, x, y, z, yaw, size);
+            }
+            finally
+            {
+                ModelMat = originalMatrix;
+                try
+                {
+                    shader.Uniform("applyAnimation", 0);
+                }
+                finally
+                {
+                    shader.Uniform("rgbaIn", 1f, 1f, 1f, 1f);
+                }
+            }
+        }
+
+        public override void Dispose()
+        {
+            if (disposed) return;
+            disposed = true;
+            poseMesh = null;
+            base.Dispose();
+        }
+    }
+
+    private sealed class GuideFixture
+    {
+        public string Name { get; set; }
+        public Dictionary<string, string> SkinParts { get; set; }
+        public GuideGarment[] Gear { get; set; }
+        public string[] Animations { get; set; }
+    }
+
+    private sealed class GuideGarment
+    {
+        public int Slot { get; set; }
+        public string Code { get; set; }
+    }
+}
+
+
+
+

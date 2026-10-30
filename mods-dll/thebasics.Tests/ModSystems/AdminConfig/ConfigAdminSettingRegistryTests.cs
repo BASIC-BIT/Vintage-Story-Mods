@@ -10,6 +10,18 @@ namespace thebasics.Tests.ModSystems.AdminConfig;
 public class ConfigAdminSettingRegistryTests
 {
     [Fact]
+    public void ProximityTabPosition_CanonicalizesValidChoiceAndRejectsUnknownChoice()
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("ProximityChatTabPosition");
+        setting.TrySetValue(config, "aftergeneral", out var error).Should().BeTrue(error);
+        config.ProximityChatTabPosition.Should().Be("AfterGeneral");
+        setting.TrySetValue(config, "Last", out _).Should().BeFalse();
+        config.ProximityChatTabPosition.Should().Be("AfterGeneral");
+        setting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+    }
+
+    [Fact]
     public void ValidateConfig_AcceptsTheUnlimitedSentinel()
     {
         var config = CreateConfig();
@@ -586,4 +598,17 @@ public class ConfigAdminSettingRegistryTests
         ConfigAdminSettingRegistry.TryGet(key, out var setting).Should().BeTrue($"{key} should be registered");
         return setting;
     }
+    [Theory]
+    [InlineData("0")]
+    [InlineData("129")]
+    [InlineData("not a size")]
+    public void MigratedModeFontSizeRejectsInvalidValuesWithoutChangingConfig(string invalid)
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("ProximityChatDefaultFontSize.Normal");
+        var before = setting.GetValue(config);
+        setting.TrySetValue(config, invalid, out _).Should().BeFalse();
+        setting.GetValue(config).Should().Be(before);
+    }
+
 }

@@ -171,6 +171,23 @@ public class LanguageConfigAdminTests
         map.Should().NotContainKey("Stable");
     }
 
+    [Fact]
+    public void EntryCopiesAreDetachedAndEqualityIncludesGrantsAndOrder()
+    {
+        var original = new List<LanguageConfigEntryMessage>
+        {
+            ValidEntry(), ValidEntry() with { OriginalName = "Other", Name = "Other", Prefix = "other" }
+        };
+        var copy = LanguageConfigAdmin.CloneEntries(original);
+
+        LanguageConfigAdmin.EntriesEqual(original, copy).Should().BeTrue();
+        copy[0].Should().NotBeSameAs(original[0]);
+        copy[0].GrantedToClasses = "hunter";
+        original[0].GrantedToClasses.Should().BeNull();
+        LanguageConfigAdmin.EntriesEqual(original, copy).Should().BeFalse();
+        LanguageConfigAdmin.EntriesEqual(original, original.AsEnumerable().Reverse()).Should().BeFalse();
+    }
+
     private static ModConfig CreateConfig()
     {
         var config = new ModConfig();

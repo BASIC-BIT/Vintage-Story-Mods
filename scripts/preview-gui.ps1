@@ -8,6 +8,7 @@ param(
     [int]$Height = 1000,
     [string]$Baseline,
     [string]$DotNet = $(if ($env:DOTNET_EXE) { $env:DOTNET_EXE } else { 'dotnet' }),
+    [switch]$Wizard,
     [switch]$Test
 )
 $ErrorActionPreference = 'Stop'
@@ -30,13 +31,23 @@ try {
         $env:THEBASICS_GUI_OUTPUT = $Output
         & $DotNet test (Join-Path $repo 'mods-dll/thebasics.Tests/thebasics.Tests.csproj') '-p:SkipPostBuildPackage=true' --filter 'FullyQualifiedName~GuiPreview'
     } else {
+        $sourceTreeHash = & (Join-Path $repo 'scripts/gui-source-identity.ps1') -Repo $repo
         $project = Join-Path $repo 'tools/GuiPreview/GuiPreview.csproj'
-        & $DotNet build $project '-p:SkipPostBuildPackage=true' --verbosity quiet
+        & $DotNet build $project '-p:SkipPostBuildPackage=true' "-p:TheBasicsSourceTreeHash=$sourceTreeHash" --verbosity quiet
         if ($LASTEXITCODE -ne 0) { throw 'GUI preview build failed.' }
-        $arguments = @('render', '--game', $GamePath, '--assets', $assets, '--output', $Output, '--scenario', $Scenario,
-            '--scale', $Scale.ToString([Globalization.CultureInfo]::InvariantCulture), '--width', "$Width", '--height', "$Height")
-        if ($Baseline) { $arguments += @('--baseline', [IO.Path]::GetFullPath($Baseline)) }
-        & $DotNet (Join-Path $repo 'tools/GuiPreview/bin/Debug/net10.0/TheBasics.GuiPreview.dll') @arguments
+        $scales = if ($Wizard) { @(1, 1.25) } else { @($Scale) }
+        if ($Wizard -and $Scenario -eq 'all') { $Scenario = 'wizard-all' }
+        foreach ($captureScale in $scales) {
+            $captureOutput = if ($Wizard) { Join-Path $Output ('scale-' + $captureScale.ToString([Globalization.CultureInfo]::InvariantCulture)) } else { $Output }
+            $arguments = @('render', '--game', $GamePath, '--assets', $assets, '--output', $captureOutput, '--scenario', $Scenario,
+                '--scale', $captureScale.ToString([Globalization.CultureInfo]::InvariantCulture), '--width', "$Width", '--height', "$Height", '--source-tree-hash', $sourceTreeHash)
+            if ($Baseline) {
+                $captureBaseline = if ($Wizard) { Join-Path $Baseline ('scale-' + $captureScale.ToString([Globalization.CultureInfo]::InvariantCulture)) } else { $Baseline }
+                $arguments += @('--baseline', [IO.Path]::GetFullPath($captureBaseline))
+            }
+            & $DotNet (Join-Path $repo 'tools/GuiPreview/bin/Debug/net10.0/TheBasics.GuiPreview.dll') @arguments
+            if ($LASTEXITCODE -ne 0) { throw "GUI preview failed (exit $LASTEXITCODE)." }
+        }
     }
     if ($LASTEXITCODE -ne 0) { throw "GUI preview failed (exit $LASTEXITCODE)." }
 } finally {

@@ -1,0 +1,282 @@
+diff --git a/mods-dll/agentcontrol/AgentControlConfig.cs b/mods-dll/agentcontrol/AgentControlConfig.cs
+--- a/mods-dll/agentcontrol/AgentControlConfig.cs
++++ b/mods-dll/agentcontrol/AgentControlConfig.cs
+@@ -3,6 +3,7 @@
+ public sealed class AgentControlConfig
+ {
+     public string PipeName { get; set; } = "vintage-story-agentcontrol";
++    public bool EnableOnStartup { get; set; }
+     public int QueueCapacity { get; set; } = 4;
+     public int MaxActionsPerExecution { get; set; } = 32;
+     public int MaxRequestBytes { get; set; } = 65_536;
+diff --git a/mods-dll/agentcontrol/AgentControlModSystem.cs b/mods-dll/agentcontrol/AgentControlModSystem.cs
+--- a/mods-dll/agentcontrol/AgentControlModSystem.cs
++++ b/mods-dll/agentcontrol/AgentControlModSystem.cs
+@@ -22,6 +22,7 @@
+     private string? _sessionSecret;
+     private long _tickListener;
+     private bool _enabled;
++    private bool _enableOnStartupPending;
+ 
+     public override bool ShouldLoad(EnumAppSide forSide) => forSide == EnumAppSide.Client;
+ 
+@@ -29,6 +30,7 @@
+     {
+         _api = api;
+         _config = api.LoadModConfig<AgentControlConfig>("agentcontrol.json") ?? new AgentControlConfig();
++        _enableOnStartupPending = _config.EnableOnStartup;
+         api.StoreModConfig(_config, "agentcontrol.json");
+         _extensions = new ExtensionRegistry();
+         api.ObjectCache[AgentControlContract.RegistryObjectCacheKey] = _extensions;
+@@ -50,6 +52,11 @@
+     private void OnTick(float deltaTime)
+     {
+         _dispatcher?.Drain();
++        if (_enableOnStartupPending && _api?.PlayerReadyFired == true)
++        {
++            _enableOnStartupPending = false;
++            Enable();
++        }
+         _engine?.Tick();
+         _hud?.SetState(_enabled, _engine?.IsActive == true, _config.GrantMutationOnEnable);
+     }
+@@ -61,6 +68,7 @@
+ 
+     private void Toggle()
+     {
++        _enableOnStartupPending = false;
+         if (_enabled)
+         {
+             Disable("toggle");
+@@ -109,6 +117,7 @@
+ 
+     private void Kill()
+     {
++        _enableOnStartupPending = false;
+         _engine?.CancelAll();
+         _game?.ReleaseOwnedControls();
+         _game?.Audit("kill_switch", new { active = _engine?.IsActive == true });
+@@ -116,6 +125,7 @@
+ 
+     private void Disable(string reason)
+     {
++        _enableOnStartupPending = false;
+         if (!_enabled)
+         {
+             return;
+diff --git a/mods-dll/agentcontrol/ExecutionModel.cs b/mods-dll/agentcontrol/ExecutionModel.cs
+--- a/mods-dll/agentcontrol/ExecutionModel.cs
++++ b/mods-dll/agentcontrol/ExecutionModel.cs
+@@ -193,6 +193,14 @@
+     private void Finish(string status, string? error = null)
+     {
+         var active = _active!;
++        try
++        {
++            active.Cancellation.Cancel();
++        }
++        catch (AggregateException)
++        {
++            // Extension cancellation callbacks must not discard the terminal receipt or control cleanup.
++        }
+         _game.ReleaseOwnedControls();
+         _steps?.Dispose();
+         _steps = null;
+@@ -212,7 +220,6 @@
+         }
+ 
+         _disposed = true;
+-        _active?.Cancellation.Cancel();
+         if (_active is not null)
+         {
+             Finish("cancelled", "Controller disposed.");
+diff --git a/mods-dll/agentcontrol/README.md b/mods-dll/agentcontrol/README.md
+--- a/mods-dll/agentcontrol/README.md
++++ b/mods-dll/agentcontrol/README.md
+@@ -10,10 +10,14 @@
+ 
+ The controller starts disabled. Press `Ctrl+Alt+F8` in game to create a session and show the persistent HUD. Press `Ctrl+Alt+F9` to cancel the active execution and release every control asserted by Agent Control. Toggling it off also revokes the in-memory session secret and stops the pipe.
+ 
++For an owner-authorized disposable profile, set `EnableOnStartup` to `true` in that profile's `ModConfig/agentcontrol.json`. This defaults to `false` and enables once after the local player is ready. A manual toggle, kill, or disable cancels the pending enable; disabling an active session never causes an automatic retry. Keep this option off in other profiles.
++
+ The pipe uses Windows current-user access and each non-hello request requires the random session secret returned by `hello`. The CLI keeps this secret in memory and redacts it from output. Mutations are granted per enabled session by `GrantMutationOnEnable`; sending chat or a command is written to the Vintage Story audit log with redacted content by default.
+ 
+ ## Extensions
+ 
+ Client mods reference `agentcontrol.abstractions.dll`, depend on `agentcontrol`, retrieve `IAgentExtensionRegistry` from `api.ObjectCache["agentcontrol:registry"]`, and register a synchronous delegate. Registration and execution happen on the game thread. Restart the client after changing extension assemblies.
+ 
++An extension's cancellation token is canceled when its owning execution ends, including completion. Keep the execution alive while queued render work is pending.
++
+ See `agentcontrol.sample` for a complete `selection.describe` operation.
+diff --git a/mods-dll/agentcontrol/RUNBOOK.md b/mods-dll/agentcontrol/RUNBOOK.md
+--- a/mods-dll/agentcontrol/RUNBOOK.md
++++ b/mods-dll/agentcontrol/RUNBOOK.md
+@@ -21,6 +21,7 @@
+ 
+ 1. Join only the disposable Profile2 test world.
+ 2. Press `Ctrl+Alt+F8`. Confirm the `AGENT CONTROL: READY` HUD and mutation-grant status.
++   For unattended Profile2 QA, set `EnableOnStartup` to `true` only in Profile2's `ModConfig/agentcontrol.json` before launching. The session starts once the player is ready, without the hotkey. The same HUD, mutation grant, session secret, and kill switch apply. Remove the option or set it to `false` to restore manual enable.
+ 3. Run:
+ 
+ ```powershell
+diff --git a/mods-dll/agentcontrol.Tests/ExecutionEngineTests.cs b/mods-dll/agentcontrol.Tests/ExecutionEngineTests.cs
+--- a/mods-dll/agentcontrol.Tests/ExecutionEngineTests.cs
++++ b/mods-dll/agentcontrol.Tests/ExecutionEngineTests.cs
+@@ -171,6 +171,39 @@
+         }
+     }
+ 
++    [Theory]
++    [InlineData("completed", false)]
++    [InlineData("failed", false)]
++    [InlineData("timed_out", false)]
++    [InlineData("cancelled", false)]
++    [InlineData("completed", true)]
++    public async Task TerminalExecution_CancelsExtensionOwnerWithoutLosingItsReceipt(string status, bool throwOnCancellation)
++    {
++        var clock = new FakeClock();
++        var game = new FakeGame { ThrowOnExtensionCancellation = throwOnCancellation };
++        using var engine = Create(game, clock);
++        const string extension = """{"type":"extension.invoke","operation":"capture.queue"}""";
++        var execution = engine.Enqueue("extension-owner", status == "failed"
++            ? Actions(extension, """{"type":"unknown"}""")
++            : Actions(extension));
++
++        engine.Tick();
++        game.ExtensionCancellation.CanBeCanceled.Should().BeTrue();
++        game.ExtensionCancellation.IsCancellationRequested.Should().BeFalse();
++        if (status == "timed_out") clock.Advance(30_001);
++        if (status == "cancelled") engine.Cancel("extension-owner").Should().BeTrue();
++        engine.Tick();
++
++        var receipt = await execution;
++        receipt.Status.Should().Be(status);
++        game.ExtensionCancellation.IsCancellationRequested.Should().BeTrue();
++        engine.IsActive.Should().BeFalse();
++        game.ReleaseCalls.Should().BeGreaterThan(0);
++        if (status == "failed") receipt.Error.Should().Contain("Unknown action type");
++        if (status == "timed_out") receipt.Error.Should().Contain("Batch deadline exceeded");
++        if (status == "completed") receipt.Error.Should().BeNull();
++    }
++
+     private static ExecutionEngine Create(
+         FakeGame game,
+         FakeClock clock,
+@@ -208,6 +241,8 @@
+     public int SelectedSlot { get; private set; } = -1;
+     public int ReleaseCalls { get; private set; }
+     public List<(string Event, object Details)> AuditEvents { get; } = [];
++    public CancellationToken ExtensionCancellation { get; private set; }
++    public bool ThrowOnExtensionCancellation { get; init; }
+ 
+     public object Observe() => new { connected = true };
+     public void SetLook(float yaw, float pitch) { }
+@@ -223,7 +258,12 @@
+     public void SelectSlot(int slot) => SelectedSlot = slot;
+     public void Send(string text) { }
+     public bool Evaluate(JsonElement condition) => true;
+-    public ValueTask<JsonElement> InvokeExtension(string operation, string callId, JsonElement arguments, CancellationToken cancellationToken) =>
+-        ValueTask.FromResult(JsonSerializer.SerializeToElement(new { operation }));
++    public ValueTask<JsonElement> InvokeExtension(string operation, string callId, JsonElement arguments, CancellationToken cancellationToken)
++    {
++        ExtensionCancellation = cancellationToken;
++        if (ThrowOnExtensionCancellation)
++            cancellationToken.Register(() => throw new InvalidOperationException("Extension cancellation callback failed."));
++        return ValueTask.FromResult(JsonSerializer.SerializeToElement(new { operation }));
++    }
+     public void Audit(string eventName, object details) => AuditEvents.Add((eventName, details));
+ }
+diff --git a/mods-dll/agentcontrol.Tests/StartupEnableTests.cs b/mods-dll/agentcontrol.Tests/StartupEnableTests.cs
+new file mode 100644
+--- /dev/null
++++ b/mods-dll/agentcontrol.Tests/StartupEnableTests.cs
+@@ -0,0 +1,89 @@
++using System.Reflection;
++using FluentAssertions;
++using Vintagestory.API.Client;
++
++namespace AgentControl.Tests;
++
++public sealed class StartupEnableTests
++{
++    [Fact]
++    public async Task StartupEnable_WaitsForReadinessAndCannotUndoCancellationOrDisable()
++    {
++        new AgentControlConfig().EnableOnStartup.Should().BeFalse();
++        var api = DispatchProxy.Create<ICoreClientAPI, ReadinessApi>();
++        var readiness = (ReadinessApi)(object)api;
++        var mod = new AgentControlModSystem();
++        var dispatcher = new GameThreadDispatcher();
++        Set(mod, "_api", api);
++        Set(mod, "_dispatcher", dispatcher);
++        Set(mod, "_config", new AgentControlConfig { EnableOnStartup = true, PipeName = $"agentcontrol-startup-{Guid.NewGuid():n}" });
++        Set(mod, "_enableOnStartupPending", true);
++        try
++        {
++            Call(mod, "OnTick", 0f);
++            Get<bool>(mod, "_enabled").Should().BeFalse();
++            Get<bool>(mod, "_enableOnStartupPending").Should().BeTrue();
++
++            readiness.Ready = true;
++            Call(mod, "OnTick", 0f);
++            Get<bool>(mod, "_enabled").Should().BeTrue();
++            Get<bool>(mod, "_enableOnStartupPending").Should().BeFalse();
++            readiness.Messages.Should().HaveCount(1);
++
++            var shutdown = (Task<RpcResponse>)Call(mod, "Shutdown", "shutdown")!;
++            Call(mod, "OnTick", 0f);
++            (await shutdown).Ok.Should().BeTrue();
++            Call(mod, "OnTick", 0f);
++            Get<bool>(mod, "_enabled").Should().BeFalse();
++            readiness.Messages.Should().HaveCount(1);
++
++            Call(mod, "Toggle");
++            Call(mod, "Toggle");
++            Call(mod, "OnTick", 0f);
++            Get<bool>(mod, "_enabled").Should().BeFalse();
++            readiness.Messages.Should().HaveCount(2);
++
++            foreach (var cancellation in new[] { "Kill", "Disable" })
++            {
++                readiness.Ready = false;
++                Set(mod, "_enableOnStartupPending", true);
++                if (cancellation == "Disable") Call(mod, cancellation, "pipe_failed");
++                else Call(mod, cancellation);
++                readiness.Ready = true;
++                Call(mod, "OnTick", 0f);
++                Get<bool>(mod, "_enabled").Should().BeFalse();
++                Get<bool>(mod, "_enableOnStartupPending").Should().BeFalse();
++            }
++        }
++        finally
++        {
++            Call(mod, "Disable", "test_cleanup");
++            dispatcher.Shutdown();
++        }
++    }
++
++    private static FieldInfo Field(string name) =>
++        typeof(AgentControlModSystem).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!;
++
++    private static void Set(AgentControlModSystem mod, string name, object value) => Field(name).SetValue(mod, value);
++    private static T Get<T>(AgentControlModSystem mod, string name) => (T)Field(name).GetValue(mod)!;
++    private static object? Call(AgentControlModSystem mod, string name, params object[] args) =>
++        typeof(AgentControlModSystem).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(mod, args);
++
++    public class ReadinessApi : DispatchProxy
++    {
++        public bool Ready { get; set; }
++        public List<string> Messages { get; } = [];
++
++        protected override object? Invoke(MethodInfo? method, object?[]? args)
++        {
++            if (method?.Name == "get_PlayerReadyFired") return Ready;
++            if (method?.Name == "ShowChatMessage")
++            {
++                Messages.Add((string)args![0]!);
++                return null;
++            }
++            throw new NotSupportedException(method?.Name);
++        }
++    }
++}

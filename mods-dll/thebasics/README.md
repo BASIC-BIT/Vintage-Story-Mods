@@ -56,6 +56,8 @@ The RP Proximity Chat System is a feature-rich chat system designed for role-pla
 
 The system is highly configurable through the mod's configuration file. You can adjust the talking ranges, enable or disable features, and customize message formatting.
 
+In `/basic config`, **Search settings** opens a read-only search across setting names, JSON keys, descriptions, categories, and current values. Separate words must all match, regardless of case. Language definitions and character-sheet field definitions are included. Click a result title to open the corresponding editor and focus its control. Settings use your current draft values and mark unsaved changes. The search query stays selected when reopened within the same configuration session and clears when you close the configuration menu. Settings scroll while navigation and Save remain visible.
+
 Version 5.5.0 makes the default generated config more feature-forward for RP servers: proximity chat opens by default, global OOC is enabled, server save completion announcements are enabled, chatter sounds are enabled, and LOS-gated nametags/sign language are enabled. Existing explicit config values are respected, so review `ModConfig/the_basics.json` after upgrading if you want quieter or more conservative defaults.
 
 TPA is also enabled and usable by default in 5.5.0 via `TpaRequestPrivilege=chat`, while `TpaRequireTemporalGear=true` keeps teleport requests from becoming free fast travel.

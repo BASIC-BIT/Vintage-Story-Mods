@@ -20,10 +20,12 @@ internal static class SceneTitleIcons
         .Where(name => SceneDescriptionData.NormalizeIconName(name).Length > 0)
         .Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
 
-    /// <summary><paramref name="color"/> tints the icon from the marker palette; null keeps the white catalog look.
+    /// <summary><paramref name="color"/> tints the icon from the marker palette; null keeps the white catalog look.</summary>
     internal static bool Draw(ICoreClientAPI api, Context ctx, ImageSurface surface, string name, SceneMarkerColor? color = null)
+        => Draw(api, ctx, surface, name, color.HasValue ? SceneMarkerVisuals.Palette(color.Value) : (R: 1.0, G: 1.0, B: 1.0));
+
+    internal static bool Draw(ICoreClientAPI api, Context ctx, ImageSurface surface, string name, (double R, double G, double B) rgb)
     {
-        var rgb = color.HasValue ? SceneMarkerVisuals.Palette(color.Value) : (R: 1.0, G: 1.0, B: 1.0);
         try
         {
             if (name.StartsWith("svg:", StringComparison.Ordinal))

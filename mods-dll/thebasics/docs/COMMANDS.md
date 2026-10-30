@@ -42,6 +42,7 @@ New guide/help strings in non-English locale files intentionally use English fal
 
 ## Server Operator Commands
 
+- `/thebasics setup`, `/basic setup`, `/tb setup` - Open guided setup for chat, teleportation, and notifications. Requires root privilege. Changes remain in a draft until saved; the finish screen explains any required restart.
 - `/thebasics config`, `/basic config`, `/tb config` - Open the admin config panel.
 - `/thebasics config languages` - Open the language definition editor.
 - `/thebasics config charsheetfields` - Open the character sheet field editor.

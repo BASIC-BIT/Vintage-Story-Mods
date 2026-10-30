@@ -216,7 +216,7 @@ public static class SpeechBubbleVtmlPatches
         return capi.Gui.TextTexture.GenTextTexture(plain, baseFont, BubbleMaxTextWidthPx, background, EnumTextOrientation.Center);
     }
 
-    private static CairoFont CreateBubbleFont(string mode)
+    internal static CairoFont CreateBubbleFont(string mode)
     {
         var fontSize = 25.0 * GetFontSizeMultiplier(mode);
         return new CairoFont(fontSize, GuiStyle.StandardFontName, GetBubbleFontColor())
@@ -236,7 +236,7 @@ public static class SpeechBubbleVtmlPatches
         };
     }
 
-    private static TextBackground GetBubbleBackground(string kind)
+    internal static TextBackground GetBubbleBackground(string kind)
     {
         // Default (speech)
         var bg = new TextBackground
@@ -274,10 +274,13 @@ public static class SpeechBubbleVtmlPatches
 
     internal static long CalculateReceivedTimeForMinimumDuration(long nowMs, int messageLength, int minimumDurationMs)
     {
-        var vanillaDurationMs = 3500 + 100 * (messageLength - 10);
-        var effectiveDurationMs = Math.Max(vanillaDurationMs, Math.Max(0, minimumDurationMs));
+        var vanillaDurationMs = EffectiveDurationMilliseconds(messageLength, 0);
+        var effectiveDurationMs = EffectiveDurationMilliseconds(messageLength, minimumDurationMs);
         return nowMs - vanillaDurationMs + effectiveDurationMs;
     }
+
+    internal static int EffectiveDurationMilliseconds(int messageLength, int minimumDurationMs) =>
+        Math.Max(3500 + 100 * (messageLength - 10), Math.Max(0, minimumDurationMs));
 
     /// <summary>
     /// Extracts a marker value from a key segment string.

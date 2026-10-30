@@ -236,14 +236,14 @@ public static class EntityBehaviorNameTagPatches
         });
     }
 
-    private static CairoFont CreateNametagBaseFont()
+    internal static CairoFont CreateNametagBaseFont()
     {
         var baseFont = CairoFont.WhiteMediumText().WithColor(ColorUtil.WhiteArgbDouble);
         baseFont.Orientation = EnumTextOrientation.Left;
         return baseFont;
     }
 
-    private static TextBackground CreateNametagBackground(double[] backgroundColor, double[] borderColor)
+    internal static TextBackground CreateNametagBackground(double[] backgroundColor, double[] borderColor)
     {
         return new TextBackground
         {

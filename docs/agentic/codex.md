@@ -19,6 +19,7 @@ Current wrappers:
 - `human-qa`
 - `moddb-release-playwright`
 - `rp-culture`
+- `vintage-story-agent-control`
 - `vintage-story-ci-dependencies`
 - `vintage-story-workspace`
 
