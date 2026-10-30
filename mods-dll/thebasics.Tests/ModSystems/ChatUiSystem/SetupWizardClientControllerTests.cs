@@ -299,6 +299,72 @@ public class SetupWizardClientControllerTests
         sent.Last(request => request.Kind == SetupWizardRequestKind.Save).Languages[0].OriginalName.Should().Be("Coastal");
     }
     [VisualTheory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    public void AmbiguousLanguageReadbackRetainsDraftAndExplainsDiscardRecovery(double scale)
+    {
+        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
+            Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
+        var api = Substitute.For<ICoreClientAPI>();
+        var timeouts = new List<Action<float>>();
+        api.Event.RegisterCallback(Arg.Do<Action<float>>(callback => timeouts.Add(callback)), 30000);
+        var channel = Substitute.For<IClientNetworkChannel>();
+        channel.Connected.Returns(true);
+        var sent = new List<TheBasicsSetupWizardRequestMessage>();
+        channel.When(value => value.SendPacket(Arg.Any<TheBasicsSetupWizardRequestMessage>()))
+            .Do(call => sent.Add(call.Arg<TheBasicsSetupWizardRequestMessage>()));
+        using var safe = new SafeClientNetworkChannel(channel, api, new() { EnableDebugLogging = false });
+        using var controller = new SetupWizardClientController(api, safe);
+        var config = new ModConfig();
+        config.InitializeDefaultsIfNeeded();
+        var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues(),
+            LanguageConfigAdmin.BuildEntries(config), CharacterSheetFieldConfigAdmin.BuildEntries(config));
+        var originalName = draft.Languages[0].OriginalName;
+        draft.Languages[0].Name = "Coastal";
+        var dialog = new SetupWizardDialog(host.Api, draft, "run", true, null!, null!, null!, layoutOnly: true, actorFactory: host.CreateGuide);
+        typeof(SetupWizardClientController).GetProperty(nameof(SetupWizardClientController.CurrentDialog))!.SetValue(controller, dialog);
+        typeof(SetupWizardClientController).GetField("_runId", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(controller, "run");
+        var save = typeof(SetupWizardClientController).GetMethod("Save", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        dialog.ShowPage("review");
+        save.Invoke(controller, null);
+        var request = sent.Single(value => value.Kind == SetupWizardRequestKind.Save);
+        LanguageConfigAdmin.TryApplyEntries(config, request.Languages, out _).Should().BeTrue();
+        config.Languages[0] = config.Languages[0] with { Description = "Another administrator changed this after the save." };
+        draft.Languages[0].Name = "Mountain";
+        timeouts[0](30);
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var open = sent.Last(value => value.Kind == SetupWizardRequestKind.Open);
+            controller.HandleResult(new()
+            {
+                Kind = SetupWizardResultKind.Open,
+                RequestId = open.RequestId,
+                RunId = "readback-run",
+                Success = true,
+                Values = SetupWizardCaptureScenes.DefaultValues(),
+                Languages = LanguageConfigAdmin.BuildEntries(config),
+                SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(config)
+            });
+
+            controller.CurrentDialog.Should().BeSameAs(dialog);
+            draft.HasUnconfirmedSave.Should().BeTrue();
+            draft.Languages[0].Name.Should().Be("Mountain");
+            draft.Languages[0].OriginalName.Should().Be(originalName);
+            dialog.ShowPage("review");
+            dialog.SingleComposer.GetButton("review").Enabled.Should().BeFalse();
+            host.RenderGuiDialog(dialog, 0);
+            var message = dialog.SingleComposer.GetRichtext("setup-message");
+            string.Concat(message.Components.OfType<RichTextComponent>().Select(component => component.DisplayText))
+                .Should().Contain("Could not confirm").And.Contain("discard this draft").And.Contain("/basic setup");
+            (message.Bounds.renderY + message.TotalHeight).Should().BeLessThanOrEqualTo(dialog.SingleComposer.GetButton("close").Bounds.renderY);
+            save.Invoke(controller, null);
+            sent.Count(value => value.Kind == SetupWizardRequestKind.Save).Should().Be(1);
+            if (attempt == 0) controller.Open();
+        }
+    }
+
+    [VisualTheory]
     [InlineData(true, true)]
     [InlineData(false, true)]
     [InlineData(true, false)]

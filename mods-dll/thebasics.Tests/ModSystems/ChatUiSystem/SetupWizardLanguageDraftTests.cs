@@ -7,6 +7,101 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 
 public class SetupWizardLanguageDraftTests
 {
+    [Fact]
+    public void TimedOutAppliedNameSwapWithForeignEditCannotRetryAnUnconfirmedRename()
+    {
+        var current = CurrentConfig(Row());
+        Assert.True(LanguageConfigAdmin.TryApplyEntries(current,
+            [Row(), Row() with { Name = "Coastal", OriginalName = "Coastal", Prefix = "coastal" }], out _));
+        var draft = new SetupWizardDraft([new() { Key = "EnableGlobalOOC", Value = "1" }], LanguageConfigAdmin.BuildEntries(current));
+        draft.Set("EnableGlobalOOC", "0");
+        draft.Languages[0].Name = "Coastal";
+        draft.Languages[1].Name = "Harbor";
+        var submitted = draft.CreateSaveRequest(1, "run");
+        Assert.True(LanguageConfigAdmin.TryApplyEntries(current, submitted.Languages, out _));
+        var foreignEdit = LanguageConfigAdmin.BuildEntries(current);
+        foreignEdit[0].Color = "#112233";
+        Assert.True(LanguageConfigAdmin.TryApplyEntries(current, foreignEdit, out _));
+        draft.MarkSaveTimedOut();
+
+        Assert.False(draft.MergeSaveReadback(new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open,
+            RequestId = 2,
+            RunId = "run",
+            Success = true,
+            Values = [new() { Key = "EnableGlobalOOC", Value = "0" }],
+            Languages = LanguageConfigAdmin.BuildEntries(current)
+        }));
+
+        Assert.True(draft.HasUnconfirmedSave);
+        Assert.Equal("1", draft.GetOriginal("EnableGlobalOOC"));
+        Assert.Equal("Harbor", draft.OriginalLanguages[0].Name);
+        Assert.Equal("Harbor", draft.Languages[0].OriginalName);
+        Assert.Throws<InvalidOperationException>(() => draft.CreateSaveRequest(3, "run"));
+    }
+
+    [Fact]
+    public void TimedOutAppliedNameSwapRebasesIdentitiesAndKeepsNewerEdits()
+    {
+        var current = CurrentConfig(Row());
+        Assert.True(LanguageConfigAdmin.TryApplyEntries(current,
+            [Row(), Row() with { Name = "Coastal", OriginalName = "Coastal", Prefix = "coastal" }], out _));
+        var draft = new SetupWizardDraft([], LanguageConfigAdmin.BuildEntries(current));
+        draft.Languages[0].Name = "Coastal";
+        draft.Languages[1].Name = "Harbor";
+        var submitted = draft.CreateSaveRequest(1, "run");
+        Assert.True(LanguageConfigAdmin.TryApplyEntries(current, submitted.Languages, out _));
+        draft.Languages[0].Color = "#112233";
+        draft.MarkSaveTimedOut();
+
+        Assert.True(draft.MergeSaveReadback(new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open,
+            RequestId = 2,
+            RunId = "run",
+            Success = true,
+            Languages = LanguageConfigAdmin.BuildEntries(current)
+        }));
+
+        Assert.Equal("Coastal", draft.Languages[0].OriginalName);
+        Assert.Equal("Harbor", draft.Languages[1].OriginalName);
+        Assert.Equal("#112233", draft.Languages[0].Color);
+        var retry = draft.CreateSaveRequest(3, "run");
+        Assert.Empty(LanguageConfigAdmin.BuildRenameMap(retry.Languages));
+        Assert.True(new SetupWizardState(current).TryValidatePatch(current, retry,
+            out var next, out _, out _, out var errors), string.Join("; ", errors));
+        Assert.Equal("#112233", next.Languages[0].Color);
+    }
+
+    [Fact]
+    public void TimedOutUnappliedNameSwapPreservesOriginalLanguageIdentities()
+    {
+        var current = CurrentConfig(Row());
+        Assert.True(LanguageConfigAdmin.TryApplyEntries(current,
+            [Row(), Row() with { Name = "Coastal", OriginalName = "Coastal", Prefix = "coastal" }], out _));
+        var unchanged = LanguageConfigAdmin.BuildEntries(current);
+        var draft = new SetupWizardDraft([], unchanged);
+        draft.Languages[0].Name = "Coastal";
+        draft.Languages[1].Name = "Harbor";
+        draft.CreateSaveRequest(1, "run");
+        draft.MarkSaveTimedOut();
+
+        Assert.True(draft.MergeSaveReadback(new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open,
+            RequestId = 2,
+            RunId = "run",
+            Success = true,
+            Languages = unchanged
+        }));
+
+        var retry = draft.CreateSaveRequest(3, "run");
+        var renames = LanguageConfigAdmin.BuildRenameMap(retry.Languages);
+        Assert.Equal("Coastal", renames.GetValueOrDefault("Harbor"));
+        Assert.Equal("Harbor", renames.GetValueOrDefault("Coastal"));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

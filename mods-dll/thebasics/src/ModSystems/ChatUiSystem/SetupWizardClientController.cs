@@ -144,8 +144,10 @@ public sealed class SetupWizardClientController : IDisposable
             CurrentDialog.Draft.CancelRequest();
             try
             {
-                if (CurrentDialog.Draft.MergeSaveReadback(result))
-                    CurrentDialog.SetRequestFailure("Save status checked. Any remaining changes are still in your draft.");
+                if (CurrentDialog.Draft.HasUnconfirmedSave)
+                    CurrentDialog.SetRequestFailure(CurrentDialog.Draft.MergeSaveReadback(result)
+                        ? "Save status checked. Any remaining changes are still in your draft."
+                        : "Could not confirm the save. Close and discard this draft, then reopen with /basic setup.");
                 CurrentDialog.SetSession(result);
                 NavigateDestination();
                 CurrentDialog.TryOpen();
