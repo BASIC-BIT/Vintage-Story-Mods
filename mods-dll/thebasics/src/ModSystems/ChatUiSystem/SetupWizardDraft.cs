@@ -210,18 +210,7 @@ public sealed class SetupWizardDraft
                 _values[key] = value.Value ?? string.Empty;
             _originals[key] = value.Value ?? string.Empty;
         }
-        if (result.Languages?.Count > 0)
-        {
-            var normalized = new thebasics.Configs.ModConfig();
-            var matchesSubmitted = LanguageConfigAdmin.TryApplyEntries(normalized, _unconfirmedLanguages, out _) &&
-                LanguageConfigAdmin.EntriesEqual(LanguageConfigAdmin.BuildEntries(normalized), result.Languages);
-            if (LanguageConfigAdmin.EntriesEqual(Languages, _unconfirmedLanguages) &&
-                (_unconfirmedLanguageNames == null || matchesSubmitted))
-                Languages = LanguageConfigAdmin.CloneEntries(result.Languages);
-            else if (_unconfirmedLanguageNames != null)
-                LanguageConfigDialog.RebaseSavedNames(Languages, _unconfirmedLanguageNames, result.Languages);
-            _originalLanguages = LanguageConfigAdmin.CloneEntries(result.Languages);
-        }
+        MergeLanguageReadback(result.Languages);
         var normalizedFields = new thebasics.Configs.ModConfig();
         var fieldsMatch = CharacterSheetFieldConfigAdmin.TryApplyEntries(normalizedFields, SetupWizardState.NormalizeSheetDraft(_unconfirmedSheetFields), out _) &&
             CharacterSheetFieldConfigAdmin.EntriesEqual(CharacterSheetFieldConfigAdmin.BuildEntries(normalizedFields), result.SheetFields);
@@ -231,6 +220,22 @@ public sealed class SetupWizardDraft
         _unconfirmedLanguages = null;
         _unconfirmedLanguageNames = null;
         return true;
+    }
+
+    private void MergeLanguageReadback(List<LanguageConfigEntryMessage> languages)
+    {
+        if (languages?.Count > 0)
+        {
+            var normalized = new thebasics.Configs.ModConfig();
+            var matchesSubmitted = LanguageConfigAdmin.TryApplyEntries(normalized, _unconfirmedLanguages, out _) &&
+                LanguageConfigAdmin.EntriesEqual(LanguageConfigAdmin.BuildEntries(normalized), languages);
+            if (LanguageConfigAdmin.EntriesEqual(Languages, _unconfirmedLanguages) &&
+                (_unconfirmedLanguageNames == null || matchesSubmitted))
+                Languages = LanguageConfigAdmin.CloneEntries(languages);
+            else if (_unconfirmedLanguageNames != null)
+                LanguageConfigDialog.RebaseSavedNames(Languages, _unconfirmedLanguageNames, languages);
+            _originalLanguages = LanguageConfigAdmin.CloneEntries(languages);
+        }
     }
 
     private void MergeSheetSnapshot(List<CharacterSheetFieldConfigEntryMessage> saved,

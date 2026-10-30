@@ -55,33 +55,8 @@ public sealed class SetupWizardState
         }
 
         errors.AddRange(ConfigAdminSaveWorkflow.ApplyValues(candidate, request.Values));
-        if (languagesEdited)
-        {
-            var originalNames = currentLanguages.Select(entry => entry.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var submittedOriginals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in request.Languages.Where(entry => !string.IsNullOrWhiteSpace(entry.OriginalName)))
-            {
-                if (!originalNames.Contains(entry.OriginalName) || !submittedOriginals.Add(entry.OriginalName))
-                    errors.Add("A language's original name is missing or duplicated. Reopen setup and try again.");
-            }
-            errors.AddRange(LanguageConfigAdmin.ValidateEntries(request.Languages, out var languages));
-            if (!LanguageConfigAdmin.EntriesEqual(currentLanguages, request.Languages)) candidate.Languages = languages;
-        }
-        if (fieldsEdited)
-        {
-            var existingIds = currentFields.Select(entry => entry.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var claimedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in request.SheetFields)
-            {
-                var originalId = entry.OriginalId?.Trim() ?? string.Empty;
-                if (originalId.Length > 0 && (!existingIds.Contains(originalId) || !claimedIds.Add(originalId)))
-                    errors.Add("A character sheet field's original key is missing or duplicated. Reopen setup and try again.");
-                if (originalId.Length == 0 && existingIds.Contains(entry.Id?.Trim() ?? string.Empty))
-                    errors.Add("An existing character sheet field must retain its original key.");
-            }
-            errors.AddRange(CharacterSheetFieldConfigAdmin.ValidateEntries(NormalizeSheetDraft(request.SheetFields), out var fields));
-            candidate.CharacterSheetFields = fields;
-        }
+        if (languagesEdited) ApplyLanguagePatch(candidate, currentLanguages, request.Languages, errors);
+        if (fieldsEdited) ApplySheetPatch(candidate, currentFields, request.SheetFields, errors);
         if (errors.Count == 0) errors.AddRange(ConfigAdminSettingRegistry.ValidateConfig(candidate));
         if (errors.Count > 0) return false;
 
@@ -109,21 +84,74 @@ public sealed class SetupWizardState
     {
         var errors = new List<string>();
         if (request == null) return new[] { "Missing setup request." };
+        ValidateRequestHeader(request, errors);
+
+        var values = ValidateValues(request.Values, "values", errors);
+        var originals = ValidateValues(request.OriginalValues, "original values", errors);
+        ValidateLanguageSnapshots(request, errors);
+        errors.AddRange(ValidateSheetSnapshots(request.SheetFields, request.OriginalSheetFields));
+        if (errors.Count == 0 && request.Kind == SetupWizardRequestKind.Save) errors.AddRange(ValidateSheetChoices(request.SheetFields));
+        ValidateRequestContent(request, values, originals, errors);
+        return errors;
+    }
+
+    private static void ApplyLanguagePatch(ModConfig candidate, List<LanguageConfigEntryMessage> currentLanguages,
+        List<LanguageConfigEntryMessage> entries, List<string> errors)
+    {
+        var originalNames = currentLanguages.Select(entry => entry.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var submittedOriginals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in entries.Where(entry => !string.IsNullOrWhiteSpace(entry.OriginalName)))
+        {
+            if (!originalNames.Contains(entry.OriginalName) || !submittedOriginals.Add(entry.OriginalName))
+                errors.Add("A language's original name is missing or duplicated. Reopen setup and try again.");
+        }
+        errors.AddRange(LanguageConfigAdmin.ValidateEntries(entries, out var languages));
+        if (!LanguageConfigAdmin.EntriesEqual(currentLanguages, entries)) candidate.Languages = languages;
+    }
+
+    private static void ApplySheetPatch(ModConfig candidate, List<CharacterSheetFieldConfigEntryMessage> currentFields,
+        List<CharacterSheetFieldConfigEntryMessage> entries, List<string> errors)
+    {
+        var existingIds = currentFields.Select(entry => entry.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var claimedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in entries)
+        {
+            var originalId = entry.OriginalId?.Trim() ?? string.Empty;
+            if (originalId.Length > 0 && (!existingIds.Contains(originalId) || !claimedIds.Add(originalId)))
+                errors.Add("A character sheet field's original key is missing or duplicated. Reopen setup and try again.");
+            if (originalId.Length == 0 && existingIds.Contains(entry.Id?.Trim() ?? string.Empty))
+                errors.Add("An existing character sheet field must retain its original key.");
+        }
+        errors.AddRange(CharacterSheetFieldConfigAdmin.ValidateEntries(NormalizeSheetDraft(entries), out var fields));
+        candidate.CharacterSheetFields = fields;
+    }
+
+    private static void ValidateRequestHeader(TheBasicsSetupWizardRequestMessage request, List<string> errors)
+    {
         if ((request.Destination?.Length ?? 0) > 64) errors.Add("Setup destination is too long.");
         if (!Enum.IsDefined(request.Kind)) errors.Add("Unknown setup request kind.");
         if (request.CaptureOnly && request.Kind != SetupWizardRequestKind.Open) errors.Add("Only open requests may use QA capture mode.");
         if (request.RequestId < 0 || request.Kind == SetupWizardRequestKind.Save && request.RequestId == 0) errors.Add("Invalid setup request ID.");
+        ValidateJourneyFields(request, errors);
+    }
+
+    private static void ValidateJourneyFields(TheBasicsSetupWizardRequestMessage request, List<string> errors)
+    {
         if ((request.RunId?.Length ?? 0) > 64 || (request.RunId?.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_') ?? false)) errors.Add("Invalid setup run ID.");
         if ((request.StepId?.Length ?? 0) > 64 || (request.ChoiceId?.Length ?? 0) > 64 || (request.JourneyAction?.Length ?? 0) > 64) errors.Add("Setup journey fields are too long.");
+    }
 
-        var values = ValidateValues(request.Values, "values", errors);
-        var originals = ValidateValues(request.OriginalValues, "original values", errors);
+    private static void ValidateLanguageSnapshots(TheBasicsSetupWizardRequestMessage request, List<string> errors)
+    {
         var languagePayloadLength = 0;
         ValidateLanguages(request.Languages, "languages", errors, ref languagePayloadLength);
         ValidateLanguages(request.OriginalLanguages, "original languages", errors, ref languagePayloadLength);
         if (languagePayloadLength > MaxLanguagePayloadLength) errors.Add("Setup language payload is too long.");
-        errors.AddRange(ValidateSheetSnapshots(request.SheetFields, request.OriginalSheetFields));
-        if (errors.Count == 0 && request.Kind == SetupWizardRequestKind.Save) errors.AddRange(ValidateSheetChoices(request.SheetFields));
+    }
+
+    private static void ValidateRequestContent(TheBasicsSetupWizardRequestMessage request, HashSet<string> values,
+        HashSet<string> originals, List<string> errors)
+    {
         if (request.Kind != SetupWizardRequestKind.Save && ((request.SheetFields?.Count ?? 0) > 0 || (request.OriginalSheetFields?.Count ?? 0) > 0))
             errors.Add("Only save requests may contain character sheet fields.");
         if (request.Kind == SetupWizardRequestKind.Save)
@@ -135,7 +163,6 @@ public sealed class SetupWizardState
             errors.Add("Only save requests may contain language values.");
         if (request.Kind == SetupWizardRequestKind.Track &&
             !AnalyticsService.IsValidSetupWizardJourney(request.RunId, 1, request.StepId, request.JourneyAction, request.ChoiceId)) errors.Add("Unknown setup journey step, action, or choice.");
-        return errors;
     }
 
     // Inactive editor height stays in the local draft; persisted non-long-text fields use zero rows.

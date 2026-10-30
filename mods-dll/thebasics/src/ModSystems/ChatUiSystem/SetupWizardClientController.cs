@@ -86,6 +86,18 @@ public sealed class SetupWizardClientController : IDisposable
         }
         if (!_requests.Accept(result.RequestId)) return;
         _opening = false;
+        if (TryHandleMaintenanceResult(result)) return;
+        if (result.Kind == SetupWizardResultKind.Denied || !result.Success)
+        {
+            HandleRequestFailure(result);
+            return;
+        }
+        if (result.Kind != SetupWizardResultKind.Open) return;
+        HandleOpenResult(result);
+    }
+
+    private bool TryHandleMaintenanceResult(TheBasicsSetupWizardResultMessage result)
+    {
         if (_maintenance.HasValue)
         {
             var action = _maintenance.Value;
@@ -99,26 +111,30 @@ public sealed class SetupWizardClientController : IDisposable
                 }
                 CurrentDialog.SetRequestFailure(result.Message ?? "This action is unavailable. Your edits are still here.");
                 CurrentDialog.TryOpen();
-                return;
+                return true;
             }
         }
-        if (result.Kind == SetupWizardResultKind.Denied || !result.Success)
+        return false;
+    }
+
+    private void HandleRequestFailure(TheBasicsSetupWizardResultMessage result)
+    {
+        _captureRequested = false;
+        if (CurrentDialog != null)
         {
-            _captureRequested = false;
-            if (CurrentDialog != null)
+            CurrentDialog.SetRequestFailure(result.Message);
+            if (result.Kind == SetupWizardResultKind.Denied)
             {
-                CurrentDialog.SetRequestFailure(result.Message);
-                if (result.Kind == SetupWizardResultKind.Denied)
-                {
-                    _authorized = false;
-                    CurrentDialog.Suspend();
-                    _api.ShowChatMessage(result.Message ?? "You no longer have permission to change these settings. Your edits are still here. Reopen with /basic setup when you have access again.");
-                }
+                _authorized = false;
+                CurrentDialog.Suspend();
+                _api.ShowChatMessage(result.Message ?? "You no longer have permission to change these settings. Your edits are still here. Reopen with /basic setup when you have access again.");
             }
-            else _api.ShowChatMessage(result.Message ?? "Setup is not available.");
-            return;
         }
-        if (result.Kind != SetupWizardResultKind.Open) return;
+        else _api.ShowChatMessage(result.Message ?? "Setup is not available.");
+    }
+
+    private void HandleOpenResult(TheBasicsSetupWizardResultMessage result)
+    {
         _authorized = true;
         _destination = SetupWizardState.ValidDestination(result.Destination) ?? _destination;
         if (IsCaptureOnly && !_captureRequested) Close();

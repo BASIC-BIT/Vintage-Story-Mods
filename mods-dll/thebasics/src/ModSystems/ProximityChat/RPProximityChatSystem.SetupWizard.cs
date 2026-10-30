@@ -86,6 +86,11 @@ public partial class RPProximityChatSystem
                 false, "This setup session has ended. Open it again with /basic setup.");
             return;
         }
+        HandleSetupWizardSessionRequest(player, request, run);
+    }
+
+    private void HandleSetupWizardSessionRequest(IServerPlayer player, TheBasicsSetupWizardRequestMessage request, SetupWizardRun run)
+    {
         switch (request.Kind)
         {
             case SetupWizardRequestKind.InviteStart:
