@@ -1272,11 +1272,12 @@ public class SetupWizardChatPreviewTests
             }
         Assert.True(changed > 0);
     }
-    [Fact]
-    public void NativeParsingContainsMalformedStyleOnlyWhenIsolationIsEnabled()
+    [VisualTheory]
+    [InlineData(1.0)]
+    public void NativeParsingContainsMalformedStyleOnlyWhenIsolationIsEnabled(double scale)
     {
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
-        using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, 1);
+        using var host = CreateHost(scale, 1280, 720);
         var api = host.Api;
         var isolated = SetupWizardTextAppearancePreview.Components(api, draft).OfType<RichTextComponent>().Single(c => c.DisplayText.Contains("Mara:"));
         Assert.Equal(Cairo.FontSlant.Normal, isolated.Font.Slant);
