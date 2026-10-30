@@ -87,6 +87,7 @@ public class SetupWizardSheetRenderTests
     private static void Save(PreviewHost host, string name)
     {
         var root = Path.GetFullPath(Path.Combine(Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, "../../.."));
+        Directory.CreateDirectory(Path.Combine(root, ".superpowers/sdd/2026-10-26-character-sheet-builder"));
         host.Canvas.SavePng(Path.Combine(root, ".superpowers/sdd/2026-10-26-character-sheet-builder/task-4-fix2-" + name + ".png"));
     }
 }

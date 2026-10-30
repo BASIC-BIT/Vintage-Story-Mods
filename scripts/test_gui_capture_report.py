@@ -181,6 +181,80 @@ class CaptureReportTests(unittest.TestCase):
                 self.assertEqual(report["counts"], {"unchanged" if case == "same" else "stale": 1})
                 self.assertEqual(report["evidenceValid"], case == "same")
 
+    @unittest.skipUnless(shutil.which("pwsh"), "PowerShell required for collector aggregation check")
+    def test_collector_externalizes_222_expanded_receipts_within_report_size_bound(self):
+        collector = Path(__file__).with_name("collect-gui-captures.ps1").resolve()
+        aggregate = self.root / "aggregate.ps1"
+        # Execute the production aggregation statements without downloads, builds, or rendering.
+        aggregate.write_text(r'''param([string]$Collector, [string]$CaptureRoot, [string]$SourceHash)
+$ErrorActionPreference = 'Stop'
+$ast = [Management.Automation.Language.Parser]::ParseFile($Collector, [ref]$null, [ref]$null)
+$entryLoop = @($ast.FindAll({ param($node)
+    $node -is [Management.Automation.Language.ForEachStatementAst] -and
+        $node.Variable.VariablePath.UserPath -eq 'entry' -and $node.Condition.Extent.Text -eq '$index.captures'
+}, $true))
+$indexWriter = @($ast.FindAll({ param($node)
+    $node -is [Management.Automation.Language.PipelineAst] -and
+        $node.Extent.Text.StartsWith('@{ schema = 1; sourceTreeHash = $sourceHash;')
+}, $true))
+if ($entryLoop.Count -ne 1 -or $indexWriter.Count -ne 1) { throw 'Expected one capture loop and index writer.' }
+$captures = [Collections.Generic.List[object]]::new()
+$coverage = 'layout-only'
+$hasScenes = $true
+$directory = $CaptureRoot
+foreach ($scale in @('1', '1.25')) {
+    $scaleDirectory = Join-Path $directory ('scale-' + $scale)
+    $index = Get-Content -LiteralPath (Join-Path $scaleDirectory 'captures.json') -Raw | ConvertFrom-Json
+    & ([scriptblock]::Create($entryLoop[0].Extent.Text))
+}
+& ([scriptblock]::Create($indexWriter[0].Extent.Text))
+''', encoding="utf-8")
+        bound = 4 * 1024 * 1024
+        for root, source in ((self.before, BASE_HASH), (self.after, CURRENT_HASH)):
+            template = self.capture(root)
+            commands = [{"op": "texture", "id": number, "x": number % 80, "y": number // 80,
+                         "width": 40, "height": 22, "z": 50, "color": [1, 1, 1, 1]}
+                        for number in range(400)]
+            for scale in (1, 1.25):
+                directory = root / ("scale-" + str(scale))
+                directory.mkdir()
+                entries = []
+                for number in range(111):
+                    scene = "wizard-scene-" + str(number)
+                    manifest = dict(template, scenario=scene, scale=scale,
+                                    environment=dict(template["environment"], commands=commands),
+                                    environmentIdentity=dict(template["environmentIdentity"], scale=scale))
+                    (directory / (scene + ".png")).write_bytes((root / "chat.png").read_bytes())
+                    reporter.write_json(directory / (scene + ".json"), manifest)
+                    entries.append({"scenario": scene, "file": scene + ".png", "manifest": scene + ".json"})
+                reporter.write_json(directory / "captures.json", {"schema": 1, "sourceTreeHash": source,
+                                    "coverage": "layout-only", "captures": entries})
+            subprocess.run(["pwsh", "-NoProfile", "-File", str(aggregate), str(collector), str(root), source], check=True)
+            self.assertLess((root / "captures.json").stat().st_size, bound)
+            index, entries = reporter.load_index(root)
+            self.assertEqual(len(entries), 222)
+            for entry in entries.values():
+                self.assertIsInstance(entry["manifest"], str)
+                self.assertNotIn("\\", entry["manifest"])
+                manifest = reporter.read_json(root / entry["manifest"])
+                self.assertEqual(manifest["scenario"], entry["scenario"])
+                self.assertEqual(manifest["sceneId"], entry["scenario"].split("/")[1])
+                self.assertEqual(manifest["environment"]["commands"], commands)
+                original = reporter.read_json(root / entry["manifest"].replace(".report.json", ".json"))
+                self.assertEqual(original["scenario"], manifest["sceneId"])
+                self.assertNotIn("sceneId", original)
+        report = self.run_report()
+        self.assertTrue(report["evidenceValid"])
+        self.assertEqual(report["counts"], {"unchanged": 222})
+        # The prior inline index repeats the same complete receipts and exceeds the existing guard.
+        index = reporter.read_json(self.after / "captures.json")
+        for entry in index["captures"]:
+            entry["manifest"] = reporter.read_json(self.after / entry["manifest"])
+        reporter.write_json(self.after / "captures.json", index)
+        self.assertGreater((self.after / "captures.json").stat().st_size, bound)
+        with self.assertRaisesRegex(ValueError, "Manifest exceeds size limit"):
+            reporter.load_index(self.after)
+
     def test_all_png_filters_rgb_and_rgba(self):
         path = self.root / "fixture.png"
         for channels in (3, 4):

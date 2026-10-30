@@ -61,7 +61,9 @@ try {
                     $scenario = 'scale-' + $scale + '/' + $entry.scenario
                     $manifest | Add-Member -NotePropertyName sceneId -NotePropertyValue $entry.scenario
                     $manifest.scenario = $scenario
-                    $captures.Add(@{ scenario = $scenario; file = 'scale-' + $scale + '/' + $entry.file; manifest = $manifest })
+                    $reportManifest = [IO.Path]::ChangeExtension($entry.manifest, '.report.json')
+                    $manifest | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath (Join-Path $scaleDirectory $reportManifest) -Encoding utf8
+                    $captures.Add(@{ scenario = $scenario; file = 'scale-' + $scale + '/' + $entry.file; manifest = 'scale-' + $scale + '/' + $reportManifest })
                 }
             }
         }
