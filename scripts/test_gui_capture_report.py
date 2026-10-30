@@ -46,7 +46,7 @@ def filtered_png(channels, mode):
 class CaptureReportTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.before, self.after, self.output = (self.root / name for name in ("before", "after", "report"))
         self.before.mkdir()
         self.after.mkdir()
