@@ -103,6 +103,20 @@ public static class SetupWizardCaptureScenes
         Validate(scenario, 0);
         // Only QA-owned drafts use these deterministic values. Nothing is submitted to the server.
         foreach (var value in DefaultValues()) draft.Set(value.Key, value.Value);
+        ApplyLanguageAndChatDraft(draft, scenario);
+        ApplyWorldAndAppearanceDraft(draft, scenario);
+        ApplyRecordsDraft(draft, scenario);
+        if (scenario is "wizard-chat-focus-switches" or "wizard-chat-focus-stays" or "wizard-chat-focus-remembers" or "wizard-chat-focus-default")
+        {
+            draft.Set("UseGeneralChannelAsProximityChat", "0");
+            draft.Set("ProximityChatAsDefault", "1");
+            draft.Set("PreventProximityChannelSwitching", scenario == "wizard-chat-focus-switches" ? "0" : "1");
+            draft.Set("PreserveDefaultChatChoice", scenario == "wizard-chat-focus-default" ? "0" : "1");
+        }
+    }
+
+    private static void ApplyLanguageAndChatDraft(SetupWizardDraft draft, string scenario)
+    {
         if (scenario.StartsWith("wizard-language-", StringComparison.Ordinal))
         {
             draft.Languages.Clear();
@@ -133,6 +147,10 @@ public static class SetupWizardCaptureScenes
             draft.Set("ProximityChatPresentationMode", "Prose");
             draft.Set("UseGeneralChannelAsProximityChat", "1");
         }
+    }
+
+    private static void ApplyWorldAndAppearanceDraft(SetupWizardDraft draft, string scenario)
+    {
         if (scenario == "wizard-travel-edited")
         {
             draft.Set("AllowPlayerTpa", "0");
@@ -190,6 +208,10 @@ public static class SetupWizardCaptureScenes
             draft.Set("ShowNicknameInNametag", "1");
             draft.Set("ShowPlayerNameInNametag", "1");
         }
+    }
+
+    private static void ApplyRecordsDraft(SetupWizardDraft draft, string scenario)
+    {
         if (scenario is "wizard-characters-autoopen" or "wizard-characters-manual")
         {
             draft.Set("EnableCharacterSheets", "1");
@@ -207,20 +229,41 @@ public static class SetupWizardCaptureScenes
             draft.Set("EnableAdminNoteLedger", scenario == "wizard-notes-notebook" ? "1" : "0");
         }
         if (scenario == "wizard-personal-notebook") draft.Set("EnablePlayerNotes", "1");
-        if (scenario is "wizard-chat-focus-switches" or "wizard-chat-focus-stays" or "wizard-chat-focus-remembers" or "wizard-chat-focus-default")
-        {
-            draft.Set("UseGeneralChannelAsProximityChat", "0");
-            draft.Set("ProximityChatAsDefault", "1");
-            draft.Set("PreventProximityChannelSwitching", scenario == "wizard-chat-focus-switches" ? "0" : "1");
-            draft.Set("PreserveDefaultChatChoice", scenario == "wizard-chat-focus-default" ? "0" : "1");
-        }
     }
 
     public static void Show(SetupWizardDialog dialog, string scenario, double previewTime)
     {
         Validate(scenario, previewTime);
         ApplyDraft(dialog.Draft, scenario);
-        var page = scenario switch
+        var page = ScenarioPage(scenario);
+        page = ConfigurePreviewPage(dialog, scenario, page);
+        dialog.ShowPage(page);
+        if (scenario is "wizard-wording-bottom" or "wizard-shortcuts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
+        if (scenario is "wizard-textappearance-bottom" or "wizard-occlusion-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
+        if (scenario is "wizard-voices-bottom" or "wizard-tts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
+        if (scenario == "wizard-server-stats-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
+        if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) ShowSheetBuilder(dialog, scenario);
+        if (scenario == "wizard-language-grants") dialog.SingleComposer.GetScrollbar("language-editor-scroll").ScrollToBottom();
+        if (scenario == "wizard-error") dialog.SetRequestFailure("The setting changed on the server. Review your changes and try saving again.");
+        if (scenario.StartsWith("wizard-restart-", StringComparison.Ordinal))
+        {
+            dialog.Draft.CreateSaveRequest(1, dialog.RunId);
+            dialog.SetResult(new TheBasicsSetupWizardResultMessage
+            {
+                Kind = SetupWizardResultKind.SaveResult, RequestId = 1, RunId = dialog.RunId, Success = true,
+                Message = "Settings saved. Restart the server to apply them.",
+                Values = dialog.Draft.Values.ToList(), RestartRequiredKeys = ["UseGeneralChannelAsProximityChat"],
+                IsDedicated = scenario == "wizard-restart-dedicated"
+            });
+            dialog.ShowPage("finish");
+        }
+        dialog.SetPreviewTime(previewTime);
+        OpenScenarioControls(dialog, scenario);
+    }
+
+    private static string ScenarioPage(string scenario)
+    {
+        return scenario switch
         {
             "wizard-hub" => "hub",
             "wizard-language-configured" or "wizard-language-edited" or "wizard-language-invalid" or "wizard-language-grants" or
@@ -258,6 +301,10 @@ public static class SetupWizardCaptureScenes
             "wizard-review" => "review",
             _ => "chat.basics"
         };
+    }
+
+    private static string ConfigurePreviewPage(SetupWizardDialog dialog, string scenario, string page)
+    {
         if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) page = "characters.builder";
         if (scenario.StartsWith("wizard-voices", StringComparison.Ordinal)) page = "chat.voices";
         if (scenario.StartsWith("wizard-tts", StringComparison.Ordinal)) page = "chat.tts";
@@ -309,27 +356,11 @@ public static class SetupWizardCaptureScenes
             dialog.Draft.Set("ChatDelimiters.Bold.End", "");
             dialog.Draft.Set("ChatDelimiters.Italic.Start", "<literal>");
         }
-        dialog.ShowPage(page);
-        if (scenario is "wizard-wording-bottom" or "wizard-shortcuts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
-        if (scenario is "wizard-textappearance-bottom" or "wizard-occlusion-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
-        if (scenario is "wizard-voices-bottom" or "wizard-tts-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
-        if (scenario == "wizard-server-stats-bottom") dialog.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
-        if (scenario.StartsWith("wizard-sheet-builder", StringComparison.Ordinal)) ShowSheetBuilder(dialog, scenario);
-        if (scenario == "wizard-language-grants") dialog.SingleComposer.GetScrollbar("language-editor-scroll").ScrollToBottom();
-        if (scenario == "wizard-error") dialog.SetRequestFailure("The setting changed on the server. Review your changes and try saving again.");
-        if (scenario.StartsWith("wizard-restart-", StringComparison.Ordinal))
-        {
-            dialog.Draft.CreateSaveRequest(1, dialog.RunId);
-            dialog.SetResult(new TheBasicsSetupWizardResultMessage
-            {
-                Kind = SetupWizardResultKind.SaveResult, RequestId = 1, RunId = dialog.RunId, Success = true,
-                Message = "Settings saved. Restart the server to apply them.",
-                Values = dialog.Draft.Values.ToList(), RestartRequiredKeys = ["UseGeneralChannelAsProximityChat"],
-                IsDedicated = scenario == "wizard-restart-dedicated"
-            });
-            dialog.ShowPage("finish");
-        }
-        dialog.SetPreviewTime(previewTime);
+        return page;
+    }
+
+    private static void OpenScenarioControls(SetupWizardDialog dialog, string scenario)
+    {
         if (scenario.StartsWith("wizard-language-color-", StringComparison.Ordinal))
         {
             var picker = (GuiElementColorPicker)dialog.SingleComposer.GetElement("language-editor-color-picker");
