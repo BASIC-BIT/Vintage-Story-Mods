@@ -187,9 +187,9 @@ public class SetupWizardAppearancePreviewTests
             var pixels = image.Data;
             int left = image.Width, right = 0, top = image.Height, bottom = 0;
             for (int y = (int)(45 * scale); y < (int)(125 * scale); y++)
-            for (int x = 0; x < image.Width; x++)
-                if (pixels[y * image.Stride + x * 4 + 3] > 32)
-                { left = Math.Min(left, x); right = Math.Max(right, x); top = Math.Min(top, y); bottom = Math.Max(bottom, y); }
+                for (int x = 0; x < image.Width; x++)
+                    if (pixels[y * image.Stride + x * 4 + 3] > 32)
+                    { left = Math.Min(left, x); right = Math.Max(right, x); top = Math.Min(top, y); bottom = Math.Max(bottom, y); }
             Assert.True(right > left && bottom > top);
             // Native font hinting changes glyph widths between scales. The scene must retain that renderer's size.
             Assert.InRange(Math.Abs((right - left + 1) / scale - native.Width / scale), 0, 3);

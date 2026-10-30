@@ -3,9 +3,12 @@ using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.Analytics;
 using thebasics.ModSystems.ChatUiSystem;
 namespace thebasics.Tests.ModSystems.ChatUiSystem;
+
 public class SetupWizardSheetReviewTests
 {
-    [Theory] [InlineData("option", "Red,Blue", "0")] [InlineData("longstring", "", "6")]
+    [Theory]
+    [InlineData("option", "Red,Blue", "0")]
+    [InlineData("longstring", "", "6")]
     public void Inactive_type_roundtrip_is_not_an_effective_edit(string type, string options, string rows)
     {
         var before = new[] { SetupWizardSheetEditorTests.Field("name", "body") };
@@ -21,7 +24,9 @@ public class SetupWizardSheetReviewTests
         Assert.True(draft.SheetFieldsChanged);
     }
 
-    [Theory] [InlineData("option", "Red,,Blue", "0")] [InlineData("longstring", "", "invalid")]
+    [Theory]
+    [InlineData("option", "Red,,Blue", "0")]
+    [InlineData("longstring", "", "invalid")]
     public void Invalid_active_type_values_remain_dirty_and_fail_validation(string type, string options, string rows)
     {
         var draft = new SetupWizardDraft(Array.Empty<ConfigAdminSettingValue>(), fields: new[] { SetupWizardSheetEditorTests.Field("name", "body") });
@@ -49,37 +54,42 @@ public class SetupWizardSheetReviewTests
         Assert.True(draft.SheetFieldsChanged);
     }
 
-    [Fact] public void Net_reverted_edits_have_no_rows_or_warnings()
+    [Fact]
+    public void Net_reverted_edits_have_no_rows_or_warnings()
     {
         var before = new[] { SetupWizardSheetEditorTests.Field("name", "body") };
-        var after = CharacterSheetFieldConfigAdmin.CloneEntries(before); after[0].Type="number"; after[0].Type="string";
+        var after = CharacterSheetFieldConfigAdmin.CloneEntries(before); after[0].Type = "number"; after[0].Type = "string";
         Assert.Empty(SetupWizardSheetReview.Rows(before, after, true));
     }
-    [Fact] public void Review_groups_readable_changes_and_exact_consequences_without_ids()
+    [Fact]
+    public void Review_groups_readable_changes_and_exact_consequences_without_ids()
     {
-        var before = new[] { SetupWizardSheetEditorTests.Field("internal", "body") with { Label="Appearance" }, SetupWizardSheetEditorTests.Field("removed-id", "body") with { Label="Background" } };
+        var before = new[] { SetupWizardSheetEditorTests.Field("internal", "body") with { Label = "Appearance" }, SetupWizardSheetEditorTests.Field("removed-id", "body") with { Label = "Background" } };
         var after = CharacterSheetFieldConfigAdmin.CloneEntries(before.Take(1));
-        after[0].Type="longstring"; after[0].BindTo="thebasics.fullName"; after[0].Optional=false;
+        after[0].Type = "longstring"; after[0].BindTo = "thebasics.fullName"; after[0].Optional = false;
         var rows = SetupWizardSheetReview.Rows(before, after, true);
         Assert.Equal(2, rows.Count); Assert.Equal("Background", rows[0].Title); Assert.Equal(SetupWizardSheetReview.RemovalWarning, rows[0].Detail);
         Assert.Contains("Short text > Long text", rows[1].Detail); Assert.Contains("Character name", rows[1].Detail);
         Assert.Contains(SetupWizardSheetReview.RulesWarning, rows[1].Detail); Assert.Contains(SetupWizardSheetReview.BindingWarning, rows[1].Detail);
         Assert.Contains("block roleplay", rows[1].Detail); Assert.DoesNotContain("internal", string.Join(" ", rows));
-        after[0].Visibility="admin";
+        after[0].Visibility = "admin";
         Assert.DoesNotContain("block roleplay", string.Join(" ", SetupWizardSheetReview.Rows(before, after, true)));
-        after[0].Visibility="public";
-        after[0].BindTo="thebasics.nickname";
+        after[0].Visibility = "public";
+        after[0].BindTo = "thebasics.nickname";
         Assert.DoesNotContain("block roleplay", string.Join(" ", SetupWizardSheetReview.Rows(before, after, true, true)));
         Assert.DoesNotContain("block roleplay", string.Join(" ", SetupWizardSheetReview.Rows(before, after, false)));
     }
-    [Theory] [InlineData("First,,Second")] [InlineData("First,first")]
+    [Theory]
+    [InlineData("First,,Second")]
+    [InlineData("First,first")]
     public void Wizard_choice_validation_rejects_empty_and_duplicate_rows_but_preserves_inactive_values(string options)
     {
-        var field = SetupWizardSheetEditorTests.Field("choice", "body") with { Type="option", Options=options };
+        var field = SetupWizardSheetEditorTests.Field("choice", "body") with { Type = "option", Options = options };
         Assert.NotEmpty(SetupWizardState.ValidateSheetChoices(new[] { field }));
-        field.Type="string"; Assert.Empty(SetupWizardState.ValidateSheetChoices(new[] { field })); Assert.Equal(options, field.Options);
+        field.Type = "string"; Assert.Empty(SetupWizardState.ValidateSheetChoices(new[] { field })); Assert.Equal(options, field.Options);
     }
-    [Fact] public void Journey_allows_only_fixed_builder_actions_and_never_accepts_contents_as_choice()
+    [Fact]
+    public void Journey_allows_only_fixed_builder_actions_and_never_accepts_contents_as_choice()
     {
         foreach (var action in new[] { "sheet_select", "sheet_add", "sheet_remove", "sheet_move", "sheet_preview", "sheet_reset" })
         {

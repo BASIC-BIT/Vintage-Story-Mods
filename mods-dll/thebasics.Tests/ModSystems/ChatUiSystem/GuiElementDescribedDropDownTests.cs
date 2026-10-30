@@ -215,9 +215,9 @@ public class GuiElementDescribedDropDownTests
         Assert.Contains(components, component => component.DisplayText == Names[0] && component.Font.UnscaledFontsize == 17);
         Assert.Contains(components, component => component.DisplayText == Descriptions[0] && component.Font.UnscaledFontsize == 13);
         for (var i = 0; i < rows.Length; i++)
-        foreach (var line in rows[i].Components.OfType<RichTextComponent>().SelectMany(component => component.BoundsPerLine))
-            Assert.InRange(line.Y + line.Height + rows[i].Bounds.drawY - i * dropdown.Bounds.InnerHeight,
-                0, dropdown.Bounds.InnerHeight);
+            foreach (var line in rows[i].Components.OfType<RichTextComponent>().SelectMany(component => component.BoundsPerLine))
+                Assert.InRange(line.Y + line.Height + rows[i].Bounds.drawY - i * dropdown.Bounds.InnerHeight,
+                    0, dropdown.Bounds.InnerHeight);
     }
 
     private static void AssertSelectedAndExpandedLayoutMatch(GuiElementDropDown dropdown, double scale)

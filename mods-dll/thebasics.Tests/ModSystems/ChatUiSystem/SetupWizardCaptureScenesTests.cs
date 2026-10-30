@@ -191,7 +191,10 @@ public class SetupWizardCaptureScenesTests
             () => saves++, null!, null!, layoutOnly: true, captureOnly: true, actorFactory: host.CreateGuide);
         wizard.SetSession(new TheBasicsSetupWizardResultMessage
         {
-            Kind = SetupWizardResultKind.Open, Success = true, RunId = "qa-run", IsDedicated = true,
+            Kind = SetupWizardResultKind.Open,
+            Success = true,
+            RunId = "qa-run",
+            IsDedicated = true,
             Values = values,
             PrivilegeSuggestions = [new() { Code = "custom.server", Description = "Manage custom server tools" }]
         });

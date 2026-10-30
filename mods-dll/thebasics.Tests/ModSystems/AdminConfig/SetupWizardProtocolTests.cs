@@ -111,8 +111,17 @@ public class SetupWizardProtocolTests
         request.ChoiceId.Should().Be("off");
         request.Languages.Single().Should().BeEquivalentTo(new LanguageConfigEntryMessage
         {
-            OriginalName = "Old speech", Name = "River speech", Prefix = "river", Color = "#34AACC", Syllables = "ra, vo", Default = true,
-            Hidden = true, GrantedToClasses = "hunter", GrantedToModels = "seraph", GrantedToModelGroups = "folk", GrantedToTraits = "keenears"
+            OriginalName = "Old speech",
+            Name = "River speech",
+            Prefix = "river",
+            Color = "#34AACC",
+            Syllables = "ra, vo",
+            Default = true,
+            Hidden = true,
+            GrantedToClasses = "hunter",
+            GrantedToModels = "seraph",
+            GrantedToModelGroups = "folk",
+            GrantedToTraits = "keenears"
         });
         request.OriginalLanguages.Single().Description.Should().Be("Old description");
     }
@@ -153,7 +162,9 @@ public class SetupWizardProtocolTests
     {
         var request = Serializer.DeepClone(new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Open, RequestId = 125, CaptureOnly = true
+            Kind = SetupWizardRequestKind.Open,
+            RequestId = 125,
+            CaptureOnly = true
         });
 
         request.Kind.Should().Be(SetupWizardRequestKind.Open);

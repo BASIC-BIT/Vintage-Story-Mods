@@ -46,7 +46,10 @@ public class SetupWizardClientControllerTests
 
         var failure = Record.Exception(() => controller.HandleResult(new TheBasicsSetupWizardResultMessage
         {
-            Kind = SetupWizardResultKind.Open, RequestId = 1, RunId = "failed-reopen", Success = true,
+            Kind = SetupWizardResultKind.Open,
+            RequestId = 1,
+            RunId = "failed-reopen",
+            Success = true,
             Values = SetupWizardCaptureScenes.DefaultValues()
         }));
 
@@ -62,7 +65,10 @@ public class SetupWizardClientControllerTests
         controller.Open();
         controller.HandleResult(new TheBasicsSetupWizardResultMessage
         {
-            Kind = SetupWizardResultKind.Open, RequestId = 2, RunId = "retried-run", Success = true,
+            Kind = SetupWizardResultKind.Open,
+            RequestId = 2,
+            RunId = "retried-run",
+            Success = true,
             Values = SetupWizardCaptureScenes.DefaultValues()
         });
 
@@ -88,7 +94,10 @@ public class SetupWizardClientControllerTests
 
         var failure = Record.Exception(() => controller.HandleResult(new TheBasicsSetupWizardResultMessage
         {
-            Kind = SetupWizardResultKind.Open, RequestId = 1, RunId = "capture-run", Success = true,
+            Kind = SetupWizardResultKind.Open,
+            RequestId = 1,
+            RunId = "capture-run",
+            Success = true,
             Values = SetupWizardCaptureScenes.DefaultValues()
         }));
 
@@ -138,7 +147,9 @@ public class SetupWizardClientControllerTests
         otherDialog.TryOpen().Should().BeTrue();
         var invitation = new TheBasicsSetupWizardResultMessage
         {
-            Kind = SetupWizardResultKind.Invitation, RunId = new string('d', 32), Success = true
+            Kind = SetupWizardResultKind.Invitation,
+            RunId = new string('d', 32),
+            Success = true
         };
 
         controller.HandleResult(invitation);
@@ -193,7 +204,10 @@ public class SetupWizardClientControllerTests
             request.Kind == SetupWizardRequestKind.Open && request.RequestId == 1 && !request.CaptureOnly));
         controller.HandleResult(new TheBasicsSetupWizardResultMessage
         {
-            Kind = SetupWizardResultKind.Open, RequestId = 1, RunId = "refreshed-run", Success = true,
+            Kind = SetupWizardResultKind.Open,
+            RequestId = 1,
+            RunId = "refreshed-run",
+            Success = true,
             Values = [new() { Key = "EnableChatter", Value = "1" }, new() { Key = "TpaCooldownInGameHours", Value = "3" }]
         });
         dialog.RunId.Should().Be("refreshed-run");
@@ -265,8 +279,13 @@ public class SetupWizardClientControllerTests
 
         controller.HandleResult(new TheBasicsSetupWizardResultMessage
         {
-            Kind = SetupWizardResultKind.Open, RequestId = open.RequestId, RunId = "run", Success = true,
-            Values = SetupWizardCaptureScenes.DefaultValues(), Languages = LanguageConfigAdmin.BuildEntries(config), SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(config)
+            Kind = SetupWizardResultKind.Open,
+            RequestId = open.RequestId,
+            RunId = "run",
+            Success = true,
+            Values = SetupWizardCaptureScenes.DefaultValues(),
+            Languages = LanguageConfigAdmin.BuildEntries(config),
+            SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(config)
         });
 
         draft.HasUnconfirmedSave.Should().BeFalse();
@@ -303,8 +322,16 @@ public class SetupWizardClientControllerTests
             controller.HandleResult(new() { Kind = SetupWizardResultKind.Open, Success = true, RunId = "run", Destination = "characters.builder", Values = SetupWizardCaptureScenes.DefaultValues() });
         draft.IsSavePending.Should().BeTrue();
         if (navigate) draft.Set("DebugMode", "1");
-        controller.HandleResult(new() { Kind = SetupWizardResultKind.SaveResult, RequestId = request.RequestId, RunId = "run", Success = success, RestartRequiredKeys = success ? ["ProximityChatName"] : [], Message = "Settings saved.",
-            Values = [new() { Key = "EnableChatter", Value = success ? "0" : "1" }] });
+        controller.HandleResult(new()
+        {
+            Kind = SetupWizardResultKind.SaveResult,
+            RequestId = request.RequestId,
+            RunId = "run",
+            Success = success,
+            RestartRequiredKeys = success ? ["ProximityChatName"] : [],
+            Message = "Settings saved.",
+            Values = [new() { Key = "EnableChatter", Value = success ? "0" : "1" }]
+        });
         draft.IsSavePending.Should().BeFalse(); draft.IsDirty.Should().Be(!success || navigate);
         draft.Get("EnableChatter").Should().Be("0"); controller.CurrentDialog.Should().BeSameAs(dialog);
         dialog.CurrentStepId.Should().Be(navigate ? "characters.builder" : success ? "finish" : "review");
@@ -342,8 +369,14 @@ public class SetupWizardClientControllerTests
         var scroll = dialog.SingleComposer.GetScrollbar("settings-scroll").CurrentYPosition;
         scroll.Should().BeGreaterThan(0);
         controller.OpenHelp();
-        controller.HandleResult(new() { Kind = SetupWizardResultKind.SaveResult, RequestId = request.RequestId, RunId = "run", Success = success,
-            Values = [new() { Key = "EnableChatter", Value = success ? "0" : "1" }] });
+        controller.HandleResult(new()
+        {
+            Kind = SetupWizardResultKind.SaveResult,
+            RequestId = request.RequestId,
+            RunId = "run",
+            Success = success,
+            Values = [new() { Key = "EnableChatter", Value = success ? "0" : "1" }]
+        });
         dialog.IsOpened().Should().BeFalse();
         controller.ReturnFromHelp(); dialog.IsOpened().Should().BeTrue();
         dialog.SingleComposer.GetElement("search-result-0").Should().NotBeNull();

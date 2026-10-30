@@ -182,7 +182,7 @@ public class GuiElementPrivilegePickerTests
         var changes = new List<string>();
         using var composer = CreateComposer(host);
         var entries = Enumerable.Range(0, 700).Select(index => new ConfigAdminPrivilegeSuggestion
-            { Code = $"custom.{index:000}", Description = $"Description for custom privilege {index}" }).ToArray();
+        { Code = $"custom.{index:000}", Description = $"Description for custom privilege {index}" }).ToArray();
         var picker = new GuiElementPrivilegePicker(host.Api, ElementBounds.Fixed(20, 40, 600, 32),
             "custom.000", entries, changes.Add, CairoFont.WhiteSmallText());
         composer.AddInteractiveElement(picker, "privilege").Compose();
@@ -213,7 +213,7 @@ public class GuiElementPrivilegePickerTests
         var changes = new List<string>();
         using var composer = CreateComposer(host);
         var entries = Enumerable.Range(0, 100).Select(index => new ConfigAdminPrivilegeSuggestion
-            { Code = $"custom.{index:000}", Description = "A long registered privilege description that should stay inside the menu" }).ToArray();
+        { Code = $"custom.{index:000}", Description = "A long registered privilege description that should stay inside the menu" }).ToArray();
         var picker = new GuiElementPrivilegePicker(host.Api, ElementBounds.Fixed(20, 510, 400, 30).WithScale(0.9),
             "custom.000", entries, changes.Add, CairoFont.WhiteSmallText().WithFontSize(18));
         composer.AddInteractiveElement(picker, "privilege").Compose();

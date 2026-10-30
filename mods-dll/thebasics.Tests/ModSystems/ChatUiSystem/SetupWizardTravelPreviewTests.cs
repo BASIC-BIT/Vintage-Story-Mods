@@ -161,12 +161,12 @@ public class SetupWizardTravelPreviewTests
         foreach (var command in new[] { "HomeCommands", "SpawnCommands", "TopCommand", "BackCommand", "StuckCommand" })
             draft.Set("Teleportation.Register" + command, "1");
         foreach (var page in new[] { "teleport.top", "teleport.tools", "teleport.utilities" })
-        foreach (var time in new[] { 0d, 6d, 7d, 15d, 23d })
-        {
-            using var scene = Render(draft, height, page, time);
-            Assert.All(scene.Data[..scene.Stride].Where((_, index) => index % 4 == 3), alpha => Assert.Equal(0, alpha));
-            Assert.All(scene.Data[^scene.Stride..].Where((_, index) => index % 4 == 3), alpha => Assert.Equal(0, alpha));
-        }
+            foreach (var time in new[] { 0d, 6d, 7d, 15d, 23d })
+            {
+                using var scene = Render(draft, height, page, time);
+                Assert.All(scene.Data[..scene.Stride].Where((_, index) => index % 4 == 3), alpha => Assert.Equal(0, alpha));
+                Assert.All(scene.Data[^scene.Stride..].Where((_, index) => index % 4 == 3), alpha => Assert.Equal(0, alpha));
+            }
         Assert.Empty(host.UnsupportedCalls);
     }
 

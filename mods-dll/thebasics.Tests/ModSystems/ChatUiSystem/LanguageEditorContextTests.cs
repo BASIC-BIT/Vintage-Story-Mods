@@ -38,7 +38,7 @@ public class LanguageEditorContextTests
         using var host = Host(scale);
         using var dialog = new LanguageConfigDialog(host.Api,
             Enumerable.Range(1, 12).Select(index => new LanguageConfigEntryMessage
-                { OriginalName = "Language " + index, Name = "Language " + index, Prefix = "l" + index, Color = "#FFFFFF" }).ToList(),
+            { OriginalName = "Language " + index, Name = "Language " + index, Prefix = "l" + index, Color = "#FFFFFF" }).ToList(),
             "", true, _ => { }, () => { }, () => { });
         var method = typeof(LanguageConfigDialog).GetMethod("BuildOrderSummaryLines", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         var lines = Assert.IsType<List<(string Text, bool IsSelected)>>(method.Invoke(dialog, null));

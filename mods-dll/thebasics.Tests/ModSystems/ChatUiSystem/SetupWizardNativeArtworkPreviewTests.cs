@@ -29,8 +29,11 @@ public class SetupWizardNativeArtworkPreviewTests
         Assert.Equal(Region(visible, 180, 220, scale), Region(hidden, 180, 220, scale));
         var sample = new SceneDescriptionData
         {
-            Title = "Old campsite", Body = "Ashes are cold. Someone left in a hurry.",
-            ShowBodyInBubble = true, Display = SceneDescriptionDisplay.AlwaysNearby, Symbol = SceneMarkerSymbol.Information
+            Title = "Old campsite",
+            Body = "Ashes are cold. Someone left in a hurry.",
+            ShowBodyInBubble = true,
+            Display = SceneDescriptionDisplay.AlwaysNearby,
+            Symbol = SceneMarkerSymbol.Information
         };
         using (var description = SceneMarkerVisuals.DescriptionSurface(host.Api, sample))
         using (var context = new Context(hidden))

@@ -12,7 +12,8 @@ namespace thebasics.Tests.ModSystems.ChatUiSystem;
 [Collection("Standalone GUI")]
 public class SetupWizardSheetPreviewTests
 {
-    [VisualTheory] [InlineData(1d)]
+    [VisualTheory]
+    [InlineData(1d)]
     public void Unfinished_half_field_keeps_draft_order_and_pairing(double scale)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1200, scale);

@@ -18,8 +18,14 @@ public class SceneDialogLayoutTests
             Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, 1.25);
         SceneDescriptionData? saved = null;
         using var dialog = new SceneDescriptionDialog(host.Api,
-            new SceneDescriptionData { Title = "Watchtower", Display = SceneDescriptionDisplay.AlwaysNearby,
-                LockItemCode = locked ? "ui" : "", IdleBobbing = false, ShowBodyInBubble = false },
+            new SceneDescriptionData
+            {
+                Title = "Watchtower",
+                Display = SceneDescriptionDisplay.AlwaysNearby,
+                LockItemCode = locked ? "ui" : "",
+                IdleBobbing = false,
+                ShowBodyInBubble = false
+            },
             true, (value, _) => saved = value, () => { }, () => { }, () => { }, _ => { });
         dialog.TryOpen();
         host.RenderGuiDialog(dialog, 0);

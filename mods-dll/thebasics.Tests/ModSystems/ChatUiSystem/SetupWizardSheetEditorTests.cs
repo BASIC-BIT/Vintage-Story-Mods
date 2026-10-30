@@ -6,10 +6,13 @@ using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatUiSystem;
 namespace thebasics.Tests.ModSystems.ChatUiSystem;
+
 [Collection("Standalone GUI")]
 public class SetupWizardSheetEditorTests
 {
-    [VisualTheory] [InlineData(0, 2)] [InlineData(4, 4)]
+    [VisualTheory]
+    [InlineData(0, 2)]
+    [InlineData(4, 4)]
     public void Preview_uses_current_draft_nickname_limit_and_field_override(int fieldLimit, int expected)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1800, 1200, 1);
@@ -24,7 +27,8 @@ public class SetupWizardSheetEditorTests
         Assert.Empty(host.UnsupportedCalls);
     }
 
-    [Fact] public void Movement_is_section_relative_and_placement_appends()
+    [Fact]
+    public void Movement_is_section_relative_and_placement_appends()
     {
         var fields = new[] { Field("a", "body"), Field("h", "header-side"), Field("b", "body"), Field("c", "body") };
         var draft = new SetupWizardDraft(Array.Empty<ConfigAdminSettingValue>(), fields: fields);
@@ -35,7 +39,8 @@ public class SetupWizardSheetEditorTests
         Assert.Equal(new[] { "a", "h", "b", "c" }, draft.SheetFields.Select(f => f.Id));
         Assert.Equal("b", editor.SelectedId);
     }
-    [Fact] public void New_identity_is_stable_and_removal_requires_confirmation()
+    [Fact]
+    public void New_identity_is_stable_and_removal_requires_confirmation()
     {
         var draft = new SetupWizardDraft(Array.Empty<ConfigAdminSettingValue>(), fields: new[] { Field("a", "body") });
         using var editor = new SetupWizardSheetEditor(null!, draft, null, action => action());
@@ -45,8 +50,10 @@ public class SetupWizardSheetEditorTests
         Assert.Single(draft.SheetFields); Assert.False(editor.RemoveSelected(true));
     }
     [VisualTheory]
-    [InlineData(1d, 849d)] [InlineData(1d, 850d)]
-    [InlineData(1.25d, 849d)] [InlineData(1.25d, 850d)]
+    [InlineData(1d, 849d)]
+    [InlineData(1d, 850d)]
+    [InlineData(1.25d, 849d)]
+    [InlineData(1.25d, 850d)]
     public void Native_selection_typing_drawer_and_returning_inspector(double scale, double width)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1800, 1200, scale);
@@ -112,10 +119,10 @@ public class SetupWizardSheetEditorTests
         }
         void Click(ElementBounds bounds)
         {
-            var x=(int)(bounds.renderX + bounds.InnerWidth / 2); var y=(int)(bounds.renderY + bounds.InnerHeight / 2);
-            host.SetMouse(x,y); owner!.OnMouseDown(new MouseEvent(x,y,EnumMouseButton.Left,0)); owner.OnMouseUp(new MouseEvent(x,y,EnumMouseButton.Left,0));
+            var x = (int)(bounds.renderX + bounds.InnerWidth / 2); var y = (int)(bounds.renderY + bounds.InnerHeight / 2);
+            host.SetMouse(x, y); owner!.OnMouseDown(new MouseEvent(x, y, EnumMouseButton.Left, 0)); owner.OnMouseUp(new MouseEvent(x, y, EnumMouseButton.Left, 0));
         }
     }
-    internal static CharacterSheetFieldConfigEntryMessage Field(string id, string section) => new() { Id=id, OriginalId=id, Label=id, Type="string", Description="", Options="", BindTo="", LayoutSection=section, Width="full", Visibility="public", MaxLength="0", EditorRows="0" };
+    internal static CharacterSheetFieldConfigEntryMessage Field(string id, string section) => new() { Id = id, OriginalId = id, Label = id, Type = "string", Description = "", Options = "", BindTo = "", LayoutSection = section, Width = "full", Visibility = "public", MaxLength = "0", EditorRows = "0" };
 }
 

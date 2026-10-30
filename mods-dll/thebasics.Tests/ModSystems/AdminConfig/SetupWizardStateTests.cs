@@ -354,7 +354,9 @@ public class SetupWizardStateTests
     {
         SetupWizardState.ValidateRequest(new TheBasicsSetupWizardRequestMessage
         {
-            Kind = kind, RequestId = 1, CaptureOnly = true
+            Kind = kind,
+            RequestId = 1,
+            CaptureOnly = true
         }).Should().Contain("Only open requests may use QA capture mode.");
     }
 
@@ -372,13 +374,13 @@ public class SetupWizardStateTests
 
     private static TheBasicsSetupWizardRequestMessage Request(
         List<ConfigAdminSettingValue> values, List<ConfigAdminSettingValue> originals) => new()
-    {
-        Kind = SetupWizardRequestKind.Save,
-        RequestId = 1,
-        RunId = "run-a",
-        Values = values,
-        OriginalValues = originals
-    };
+        {
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 1,
+            RunId = "run-a",
+            Values = values,
+            OriginalValues = originals
+        };
 }
 
 public class SetupWizardInvitationStateTests

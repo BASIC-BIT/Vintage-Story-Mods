@@ -196,11 +196,11 @@ public class SetupWizardDraftTests
 
     private static TheBasicsSetupWizardResultMessage Result(long requestId, string runId, bool success,
         params ConfigAdminSettingValue[] values) => new()
-    {
-        Kind = SetupWizardResultKind.SaveResult,
-        RequestId = requestId,
-        RunId = runId,
-        Success = success,
-        Values = values.ToList()
-    };
+        {
+            Kind = SetupWizardResultKind.SaveResult,
+            RequestId = requestId,
+            RunId = runId,
+            Success = success,
+            Values = values.ToList()
+        };
 }

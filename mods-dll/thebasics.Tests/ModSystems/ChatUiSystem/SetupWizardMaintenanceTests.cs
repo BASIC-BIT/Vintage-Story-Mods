@@ -41,9 +41,17 @@ public class SetupWizardMaintenanceTests
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
         var config = new ModConfig(); config.InitializeDefaultsIfNeeded();
-        var snapshot = new TheBasicsSetupWizardResultMessage { Kind = SetupWizardResultKind.Open, Success = true, RunId = "run", SupportsMaintenance = true,
-            Values = SetupWizardCaptureScenes.DefaultValues(), Languages = LanguageConfigAdmin.BuildEntries(config), SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(config),
-            ReviewedKeys = ConfigAdminSettingRegistry.Settings.Select(s => s.Key).Where(key => key != "EnableChatter" && key != "DebugMode").ToList() };
+        var snapshot = new TheBasicsSetupWizardResultMessage
+        {
+            Kind = SetupWizardResultKind.Open,
+            Success = true,
+            RunId = "run",
+            SupportsMaintenance = true,
+            Values = SetupWizardCaptureScenes.DefaultValues(),
+            Languages = LanguageConfigAdmin.BuildEntries(config),
+            SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(config),
+            ReviewedKeys = ConfigAdminSettingRegistry.Settings.Select(s => s.Key).Where(key => key != "EnableChatter" && key != "DebugMode").ToList()
+        };
         var draft = new SetupWizardDraft(snapshot.Values, snapshot.Languages, snapshot.SheetFields);
         var requests = new List<SetupWizardRequestKind>();
         using var wizard = new SetupWizardDialog(host.Api, draft, "run", true, () => { }, (_, _, _) => { }, () => { },
@@ -81,9 +89,16 @@ public class SetupWizardMaintenanceTests
             var root = Environment.GetEnvironmentVariable("TASK7_CAPTURE_ROOT"); if (root == null) return;
             var dir = Path.Combine(root, "scale-" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture)); Directory.CreateDirectory(dir);
             host.Canvas.SavePng(Path.Combine(dir, name + ".png"));
-            File.WriteAllText(Path.Combine(dir, name + ".json"), JsonSerializer.Serialize(new { width = 1280, height = 720, scale,
-                sourceTreeHash = Environment.GetEnvironmentVariable("TASK7_SOURCE_HASH"), assemblySha256 = SetupWizardCaptureIdentity.HashFile(typeof(SetupWizardDialog).Assembly.Location),
-                environment = host.EnvironmentIdentity, coverage = "standalone production GUI, no game or persistence acceptance" }));
+            File.WriteAllText(Path.Combine(dir, name + ".json"), JsonSerializer.Serialize(new
+            {
+                width = 1280,
+                height = 720,
+                scale,
+                sourceTreeHash = Environment.GetEnvironmentVariable("TASK7_SOURCE_HASH"),
+                assemblySha256 = SetupWizardCaptureIdentity.HashFile(typeof(SetupWizardDialog).Assembly.Location),
+                environment = host.EnvironmentIdentity,
+                coverage = "standalone production GUI, no game or persistence acceptance"
+            }));
         }
     }
 
@@ -112,9 +127,17 @@ public class SetupWizardMaintenanceTests
         wizard.IsOpened().Should().BeTrue(); wizard.CurrentStepId.Should().Be("server.diagnostics");
         controller.Maintain(SetupWizardRequestKind.Reload); wizard.IsOpened().Should().BeFalse();
         var loaded = SetupWizardCaptureScenes.DefaultValues(); loaded.Single(x => x.Key == "DebugMode").Value = "1";
-        controller.HandleResult(new() { Kind = partial ? SetupWizardResultKind.ReloadPartiallyApplied : SetupWizardResultKind.MaintenanceResult,
-            RequestId = 1, RunId = "run", Success = success, RuntimeApplyFailed = partial,
-            SupportsMaintenance = true, Values = loaded, Message = success ? "Settings reloaded from disk." : partial ? "Settings loaded. Restart the server." : "Reload failed." });
+        controller.HandleResult(new()
+        {
+            Kind = partial ? SetupWizardResultKind.ReloadPartiallyApplied : SetupWizardResultKind.MaintenanceResult,
+            RequestId = 1,
+            RunId = "run",
+            Success = success,
+            RuntimeApplyFailed = partial,
+            SupportsMaintenance = true,
+            Values = loaded,
+            Message = success ? "Settings reloaded from disk." : partial ? "Settings loaded. Restart the server." : "Reload failed."
+        });
         draft.Get("DebugMode").Should().Be(success || partial ? "1" : "0");
         if (partial)
         {

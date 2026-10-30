@@ -167,19 +167,29 @@ public class SeraphRasterizerTests
 
     private static MeshData Quad(float left, float right, float z, int textureId) => new()
     {
-        VerticesCount = 4, IndicesCount = 6, IndicesPerFace = 6, TextureIndicesCount = 1,
+        VerticesCount = 4,
+        IndicesCount = 6,
+        IndicesPerFace = 6,
+        TextureIndicesCount = 1,
         xyz = [left, 0, z, right, 0, z, right, 1, z, left, 1, z],
-        Uv = [0, 1, 1, 1, 1, 0, 0, 0], Indices = [0, 1, 2, 0, 2, 3],
+        Uv = [0, 1, 1, 1, 1, 0, 0, 0],
+        Indices = [0, 1, 2, 0, 2, 3],
         CustomInts = new CustomMeshDataPartInt { Values = [0, 0, 0, 0], Count = 4 },
-        TextureIds = [textureId], TextureIndices = [0]
+        TextureIds = [textureId],
+        TextureIndices = [0]
     };
 
     private static MeshData Join(MeshData first, MeshData second) => new()
     {
-        VerticesCount = 8, IndicesCount = 12, IndicesPerFace = 6, TextureIndicesCount = 2,
-        xyz = first.xyz.Concat(second.xyz).ToArray(), Uv = first.Uv.Concat(second.Uv).ToArray(),
+        VerticesCount = 8,
+        IndicesCount = 12,
+        IndicesPerFace = 6,
+        TextureIndicesCount = 2,
+        xyz = first.xyz.Concat(second.xyz).ToArray(),
+        Uv = first.Uv.Concat(second.Uv).ToArray(),
         Indices = first.Indices.Concat(second.Indices.Select(index => index + 4)).ToArray(),
         CustomInts = new CustomMeshDataPartInt { Values = first.CustomInts.Values.Concat(second.CustomInts.Values).ToArray(), Count = 8 },
-        TextureIds = [first.TextureIds[0], second.TextureIds[0]], TextureIndices = [0, 1]
+        TextureIds = [first.TextureIds[0], second.TextureIds[0]],
+        TextureIndices = [0, 1]
     };
 }

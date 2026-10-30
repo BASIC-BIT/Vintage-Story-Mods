@@ -23,9 +23,15 @@ public class SetupWizardLanguageDraftTests
 
     private static LanguageConfigEntryMessage Row() => new()
     {
-        Name = "Harbor", OriginalName = "Harbor", Description = "A language of the coast.",
-        Prefix = "harbor", Syllables = "sho, ra", Color = "#68B8A2", Default = true,
-        GrantedToClasses = "hunter", GrantedToTraits = "keeneyes"
+        Name = "Harbor",
+        OriginalName = "Harbor",
+        Description = "A language of the coast.",
+        Prefix = "harbor",
+        Syllables = "sho, ra",
+        Color = "#68B8A2",
+        Default = true,
+        GrantedToClasses = "hunter",
+        GrantedToTraits = "keeneyes"
     };
 
     [Fact]
@@ -290,11 +296,19 @@ public class SetupWizardLanguageDraftTests
 
     private static TheBasicsSetupWizardResultMessage Readback(LanguageConfigEntryMessage row) => new()
     {
-        Kind = SetupWizardResultKind.Open, RequestId = 2, RunId = "run", Success = true, Languages = Canonical(row)
+        Kind = SetupWizardResultKind.Open,
+        RequestId = 2,
+        RunId = "run",
+        Success = true,
+        Languages = Canonical(row)
     };
 
     private static TheBasicsSetupWizardResultMessage Result(long id, bool success, LanguageConfigEntryMessage row) => new()
     {
-        Kind = SetupWizardResultKind.SaveResult, RequestId = id, RunId = "run", Success = success, Languages = [row]
+        Kind = SetupWizardResultKind.SaveResult,
+        RequestId = id,
+        RunId = "run",
+        Success = success,
+        Languages = [row]
     };
 }

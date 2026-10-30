@@ -13,8 +13,13 @@ public class SceneMarkerCustomColorStorageTests
     {
         var edited = new SceneDescriptionData
         {
-            Title = "Watchtower", Body = "A distant light.", Color = SceneMarkerColor.Blue,
-            CustomColorHex = "#a153cf", AuthorUid = "editor", LockItemCode = "ui", ReadStamp = 50,
+            Title = "Watchtower",
+            Body = "A distant light.",
+            Color = SceneMarkerColor.Blue,
+            CustomColorHex = "#a153cf",
+            AuthorUid = "editor",
+            LockItemCode = "ui",
+            ReadStamp = 50,
             SymbolIconName = "wpStar1"
         }.Normalize();
         var data = new SceneDescriptionData { AuthorUid = "creator", ReadStamp = 10 };

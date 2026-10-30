@@ -5,12 +5,13 @@ using thebasics.ModSystems.ChatUiSystem;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 namespace thebasics.Tests.GuiPreview;
+
 [Collection("Standalone GUI")]
 public class SheetBuilderFixtureTests
 {
     public static IEnumerable<object[]> Captures =>
         from scenario in SetupWizardCaptureScenes.Names.Where(n => n.StartsWith("wizard-sheet-builder"))
-        from viewport in new[] { (1600,1000), (1280,720) }
+        from viewport in new[] { (1600, 1000), (1280, 720) }
         from scale in new[] { 1d, 1.25d }
         select new object[] { scenario, viewport.Item1, viewport.Item2, scale };
 
@@ -28,7 +29,8 @@ public class SheetBuilderFixtureTests
         Assert.Null(SetupWizardCaptureScenes.SheetFieldsForScenario("wizard-chat-default"));
     }
 
-    [VisualTheory] [MemberData(nameof(Captures))]
+    [VisualTheory]
+    [MemberData(nameof(Captures))]
     public void Production_capture_scenes_drive_native_controls_without_effects(string scenario, int width, int height, double scale)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, width, height, scale);

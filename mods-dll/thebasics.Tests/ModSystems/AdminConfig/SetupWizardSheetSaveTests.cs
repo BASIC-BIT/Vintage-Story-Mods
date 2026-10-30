@@ -33,8 +33,12 @@ public class SetupWizardSheetSaveTests
         draft.SheetFields.Add(laterAdded);
         var localOrder = draft.SheetFields.Select(field => field.Id).ToArray();
 
-        draft.MergeSaveReadback(new() { Kind = SetupWizardResultKind.Open, Success = true,
-            SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(persisted) }).Should().BeTrue();
+        draft.MergeSaveReadback(new()
+        {
+            Kind = SetupWizardResultKind.Open,
+            Success = true,
+            SheetFields = CharacterSheetFieldConfigAdmin.BuildEntries(persisted)
+        }).Should().BeTrue();
 
         added.OriginalId.Should().Be(added.Id);
         added.Label.Should().Be(laterPropertyEdit ? "Later local label" : "Submitted new field");
@@ -55,8 +59,13 @@ public class SetupWizardSheetSaveTests
     {
         var current = new ModConfig(); current.InitializeDefaultsIfNeeded();
         var fields = CharacterSheetFieldConfigAdmin.BuildEntries(current);
-        var request = new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Save, RequestId = 1,
-            SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(fields), OriginalSheetFields = fields };
+        var request = new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 1,
+            SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(fields),
+            OriginalSheetFields = fields
+        };
         request.SheetFields[0].Type = "option"; request.SheetFields[0].BindTo = ""; request.SheetFields[0].Options = options;
         new SetupWizardState(current).TryValidatePatch(current, request, out var saved, out _, out _, out var errors).Should().BeFalse();
         saved.Should().BeNull(); errors.Should().Contain(error => error.StartsWith("Choices must"));
@@ -115,8 +124,13 @@ public class SetupWizardSheetSaveTests
         var current = new ModConfig();
         current.InitializeDefaultsIfNeeded();
         var original = CharacterSheetFieldConfigAdmin.BuildEntries(current);
-        var request = new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Save, RequestId = 1,
-            SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(original), OriginalSheetFields = original };
+        var request = new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 1,
+            SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(original),
+            OriginalSheetFields = original
+        };
         request.SheetFields[0].OriginalId = "invented";
         request.SheetFields[0].Id = "invented";
         var state = new SetupWizardState(current);
@@ -167,9 +181,15 @@ public class SetupWizardSheetSaveTests
         var current = new ModConfig();
         current.InitializeDefaultsIfNeeded();
         var original = CharacterSheetFieldConfigAdmin.BuildEntries(current);
-        var request = new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Save, RequestId = 1,
-            Values = [new() { Key = "EnableChatter", Value = "0" }], OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
-            SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(original), OriginalSheetFields = original };
+        var request = new TheBasicsSetupWizardRequestMessage
+        {
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 1,
+            Values = [new() { Key = "EnableChatter", Value = "0" }],
+            OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
+            SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(original),
+            OriginalSheetFields = original
+        };
         switch (fault)
         {
             case "null": request.SheetFields = null!; break;

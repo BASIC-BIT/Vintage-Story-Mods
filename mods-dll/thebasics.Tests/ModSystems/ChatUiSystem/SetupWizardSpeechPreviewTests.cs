@@ -190,12 +190,18 @@ public class SetupWizardSpeechPreviewTests
     {
         var first = new LanguageConfigEntryMessage
         {
-            Name = "Hillspeech", Description = "Spoken in the highlands.", Prefix = "hill",
-            Syllables = "or, an", Color = "#F3CD97"
+            Name = "Hillspeech",
+            Description = "Spoken in the highlands.",
+            Prefix = "hill",
+            Syllables = "or, an",
+            Color = "#F3CD97"
         };
         var selectedDefault = first with
         {
-            Name = "River Cant", Prefix = "river", Color = "#67C9AD", Default = true
+            Name = "River Cant",
+            Prefix = "river",
+            Color = "#67C9AD",
+            Default = true
         };
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues(),
             [selectedDefault with { Color = "blue" }, first, selectedDefault]);

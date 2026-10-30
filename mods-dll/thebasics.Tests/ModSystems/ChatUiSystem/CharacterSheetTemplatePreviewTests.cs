@@ -18,13 +18,22 @@ public class CharacterSheetTemplatePreviewTests
     public void Template_selects_actual_cells_without_answer_edits_or_save(double scale)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1200, scale);
-        var view = new CharacterSheetViewMessage { CanEdit = true, Fields = Enumerable.Range(0, 14).Select(i => new CharacterSheetFieldViewMessage
+        var view = new CharacterSheetViewMessage
         {
-            FieldId = "field-" + i, Label = "Field " + i, CanEdit = true, Value = i == 5 ? "2" : "Sample", Type = i == 3 ? "option" : i == 4 ? "longstring" : i == 5 ? "number" : "string",
-            Options = i == 3 ? new List<string> { "Sample", "Other" } : new List<string>(), EditorRows = 2,
-            Width = i is 1 or 2 ? CharacterSheetFieldWidths.Half : CharacterSheetFieldWidths.Full,
-            LayoutSection = i == 0 ? CharacterSheetLayoutSections.HeaderSide : CharacterSheetLayoutSections.Body
-        }).ToList() };
+            CanEdit = true,
+            Fields = Enumerable.Range(0, 14).Select(i => new CharacterSheetFieldViewMessage
+            {
+                FieldId = "field-" + i,
+                Label = "Field " + i,
+                CanEdit = true,
+                Value = i == 5 ? "2" : "Sample",
+                Type = i == 3 ? "option" : i == 4 ? "longstring" : i == 5 ? "number" : "string",
+                Options = i == 3 ? new List<string> { "Sample", "Other" } : new List<string>(),
+                EditorRows = 2,
+                Width = i is 1 or 2 ? CharacterSheetFieldWidths.Half : CharacterSheetFieldWidths.Full,
+                LayoutSection = i == 0 ? CharacterSheetLayoutSections.HeaderSide : CharacterSheetLayoutSections.Body
+            }).ToList()
+        };
         int saves = 0;
         string? selected = null;
         using var dialog = new CharacterSheetDialog(host.Api, view, _ => saves++);
@@ -73,11 +82,21 @@ public class CharacterSheetTemplatePreviewTests
     public void Template_keeps_production_control_geometry_content_and_normal_draft_lifecycle(double scale)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!, Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1600, 1200, scale);
-        var view = new CharacterSheetViewMessage { TargetPlayerUid = "fictional", CanEdit = true, Fields = Enumerable.Range(0, 4).Select(i => new CharacterSheetFieldViewMessage
+        var view = new CharacterSheetViewMessage
         {
-            FieldId = "id" + i, Label = "Label " + i, Value = "Answer " + i, Type = "string", CanEdit = true,
-            LayoutSection = i == 0 ? "header-side" : "body", Width = i is 1 or 2 ? "half" : "full"
-        }).ToList() };
+            TargetPlayerUid = "fictional",
+            CanEdit = true,
+            Fields = Enumerable.Range(0, 4).Select(i => new CharacterSheetFieldViewMessage
+            {
+                FieldId = "id" + i,
+                Label = "Label " + i,
+                Value = "Answer " + i,
+                Type = "string",
+                CanEdit = true,
+                LayoutSection = i == 0 ? "header-side" : "body",
+                Width = i is 1 or 2 ? "half" : "full"
+            }).ToList()
+        };
         CharacterSheetSaveRequest? saved = null;
         using var normal = new CharacterSheetDialog(host.Api, view, request => saved = request, new HeadshotDialogCallbacks());
         using var template = new CharacterSheetDialog(host.Api, view, _ => throw new Exception("Preview saved answers"));

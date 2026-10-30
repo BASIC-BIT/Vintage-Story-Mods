@@ -15,7 +15,9 @@ public partial class SceneDescriptionServerTests
         marker.Block.Code = new AssetLocation("thebasics:scene-marker-ground-north");
         marker.OnReceivedClientPacket(player, 1002, SerializerUtil.Serialize(new SceneDescriptionEditPacket
         {
-            Body = "Custom marker", Color = (int)SceneMarkerColor.Blue, CustomColorHex = "#a153cf"
+            Body = "Custom marker",
+            Color = (int)SceneMarkerColor.Blue,
+            CustomColorHex = "#a153cf"
         }));
         marker.Data.CustomColorHex.Should().Be("#A153CF");
         marker.Data.Color.Should().Be(SceneMarkerColor.Blue);

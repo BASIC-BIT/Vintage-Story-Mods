@@ -93,8 +93,13 @@ public class LegacyFieldEditorLayoutTests
             Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
         using var dialog = new CharacterSheetFieldConfigDialog(host.Api,
             Enumerable.Range(1, 15).Select(index => new CharacterSheetFieldConfigEntryMessage
-                { OriginalId = "field" + index, Id = "field" + index, Label = "Field " + index,
-                    Description = "A long description shown from its beginning", Type = "string" }).ToList(),
+            {
+                OriginalId = "field" + index,
+                Id = "field" + index,
+                Label = "Field " + index,
+                Description = "A long description shown from its beginning",
+                Type = "string"
+            }).ToList(),
             _ => { }, () => { }, () => { });
         dialog.TryOpen();
         host.RenderGuiDialog(dialog, 0);

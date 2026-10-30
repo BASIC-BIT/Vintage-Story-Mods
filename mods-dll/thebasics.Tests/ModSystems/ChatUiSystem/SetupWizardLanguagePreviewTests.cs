@@ -108,8 +108,11 @@ public class SetupWizardLanguagePreviewTests
 
     private static LanguageConfigEntryMessage Entry() => new()
     {
-        Name = "River Cant", Description = "Spoken along the rivers.", Prefix = "river",
-        Syllables = "sha, vri, ko", Color = "#67C9AD"
+        Name = "River Cant",
+        Description = "Spoken along the rivers.",
+        Prefix = "river",
+        Syllables = "sha, vri, ko",
+        Color = "#67C9AD"
     };
 
     private static ModConfig Config()

@@ -122,8 +122,11 @@ public class SetupWizardFinalReviewTests
         var directory = Path.Combine(root, "scale-" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture));
         Directory.CreateDirectory(directory);
         host.Canvas.SavePng(Path.Combine(directory, name + ".png"));
-        File.WriteAllText(Path.Combine(directory, name + ".json"), JsonSerializer.Serialize(new {
-            width = 1280, height = 720, scale,
+        File.WriteAllText(Path.Combine(directory, name + ".json"), JsonSerializer.Serialize(new
+        {
+            width = 1280,
+            height = 720,
+            scale,
             sourceTreeHash = Environment.GetEnvironmentVariable("FINAL_FIX_SOURCE_HASH"),
             assemblySha256 = SetupWizardCaptureIdentity.HashFile(typeof(SetupWizardDialog).Assembly.Location),
             environment = host.EnvironmentIdentity,

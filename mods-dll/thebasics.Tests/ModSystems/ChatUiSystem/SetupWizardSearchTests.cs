@@ -3,6 +3,7 @@ using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatUiSystem;
 using thebasics.Models;
 namespace thebasics.Tests.ModSystems.ChatUiSystem;
+
 public class SetupWizardSearchTests
 {
     public SetupWizardSearchTests() => LangTestHelper.EnsureEnglish();

@@ -20,8 +20,12 @@ public class ConfigAdminToggleTests
         var value = "1";
         using var dialog = new ScrollableConfigAdminDialog(new JsonDialogSettings
         {
-            Code = "toggle-test", Alignment = EnumDialogArea.CenterMiddle, SizeMultiplier = 0.9, Padding = 16,
-            OnGet = _ => value, OnSet = (_, updated) => value = updated,
+            Code = "toggle-test",
+            Alignment = EnumDialogArea.CenterMiddle,
+            SizeMultiplier = 0.9,
+            Padding = 16,
+            OnGet = _ => value,
+            OnSet = (_, updated) => value = updated,
             Rows = [
                 new(new DialogElement { Code = "group-chat", Type = EnumDialogElementType.Text, Text = "Chat", Width = 720, Height = 30 }),
                 new(new DialogElement { Code = "EnableGlobalOOC", Type = EnumDialogElementType.Switch, Label = "Allow global OOC", Width = 720, Height = 32 }),

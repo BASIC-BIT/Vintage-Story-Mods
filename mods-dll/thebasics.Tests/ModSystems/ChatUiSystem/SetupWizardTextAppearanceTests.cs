@@ -6,6 +6,7 @@ using thebasics.ModSystems.AdminConfig;
 using thebasics.ModSystems.ChatUiSystem;
 using thebasics.Tests.GuiPreview;
 namespace thebasics.Tests.ModSystems.ChatUiSystem;
+
 [Collection("Standalone GUI")]
 public class SetupWizardTextAppearanceTests
 {

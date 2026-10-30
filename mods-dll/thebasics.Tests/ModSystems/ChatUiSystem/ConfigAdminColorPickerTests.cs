@@ -107,8 +107,11 @@ public class ConfigAdminColorPickerTests
 
     private static Dictionary<string, string> Values() => new()
     {
-        ["EmoteColor"] = "navy", ["OOCColor"] = "#112233", ["GlobalOOCColor"] = "#abcdef",
-        ["NametagBackgroundColor"] = "", ["NametagBorderColor"] = "#12345678",
+        ["EmoteColor"] = "navy",
+        ["OOCColor"] = "#112233",
+        ["GlobalOOCColor"] = "#abcdef",
+        ["NametagBackgroundColor"] = "",
+        ["NametagBorderColor"] = "#12345678",
         ["TEXT_ServerSaveAnnouncement"] = "Saving soon."
     };
 
@@ -123,9 +126,13 @@ public class ConfigAdminColorPickerTests
         rows.Add(new DialogRow(new DialogElement { Code = "save", Type = EnumDialogElementType.Button, Text = "Save", Width = 150, Height = 34 }));
         return new ScrollableConfigAdminDialog(new JsonDialogSettings
         {
-            Code = "color-picker-test", Alignment = EnumDialogArea.CenterMiddle, SizeMultiplier = 0.9, Padding = 16,
+            Code = "color-picker-test",
+            Alignment = EnumDialogArea.CenterMiddle,
+            SizeMultiplier = 0.9,
+            Padding = 16,
             OnGet = key => values.GetValueOrDefault(key, string.Empty),
-            OnSet = (key, value) => { values[key] = value; changes.Add((key, value)); }, Rows = rows.ToArray()
+            OnSet = (key, value) => { values[key] = value; changes.Add((key, value)); },
+            Rows = rows.ToArray()
         }, host.Api, false);
     }
 

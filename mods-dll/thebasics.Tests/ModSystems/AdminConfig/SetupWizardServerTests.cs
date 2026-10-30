@@ -31,7 +31,9 @@ public class SetupWizardServerTests : IDisposable
 
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 4, RunId = run,
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 4,
+            RunId = run,
             Values = [new() { Key = "EnableChatter", Value = "0" }],
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }]
         });
@@ -79,11 +81,16 @@ public class SetupWizardServerTests : IDisposable
 
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Track, RunId = runId, StepId = "invitation", JourneyAction = "viewed"
+            Kind = SetupWizardRequestKind.Track,
+            RunId = runId,
+            StepId = "invitation",
+            JourneyAction = "viewed"
         });
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.InviteStart, RequestId = 1, RunId = runId
+            Kind = SetupWizardRequestKind.InviteStart,
+            RequestId = 1,
+            RunId = runId
         });
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open });
 
@@ -113,8 +120,10 @@ public class SetupWizardServerTests : IDisposable
 
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Track, RunId = revokedPrivilege ? runId : new string('e', 32),
-            StepId = "invitation", JourneyAction = "viewed"
+            Kind = SetupWizardRequestKind.Track,
+            RunId = revokedPrivilege ? runId : new string('e', 32),
+            StepId = "invitation",
+            JourneyAction = "viewed"
         });
 
         results.Last().Kind.Should().Be(SetupWizardResultKind.Denied);
@@ -139,7 +148,9 @@ public class SetupWizardServerTests : IDisposable
         sink.DidNotReceive().Track(Arg.Any<string>(), Arg.Any<IDictionary<string, object>>());
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 2, RunId = results.Last().RunId,
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 2,
+            RunId = results.Last().RunId,
             Values = [new() { Key = "EnableChatter", Value = "0" }],
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }]
         });
@@ -164,7 +175,9 @@ public class SetupWizardServerTests : IDisposable
         api.World.AllOnlinePlayers.Returns(_ => throw new InvalidOperationException("broadcast unavailable"));
         var request = new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 3, RunId = results.Last().RunId,
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 3,
+            RunId = results.Last().RunId,
             Values = [new() { Key = "EnableChatter", Value = "0" }],
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }]
         };
@@ -204,7 +217,9 @@ public class SetupWizardServerTests : IDisposable
             .Do(_ => { if (rejectSaveReply) throw new InvalidOperationException("reply transport unavailable"); });
         var request = new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 4, RunId = results.Last().RunId,
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 4,
+            RunId = results.Last().RunId,
             Values = [new() { Key = "EnableChatter", Value = "0" }],
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }]
         };
@@ -255,7 +270,9 @@ public class SetupWizardServerTests : IDisposable
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open });
         var request = new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 5, RunId = results.Last().RunId,
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 5,
+            RunId = results.Last().RunId,
             Values = [new() { Key = "EnableChatter", Value = "0" }],
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
             OriginalLanguages = LanguageConfigAdmin.CloneEntries(results.Last().Languages),
@@ -299,7 +316,9 @@ public class SetupWizardServerTests : IDisposable
         system.OnSetupWizardRequest(player, new TheBasicsSetupWizardRequestMessage { Kind = SetupWizardRequestKind.Open });
         var request = new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 6, RunId = results.Last().RunId,
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 6,
+            RunId = results.Last().RunId,
             Values = [new() { Key = "EnableChatter", Value = "0" }],
             OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
             OriginalLanguages = LanguageConfigAdmin.CloneEntries(results.Last().Languages),
@@ -337,8 +356,11 @@ public class SetupWizardServerTests : IDisposable
         system.OnSetupWizardRequest(player, new() { Kind = SetupWizardRequestKind.Open });
         var request = new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 20, RunId = results.Last().RunId,
-            Values = [new() { Key = "EnableChatter", Value = "0" }], OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 20,
+            RunId = results.Last().RunId,
+            Values = [new() { Key = "EnableChatter", Value = "0" }],
+            OriginalValues = [new() { Key = "EnableChatter", Value = "1" }],
             SheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(results.Last().SheetFields),
             OriginalSheetFields = CharacterSheetFieldConfigAdmin.CloneEntries(results.Last().SheetFields)
         };
@@ -378,7 +400,9 @@ public class SetupWizardServerTests : IDisposable
             ConfigAdminSettingRegistry.TryGet(key, out var setting);
             system.OnSetupWizardRequest(player, new()
             {
-                Kind = SetupWizardRequestKind.Save, RequestId = 10, RunId = results.Last().RunId,
+                Kind = SetupWizardRequestKind.Save,
+                RequestId = 10,
+                RunId = results.Last().RunId,
                 Values = [new() { Key = key, Value = "custom.travel" }],
                 OriginalValues = [new() { Key = key, Value = setting.GetValue(system.Config) }]
             });
@@ -401,7 +425,8 @@ public class SetupWizardServerTests : IDisposable
         var state = new SetupWizardState(config);
         var request = new TheBasicsSetupWizardRequestMessage
         {
-            Kind = SetupWizardRequestKind.Save, RequestId = 1,
+            Kind = SetupWizardRequestKind.Save,
+            RequestId = 1,
             Values = [new() { Key = key, Value = value }],
             OriginalValues = [new() { Key = key, Value = setting.GetValue(config) }]
         };
