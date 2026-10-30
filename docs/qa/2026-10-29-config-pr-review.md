@@ -18,7 +18,11 @@ The relay must support revision 11 before a release of this producer. No relay d
 
 The tooling check, 20 screenshot-report tests, two workflow trust-boundary tests, 118 visual-workflow assertions and 29 analytics relay tests pass. Independent scoped reviews accepted the capture and relay corrections.
 
-A fresh full native-enabled regression was started from the source checkpoint before the revision-only producer change. Its result and a subsequent focused Analytics retest are pending. CI and Claude review must finish for the final pushed head. The GitHub Codex reviewer could not run because the account's code-review quota was exhausted; that is unavailable review evidence, not approval.
+A fresh full native-enabled regression was started from the source checkpoint before the revision-only producer change. That process disappeared without a terminal result or TRX file, so it is not counted as passed. The final-head CI suite and a focused local Analytics retest remain pending.
+
+For `6160ff6`, Claude reported no important findings. Its optional defensive registry-lookup suggestion remains unchanged: request validation rejects keys outside the catalog, and coverage tests enforce catalog/registry consistency. CodeQL, GUI rendering, architecture and Terraform/Worker checks passed. Build CI stopped on test-source whitespace before running tests. A formatting-only correction must pass the final-head checks and review before readiness is reported.
+
+The GitHub Codex reviewer could not run because the account's code-review quota was exhausted; that is unavailable review evidence, not approval.
 
 ## Remaining gates
 
