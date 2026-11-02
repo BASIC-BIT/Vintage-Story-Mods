@@ -18,8 +18,17 @@
     <Reference Include="VintagestoryLib">
       <HintPath>$(VINTAGE_STORY)/VintagestoryLib.dll</HintPath>
     </Reference>
+    <Reference Include="VSEssentials">
+      <HintPath>$(VINTAGE_STORY)/Mods/VSEssentials.dll</HintPath>
+    </Reference>
     <Reference Include="cairo-sharp">
       <HintPath>$(VINTAGE_STORY)/Lib/cairo-sharp.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenTK.Windowing.Common">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenTK.Windowing.GraphicsLibraryFramework">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.GraphicsLibraryFramework.dll</HintPath>
     </Reference>
     <Reference Include="SkiaSharp" Condition="Exists('$(VINTAGE_STORY)/Lib/SkiaSharp.dll')">
       <HintPath>$(VINTAGE_STORY)/Lib/SkiaSharp.dll</HintPath>

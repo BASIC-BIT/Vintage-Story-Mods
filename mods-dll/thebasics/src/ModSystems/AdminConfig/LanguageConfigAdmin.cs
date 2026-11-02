@@ -16,6 +16,12 @@ public static class LanguageConfigAdmin
     private static readonly string[] ReservedNames = [LanguageSystem.BabbleLang.Name, LanguageSystem.SignLanguage.Name];
     private static readonly string[] ReservedPrefixes = [LanguageSystem.BabbleLang.Prefix, LanguageSystem.SignLanguage.Prefix];
 
+    public static List<LanguageConfigEntryMessage> CloneEntries(IEnumerable<LanguageConfigEntryMessage> entries) =>
+        (entries ?? Array.Empty<LanguageConfigEntryMessage>()).Select(entry => entry is null ? null : entry with { }).ToList();
+
+    public static bool EntriesEqual(IEnumerable<LanguageConfigEntryMessage> first, IEnumerable<LanguageConfigEntryMessage> second) =>
+        (first ?? Array.Empty<LanguageConfigEntryMessage>()).SequenceEqual(second ?? Array.Empty<LanguageConfigEntryMessage>());
+
     public static List<LanguageConfigEntryMessage> BuildEntries(ModConfig config)
     {
         return (config?.Languages ?? Array.Empty<Language>())

@@ -1,4 +1,6 @@
 ﻿# Get absolute paths
+param([switch]$LocalOnly)
+
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")  # thebasics project root
 $solutionRoot = Resolve-Path (Join-Path $projectRoot "../..")  # solution root
 $releaseDir = Join-Path $projectRoot "bin/Release"
@@ -57,7 +59,7 @@ Write-Host "Building mod package..."
 
 # Load root-level environment before local deployment so VS_PROFILES_DIR and
 # THEBASICS_LOCAL_MOD_DIRS can direct profile-specific client installs.
-if (Test-Path $rootEnvPath) {
+if (-not $LocalOnly -and (Test-Path $rootEnvPath)) {
     Get-Content $rootEnvPath | ForEach-Object {
         if ($_ -match '^\s*([^#=\s]+)\s*=\s*(.*)\s*$') {
             $name = $matches[1]
@@ -132,6 +134,11 @@ try {
     Write-Host $msg
     "[$timestamp] $msg" | Out-File -FilePath $logFile -Append
     exit 1
+}
+
+if ($LocalOnly) {
+    Write-Host "Local-only package complete: $zipFile"
+    return
 }
 
 # Copy to local mods directories

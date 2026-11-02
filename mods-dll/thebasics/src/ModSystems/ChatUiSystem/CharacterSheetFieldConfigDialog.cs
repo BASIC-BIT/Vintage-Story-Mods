@@ -16,7 +16,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 {
     private const double DialogWidth = 980;
     private const double ContentWidth = DialogWidth - 48;
-    private const double PanelHeight = 470;
+    private const double PanelHeight = 430;
     private const double FieldHeight = 28;
     private const double FieldRowHeight = 55;
     private readonly Action<List<CharacterSheetFieldConfigEntryMessage>> _onSave;
@@ -24,6 +24,8 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     private readonly Action _onClose;
     private readonly Dictionary<string, GuiElementTextInput> _textInputs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, GuiElementDropDown> _dropDowns = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, GuiElementSetupToggle> _toggles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _fieldHelp = new();
     private List<CharacterSheetFieldConfigEntryMessage> _fields;
     private List<CharacterSheetFieldConfigEntryMessage> _lastLoadedFields;
     private int _selectedIndex;
@@ -32,6 +34,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     private GuiDialogConfirm _unsavedCloseConfirm;
     private GuiDialogConfirm _deleteConfirm;
     private bool _suspendCallbacks;
+    private string _searchField;
 
     public CharacterSheetFieldConfigDialog(
         ICoreClientAPI capi,
@@ -55,6 +58,23 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     public override bool DisableMouseGrab => true;
 
     public override double DrawOrder => 0.27;
+
+    internal bool JumpTo(string id, string field)
+    {
+        CaptureSelectedInputToDraft();
+        var index = _fields.FindIndex(entry => string.Equals(entry.OriginalId, id, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) return false;
+        _selectedIndex = index;
+        _searchField = field;
+        ComposeDialog();
+        GuiElement control = _textInputs.GetValueOrDefault(field);
+        control ??= _dropDowns.GetValueOrDefault(field);
+        control ??= _toggles.GetValueOrDefault(field);
+        // Existing field IDs are read-only; highlight their displayed value.
+        if (control == null) return field == nameof(CharacterSheetFieldConfigEntryMessage.Id);
+        if (control.Focusable) SingleComposer.FocusElement(control.TabIndex);
+        return true;
+    }
 
     public void SetView(List<CharacterSheetFieldConfigEntryMessage> fields, bool updateBaseline)
     {
@@ -110,6 +130,8 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         SingleComposer?.Dispose();
         _textInputs.Clear();
         _dropDowns.Clear();
+        _toggles.Clear();
+        _fieldHelp.Clear();
         _selectedIndex = ClampSelectedIndex(_selectedIndex);
         _suspendCallbacks = true;
 
@@ -138,11 +160,31 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         AddSelectedFieldEditor(composer, rightPanelBounds);
 
         AddButton(composer, "reload", Lang.Get("thebasics:charsheet-field-config-reload"), OnReload, ElementBounds.Fixed(0, buttonY, 118, buttonHeight), Lang.Get("thebasics:charsheet-field-config-reload-tooltip"));
-        AddButton(composer, "save", Lang.Get("thebasics:charsheet-field-config-save"), OnSave, ElementBounds.Fixed(ContentWidth - 250, buttonY, 118, buttonHeight), Lang.Get("thebasics:charsheet-field-config-save-tooltip"));
-        AddButton(composer, "close", Lang.Get("thebasics:charsheet-field-config-close"), OnCancel, ElementBounds.Fixed(ContentWidth - 122, buttonY, 110, buttonHeight), Lang.Get("thebasics:charsheet-field-config-close-tooltip"));
+        AddButton(composer, "save", Lang.Get("thebasics:charsheet-field-config-save"), OnSave, ElementBounds.Fixed(ContentWidth - 130, buttonY, 118, buttonHeight), Lang.Get("thebasics:charsheet-field-config-save-tooltip"));
+        AddButton(composer, "close", Lang.Get("thebasics:charsheet-field-config-close"), OnCancel, ElementBounds.Fixed(ContentWidth - 250, buttonY, 110, buttonHeight), Lang.Get("thebasics:charsheet-field-config-close-tooltip"));
 
         SingleComposer = composer.EndChildElements().Compose(focusFirstElement: false);
         _suspendCallbacks = false;
+        RefreshApplicableControls();
+    }
+
+    private void RefreshApplicableControls()
+    {
+        var type = GetSelectedValue(nameof(CharacterSheetFieldConfigEntryMessage.Type));
+        _textInputs[nameof(CharacterSheetFieldConfigEntryMessage.EditorRows)].Enabled = type == CharacterSheetFieldTypes.LongString;
+        _textInputs[nameof(CharacterSheetFieldConfigEntryMessage.Options)].Enabled = type == CharacterSheetFieldTypes.Option;
+        _dropDowns[nameof(CharacterSheetFieldConfigEntryMessage.Width)].Enabled =
+            GetSelectedValue(nameof(CharacterSheetFieldConfigEntryMessage.LayoutSection)) != CharacterSheetLayoutSections.HeaderSide;
+        _toggles[nameof(CharacterSheetFieldConfigEntryMessage.ShowInLook)].Enabled =
+            GetSelectedValue(nameof(CharacterSheetFieldConfigEntryMessage.Visibility)) is "public" or "nearby";
+        // Keep an existing binding editable so an incompatible type can be repaired without losing it silently.
+        _dropDowns[nameof(CharacterSheetFieldConfigEntryMessage.BindTo)].Enabled = type == CharacterSheetFieldTypes.String ||
+            !string.IsNullOrWhiteSpace(GetSelectedValue(nameof(CharacterSheetFieldConfigEntryMessage.BindTo)));
+        RefreshFieldAppearance("EditorRows", _textInputs["EditorRows"].Enabled, "field-disabled-rows");
+        RefreshFieldAppearance("Options", _textInputs["Options"].Enabled, "field-disabled-options");
+        RefreshFieldAppearance("Width", _dropDowns["Width"].Enabled, "field-disabled-width");
+        RefreshFieldAppearance("ShowInLook", _toggles["ShowInLook"].Enabled, "field-disabled-look");
+        RefreshFieldAppearance("BindTo", _dropDowns["BindTo"].Enabled, "field-disabled-binding");
     }
 
     private void AddFieldList(GuiComposer composer, ElementBounds panelBounds)
@@ -155,13 +197,13 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         var values = Enumerable.Range(0, _fields.Count).Select(index => index.ToString()).ToArray();
         var names = _fields.Select((field, index) => TrimListText($"{index + 1}. {DisplayLabel(field)}", 28)).ToArray();
         var selectedBounds = ElementBounds.Fixed(x, y + 26, width, FieldHeight);
-        var selector = new GuiElementDropDown(capi, values, names, _selectedIndex, OnSelectedFieldChanged, selectedBounds, CairoFont.WhiteSmallText(), multiSelect: false);
+        var selector = new FieldSelector(capi, values, names, _selectedIndex, OnSelectedFieldChanged, selectedBounds);
         composer.AddInteractiveElement(selector, "field-selector");
         AddTooltip(composer, "field-selector", selectedBounds, Lang.Get("thebasics:charsheet-field-config-selected-tooltip"));
 
         y += 68;
-        AddButton(composer, "add", Lang.Get("thebasics:charsheet-field-config-add"), OnAddField, ElementBounds.Fixed(x, y, 104, 28), Lang.Get("thebasics:charsheet-field-config-add-tooltip"));
-        AddButton(composer, "delete", Lang.Get("thebasics:charsheet-field-config-delete"), OnDeleteSelectedField, ElementBounds.Fixed(x + 114, y, 104, 28), Lang.Get("thebasics:charsheet-field-config-delete-tooltip"));
+        AddButton(composer, "add", Lang.Get("thebasics:charsheet-field-config-add"), OnAddField, ElementBounds.Fixed(x, y, width, 28), Lang.Get("thebasics:charsheet-field-config-add-tooltip"));
+        AddButton(composer, "delete", Lang.Get("thebasics:charsheet-field-config-delete"), OnDeleteSelectedField, ElementBounds.Fixed(x, panelBounds.fixedY + panelBounds.fixedHeight - 40, width, 28), Lang.Get("thebasics:charsheet-field-config-delete-tooltip"));
         y += 36;
         AddButton(composer, "up", Lang.Get("thebasics:charsheet-field-config-up"), OnMoveSelectedFieldUp, ElementBounds.Fixed(x, y, 104, 28), Lang.Get("thebasics:charsheet-field-config-up-tooltip"));
         AddButton(composer, "down", Lang.Get("thebasics:charsheet-field-config-down"), OnMoveSelectedFieldDown, ElementBounds.Fixed(x + 114, y, 104, 28), Lang.Get("thebasics:charsheet-field-config-down-tooltip"));
@@ -199,9 +241,9 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         leftY = AddIdEditor(composer, field, x, leftY, columnWidth);
         leftY = AddTextInput(composer, nameof(CharacterSheetFieldConfigEntryMessage.Description), Lang.Get("thebasics:charsheet-field-config-description"), field.Description, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), 280, Lang.Get("thebasics:charsheet-field-config-description-tooltip"));
         leftY = AddSelectDropDown(composer, nameof(CharacterSheetFieldConfigEntryMessage.Type), Lang.Get("thebasics:charsheet-field-config-type"), GetTypeValues(), GetTypeNames(), field.Type, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:charsheet-field-config-type-tooltip"));
-        leftY = AddBoolDropDown(composer, nameof(CharacterSheetFieldConfigEntryMessage.Optional), Lang.Get("thebasics:charsheet-field-config-optional"), field.Optional, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:charsheet-field-config-optional-tooltip"));
+        leftY = AddBoolToggle(composer, nameof(CharacterSheetFieldConfigEntryMessage.Optional), Lang.Get("thebasics:charsheet-field-config-optional"), field.Optional, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:charsheet-field-config-optional-tooltip"));
         leftY = AddSelectDropDown(composer, nameof(CharacterSheetFieldConfigEntryMessage.Visibility), Lang.Get("thebasics:charsheet-field-config-visibility"), GetVisibilityValues(), GetVisibilityNames(), field.Visibility, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:charsheet-field-config-visibility-tooltip"));
-        AddBoolDropDown(composer, nameof(CharacterSheetFieldConfigEntryMessage.ShowInLook), Lang.Get("thebasics:charsheet-field-config-show-in-look"), field.ShowInLook, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:charsheet-field-config-show-in-look-tooltip"));
+        AddBoolToggle(composer, nameof(CharacterSheetFieldConfigEntryMessage.ShowInLook), Lang.Get("thebasics:charsheet-field-config-show-in-look"), field.ShowInLook, ElementBounds.Fixed(x, leftY, columnWidth, FieldHeight), Lang.Get("thebasics:charsheet-field-config-show-in-look-tooltip"));
 
         var rightY = y + 34;
         rightY = AddSelectDropDown(composer, nameof(CharacterSheetFieldConfigEntryMessage.BindTo), Lang.Get("thebasics:charsheet-field-config-bind-to"), GetBindValues(), GetBindNames(), field.BindTo, ElementBounds.Fixed(rightColumnX, rightY, columnWidth, FieldHeight), Lang.Get("thebasics:charsheet-field-config-bind-to-tooltip"));
@@ -222,7 +264,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         var labelBounds = ElementBounds.Fixed(x, y, columnWidth, 20);
         AddLabel(composer, Lang.Get("thebasics:charsheet-field-config-key-locked"), labelBounds, tooltip: Lang.Get("thebasics:charsheet-field-config-key-locked-tooltip"));
         var valueBounds = ElementBounds.Fixed(x, y + 22, columnWidth, FieldHeight);
-        composer.AddStaticText(field.Id ?? string.Empty, CairoFont.WhiteSmallText(), valueBounds);
+        composer.AddStaticText((_searchField == nameof(CharacterSheetFieldConfigEntryMessage.Id) ? "> " : "") + (field.Id ?? string.Empty), CairoFont.WhiteSmallText(), valueBounds);
         AddTooltip(composer, "field-key-locked", valueBounds, Lang.Get("thebasics:charsheet-field-config-key-locked-tooltip"));
         return y + FieldRowHeight;
     }
@@ -230,11 +272,11 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
     private double AddTextInput(GuiComposer composer, string field, string label, string value, ElementBounds inputBounds, int maxLength, string tooltip, Action<string> onTextChanged = null)
     {
         var labelBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY, inputBounds.fixedWidth, 20);
-        AddLabel(composer, label, labelBounds, tooltip: tooltip);
+        AddSettingLabel(composer, field, label, labelBounds, tooltip);
 
         var actualInputBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY + 22, inputBounds.fixedWidth, inputBounds.fixedHeight);
         var input = new GuiElementTextInput(capi, actualInputBounds, onTextChanged, CairoFont.TextInput());
-        input.SetValue(value ?? string.Empty);
+        input.SetValue(value ?? string.Empty, setCaretPosToEnd: false);
         if (maxLength > 0)
         {
             input.SetMaxLength(maxLength);
@@ -242,27 +284,34 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         _textInputs[field] = input;
         composer.AddInteractiveElement(input, "input-" + field);
-        AddTooltip(composer, "input-" + field, labelBounds, tooltip);
+
         return inputBounds.fixedY + FieldRowHeight;
     }
 
-    private double AddBoolDropDown(GuiComposer composer, string field, string label, bool value, ElementBounds inputBounds, string tooltip)
+    private double AddBoolToggle(GuiComposer composer, string field, string label, bool value, ElementBounds inputBounds, string tooltip)
     {
         var labelBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY, inputBounds.fixedWidth, 20);
-        AddLabel(composer, label, labelBounds, tooltip: tooltip);
+        AddSettingLabel(composer, field, label, labelBounds, tooltip);
 
-        var actualInputBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY + 22, inputBounds.fixedWidth, inputBounds.fixedHeight);
-        var dropDown = new GuiElementDropDown(capi, ["0", "1"], [Lang.Get("No"), Lang.Get("Yes")], value ? 1 : 0, null, actualInputBounds, CairoFont.WhiteSmallText(), multiSelect: false);
-        _dropDowns[field] = dropDown;
-        composer.AddInteractiveElement(dropDown, "dropdown-" + field);
-        AddTooltip(composer, "dropdown-" + field, labelBounds, tooltip);
+        var actualInputBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY + 22, 112, inputBounds.fixedHeight);
+        var toggle = new GuiElementSetupToggle(capi, value, _ => { }, actualInputBounds);
+        _toggles[field] = toggle;
+        composer.AddInteractiveElement(toggle, "toggle-" + field);
+
         return inputBounds.fixedY + FieldRowHeight;
+    }
+
+    private sealed class FieldSelector : GuiElementDropDown
+    {
+        internal FieldSelector(ICoreClientAPI api, string[] values, string[] names, int index, SelectionChangedDelegate changed, ElementBounds bounds)
+            : base(api, values, names, index, changed, bounds, CairoFont.WhiteSmallText(), false)
+        { MouseOverCursor = "linkselect"; }
     }
 
     private double AddSelectDropDown(GuiComposer composer, string field, string label, string[] values, string[] names, string selectedValue, ElementBounds inputBounds, string tooltip)
     {
         var labelBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY, inputBounds.fixedWidth, 20);
-        AddLabel(composer, label, labelBounds, tooltip: tooltip);
+        AddSettingLabel(composer, field, label, labelBounds, tooltip);
 
         var selectedIndex = Array.FindIndex(values, value => string.Equals(value, selectedValue ?? string.Empty, StringComparison.OrdinalIgnoreCase));
         if (selectedIndex < 0)
@@ -271,11 +320,30 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
         }
 
         var actualInputBounds = ElementBounds.Fixed(inputBounds.fixedX, inputBounds.fixedY + 22, inputBounds.fixedWidth, inputBounds.fixedHeight);
-        var dropDown = new GuiElementDropDown(capi, values, names, selectedIndex, null, actualInputBounds, CairoFont.WhiteSmallText(), multiSelect: false);
+        var dropDown = new FieldSelector(capi, values, names, selectedIndex,
+            (_, selected) => { if (selected && !_suspendCallbacks) RefreshApplicableControls(); }, actualInputBounds);
         _dropDowns[field] = dropDown;
         composer.AddInteractiveElement(dropDown, "dropdown-" + field);
-        AddTooltip(composer, "dropdown-" + field, labelBounds, tooltip);
+
         return inputBounds.fixedY + FieldRowHeight;
+    }
+
+    private void AddSettingLabel(GuiComposer composer, string field, string label, ElementBounds bounds, string help)
+    {
+        _fieldHelp[field] = help;
+        composer.AddDynamicText(label, CairoFont.WhiteSmallText(), bounds, "label-" + field);
+        var hoverBounds = bounds.FlatCopy();
+        hoverBounds.fixedHeight = 22 + FieldHeight;
+        composer.AddHoverText(help, CairoFont.WhiteSmallText(), 360, hoverBounds, "help-" + field);
+    }
+
+    private void RefreshFieldAppearance(string field, bool enabled, string reason)
+    {
+        var label = SingleComposer.GetDynamicText("label-" + field);
+        label.Font = CairoFont.WhiteSmallText().WithColor(new[] { 1d, 1d, 1d, enabled ? 1d : .38 });
+        label.RecomposeText();
+        SingleComposer.GetHoverText("help-" + field).SetNewText(
+            enabled ? _fieldHelp[field] : Lang.Get("thebasics:" + reason));
     }
 
     private void CaptureSelectedInputToDraft()
@@ -415,6 +483,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         _fields.RemoveAt(index);
         _selectedIndex = ClampSelectedIndex(index);
+        _searchField = null;
         ComposeDialog();
     }
 
@@ -517,6 +586,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
         CaptureSelectedInputToDraft();
         _selectedIndex = ClampSelectedIndex(index);
+        _searchField = null;
         ComposeDialog();
     }
 
@@ -532,7 +602,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
     private bool GetBool(string field)
     {
-        return _dropDowns.TryGetValue(field, out var dropDown) && dropDown.SelectedValue == "1";
+        return _toggles.TryGetValue(field, out var toggle) && toggle.Value;
     }
 
     private int ClampSelectedIndex(int index)
@@ -568,7 +638,7 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
 
     private List<(string Text, bool IsSelected)> BuildOrderSummaryLines()
     {
-        const int maxLines = 12;
+        const int maxLines = 9; // Reserve a row for the overflow count and space for Delete.
         var lines = new List<(string Text, bool IsSelected)>();
         for (var index = 0; index < Math.Min(maxLines, _fields.Count); index++)
         {
@@ -802,6 +872,9 @@ public class CharacterSheetFieldConfigDialog : GuiDialog
             AddTooltip(composer, "tooltip-label-" + Math.Abs((text + bounds.fixedX + bounds.fixedY).GetHashCode()), bounds, tooltip);
         }
     }
+
+    public override void OnRenderGUI(float deltaTime) =>
+        GuiPopupHoverGuard.RenderBackground(SingleComposer, false, () => base.OnRenderGUI(deltaTime));
 
     private static void AddTooltip(GuiComposer composer, string key, ElementBounds bounds, string text)
     {

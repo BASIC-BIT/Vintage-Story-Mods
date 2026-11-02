@@ -107,6 +107,8 @@ For this repository's Pterodactyl test server, Client API operations require the
 
 For local client QA, verify Profile2/Profile3 mod zips before asking the human to test. The profiles can contain stale same-version `thebasics_*.zip` files under `D:\Games\VSProfiles\Profile2\Mods` and `D:\Games\VSProfiles\Profile3\Mods`; compare SHA256 against the freshly built package and replace stale copies before relaunching clients.
 
+For automated client setup, Agent Control actions and native wizard captures, use `.opencode/skills/vintage-story-agent-control/SKILL.md`. Its tracked scripts preserve profile backups and capture receipts. Continue to require the owner's observations for the human cards below.
+
 Do NOT repeat connection details, IPs, or other setup the human already knows. Keep it to: "Server is back up with [config changes]. Please relaunch both clients."
 
 ### Present the batch card

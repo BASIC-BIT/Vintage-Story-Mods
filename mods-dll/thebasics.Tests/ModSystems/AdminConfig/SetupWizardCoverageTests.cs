@@ -1,0 +1,79 @@
+using FluentAssertions;
+using thebasics.Configs;
+using thebasics.ModSystems.AdminConfig;
+
+namespace thebasics.Tests.ModSystems.AdminConfig;
+
+public class SetupWizardCoverageTests
+{
+    // Remove a key only when its destination is implemented and verified.
+    private static readonly string[] PendingMigrationKeys = [];
+
+    private static string[] RegisteredKeys => ConfigAdminSettingRegistry.Settings.Select(setting => setting.Key).ToArray();
+    private static string[] CoveredKeys => SetupWizardCatalog.Pages.SelectMany(page => page.SettingKeys).ToArray();
+
+    [Fact]
+    public void CatalogAndPendingInventoryPartitionTheScalarRegistry()
+    {
+        RegisteredKeys.Should().HaveCount(210).And.OnlyHaveUniqueItems();
+        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(210);
+        PendingMigrationKeys.Should().BeEmpty();
+        CoverageErrors(RegisteredKeys, CoveredKeys, PendingMigrationKeys).Should().BeEmpty();
+        foreach (var key in PendingMigrationKeys)
+            SetupWizardCatalog.IsSettingKey(key).Should().BeFalse($"{key} has no implemented wizard destination yet");
+    }
+
+    [Fact]
+    public void CoverageRejectsANewUnassignedRegistryKey()
+    {
+        CoverageErrors(RegisteredKeys.Append("FutureSetting"), CoveredKeys, PendingMigrationKeys)
+            .Should().Contain("Unassigned: FutureSetting");
+    }
+
+    [Fact]
+    public void CoverageRejectsADestinationReferencingAnUnknownKey()
+    {
+        CoverageErrors(RegisteredKeys, CoveredKeys.Append("UnknownSetting"), PendingMigrationKeys)
+            .Should().Contain("Unknown destination: UnknownSetting");
+    }
+
+    [Fact]
+    public void CoverageRejectsAPendingKeyClaimedAsComplete()
+    {
+        const string pending = "SyntheticPending";
+        CoverageErrors(RegisteredKeys.Append(pending), CoveredKeys.Append(pending), new[] { pending })
+            .Should().Contain($"Still pending: {pending}");
+    }
+
+    [Fact]
+    public void CoverageAllowsTheSameSettingOnMultiplePages()
+    {
+        CoverageErrors(RegisteredKeys, CoveredKeys.Append(CoveredKeys[0]), PendingMigrationKeys)
+            .Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("chat.languageeditor", nameof(ModConfig.Languages))]
+    [InlineData("characters.builder", nameof(ModConfig.CharacterSheetFields))]
+    public void StructuredCollectionsHaveTheirOwnPagesOutsideScalarCoverage(string pageId, string collectionKey)
+    {
+        SetupWizardCatalog.TryGetPage(pageId, out var page).Should().BeTrue();
+        page.SettingKeys.Should().BeEmpty();
+        RegisteredKeys.Should().NotContain(collectionKey);
+        CoveredKeys.Should().NotContain(collectionKey);
+        PendingMigrationKeys.Should().NotContain(collectionKey);
+        SetupWizardCatalog.IsSettingKey(collectionKey).Should().BeFalse();
+    }
+
+    private static IEnumerable<string> CoverageErrors(IEnumerable<string> registered, IEnumerable<string> covered,
+        IEnumerable<string> pending)
+    {
+        var registeredKeys = registered.ToHashSet(StringComparer.Ordinal);
+        var coveredKeys = covered.ToHashSet(StringComparer.Ordinal);
+        var pendingKeys = pending.ToHashSet(StringComparer.Ordinal);
+        return registeredKeys.Except(coveredKeys).Except(pendingKeys).Select(key => $"Unassigned: {key}")
+            .Concat(coveredKeys.Except(registeredKeys).Select(key => $"Unknown destination: {key}"))
+            .Concat(pendingKeys.Except(registeredKeys).Select(key => $"Unknown pending: {key}"))
+            .Concat(coveredKeys.Intersect(pendingKeys).Select(key => $"Still pending: {key}"));
+    }
+}

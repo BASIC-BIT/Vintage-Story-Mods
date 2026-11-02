@@ -17,7 +17,7 @@ public sealed class CharacterSheetSettingsDialog : GuiDialog
             .AddDialogTitleBar(Lang.Get("thebasics:charsheet-settings-title"), () => TryClose())
             .BeginChildElements(body)
             .AddStaticText(Lang.Get("thebasics:charsheet-settings-autoopen-label"), CairoFont.WhiteSmallishText(), ElementBounds.Fixed(0, 45, 400, 24))
-            .AddDropDown(
+            .AddInteractiveElement(new PreferenceSelector(api,
                 new[] { "default", "on", "off" },
                 new[] {
                     Lang.Get("thebasics:charsheet-autoopen-default", Lang.Get(serverDefault ? "thebasics:charsheet-autoopen-on" : "thebasics:charsheet-autoopen-off")),
@@ -25,8 +25,8 @@ public sealed class CharacterSheetSettingsDialog : GuiDialog
                     Lang.Get("thebasics:charsheet-autoopen-off")
                 },
                 choice is >= 0 and <= 2 ? choice : 0,
-                (_, _) => { }, ElementBounds.Fixed(0, 72, 400, 30), "autoopen")
-            .AddSmallButton(Lang.Get("Cancel"), () => TryClose(), ElementBounds.Fixed(0, 115, 110, 30))
+                (_, _) => { }, ElementBounds.Fixed(0, 72, 400, 30)), "autoopen")
+            .AddSmallButton(Lang.Get("Cancel"), () => TryClose(), ElementBounds.Fixed(160, 115, 110, 30))
             .AddSmallButton(Lang.Get("Save"), Save, ElementBounds.Fixed(290, 115, 110, 30))
             .EndChildElements()
             .Compose(focusFirstElement: false);
@@ -43,6 +43,16 @@ public sealed class CharacterSheetSettingsDialog : GuiDialog
         base.OnGuiClosed();
         Dispose();
     }
+
+    private sealed class PreferenceSelector : GuiElementDropDown
+    {
+        internal PreferenceSelector(ICoreClientAPI api, string[] codes, string[] names, int selected, SelectionChangedDelegate changed, ElementBounds bounds)
+            : base(api, codes, names, selected, changed, bounds, CairoFont.WhiteSmallText(), false)
+        { MouseOverCursor = "linkselect"; }
+    }
+
+    public override void OnRenderGUI(float deltaTime) =>
+        GuiPopupHoverGuard.RenderBackground(SingleComposer, false, () => base.OnRenderGUI(deltaTime));
 
     private bool Save()
     {

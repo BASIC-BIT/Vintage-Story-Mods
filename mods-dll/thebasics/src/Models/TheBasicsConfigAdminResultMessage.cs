@@ -27,4 +27,7 @@ public class TheBasicsConfigAdminResultMessage
 
     [ProtoMember(7)]
     public List<string> RestartRequiredKeys { get; set; } = new();
+
+    [ProtoMember(8)]
+    public List<ConfigAdminPrivilegeSuggestion> PrivilegeSuggestions { get; set; } = new();
 }

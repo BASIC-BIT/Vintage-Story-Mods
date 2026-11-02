@@ -59,7 +59,7 @@ namespace thebasics.ModSystems
             }
         }
 
-        protected static ModConfig CloneConfig(ModConfig source)
+        protected internal static ModConfig CloneConfig(ModConfig source)
         {
             var json = JsonConvert.SerializeObject(source);
             var clone = JsonConvert.DeserializeObject<ModConfig>(json) ?? new ModConfig();
@@ -121,6 +121,25 @@ namespace thebasics.ModSystems
             {
                 api.StoreModConfig(_sharedConfig, ConfigName);
             }
+        }
+
+        protected bool TryPersistConfigDraft(ModConfig draft, out string error)
+        {
+            try
+            {
+                // Keep runtime values unchanged until the native config write succeeds.
+                API.StoreModConfig(draft, ConfigName);
+            }
+            catch (Exception exception)
+            {
+                API.Logger?.Error($"The BASICs: config save failed ({exception.GetType().Name}).");
+                error = "Could not write The BASICs config. Your changes have not been applied; try saving again.";
+                return false;
+            }
+
+            CopyConfigValues(draft, Config);
+            error = null;
+            return true;
         }
 
         // Internal so a plain ModSystem can read the server config before the Normal phase, when

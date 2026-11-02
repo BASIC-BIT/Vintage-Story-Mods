@@ -74,7 +74,9 @@ Version 5.5.0 shifts the generated/default config toward showcasing RP-server fe
 - `NametagRequiresLineOfSight=true`
 - `OverheadChatBubbleMode=RpText`
 
-## In-Game Admin Config
+## In-game admin config
+
+`/basic setup` opens a wizard with 40 focused pages across eight topics: Chat, Teleportation, Notifications, Player display, Map visibility, Characters, Roleplay tools, and Server tools. An expandable sidebar keeps all eight category headers visible and lists the selected category's pages. Selecting a category returns to its last visited page. Long page lists scroll independently, and the selected page stays visible. Each page has at most five controls. The wizard and advanced config panel use the same setting registry and validation.
 
 Features:
 
@@ -83,22 +85,45 @@ Features:
 - Shared server config object so live-safe changes update existing systems without replacing stale references.
 - Client config resync after successful saves or disk reloads.
 - New-setting discovery through persisted `ReviewedConfigSettingKeys`.
-- Live/restart labeling in the panel; startup-shaped settings can be edited but are reported as restart-required.
+- Wizard choices stay in a shared draft while switching pages, categories, Overview and Review. Small dots mark edited pages and categories. Review the changed settings and restart requirements before saving.
+- Overview keeps eight topic cards. All settings, Close and Review changes share the footer on ordinary pages; Review replaces its action with Save settings. The sidebar supports mouse, wheel, scrollbar and keyboard navigation.
+- The shared registry now exposes existing character-sheet enablement, editing-command permissions, nearby viewing rules, and the required-fields check.
+- Permission fields in both editors offer searchable privilege codes from the server, including codes registered by other mods. They also accept typed strings and preserve configured values outside the suggestions. These fields choose a required privilege; they do not assign player roles or grants.
+- Map visibility uses a square sample with the game's parchment colors and player icons. Its On/Off management button disables and greys the dependent choices when Off, retaining their values. Hiding other players also disables the range field. The sample does not read or change the live world map.
+- Pages about sheet access, nickname policy, scene-marker availability, history retention and note lengths center their controls without an illustration. Other previews show visible outcomes without repeating permission codes, limits or instructions from the controls.
+
+```mermaid
+flowchart TD
+    Setup["/basic setup"] --> Overview
+    Overview -->|Card or sidebar category| Page[Choose a sidebar page]
+    Page -->|Edit or switch page| Draft[Shared draft]
+    Draft --> Page
+    Draft -->|Footer| Review[Review changes]
+    Review -->|Sidebar| Page
+    Review --> Save[Save settings]
+    Config["/basic config"] --> Advanced[Advanced settings] --> Save
+    Dedicated["Language and sheet-field commands"] --> Editors[Separate editors] --> Save
+    Save --> Live[Apply live changes]
+    Save --> Restart[Restart for flagged changes]
+```
 
 Admin commands:
 
+- `/basic setup`
 - `/basic config`, `/thebasics config`, `/tb config`
 - `/basic reloadconfig`, `/thebasics reloadconfig`, `/tb reloadconfig`
 
-Live-applied setting groups currently include chatter, typing indicators, nametag display/range/style, map player visibility, overhead bubble mode, selected TPA timeout/cooldown behavior, save notifications, sleep notifications, command privilege settings, per-mode proximity/chat/audio dictionaries, chat delimiters, player-stat toggles, and debug mode. Restart-required settings include startup-shaped command registration, chat group setup, language system enablement, and player stats enablement.
+Live settings include speech and display options, managed map visibility, teleport timing, notifications, character-sheet viewing rules, notes, chat history, and selected command permissions. Command availability, chat group setup, language enablement, character-sheet enablement and command permissions, character-slot enablement, and player-statistics enablement require a restart.
 
-The admin panel exposes fixed-shape complex settings as validated flattened rows. This covers per-mode distance, obfuscation, font-size, verb, punctuation, RPTTS, chatter dictionaries, chat delimiter start/end values, player-stat toggles, and comma-separated font-size clamps. Variable-length/nested collections use dedicated editors where available: `/thebasics config languages` for `Languages` and `/thebasics config charsheetfields` for `CharacterSheetFields`. Prefer these editors over direct JSON edits because they validate field keys, bindings, options, and persisted character-sheet compatibility.
+Individual player-stat toggles remain available in the advanced panel, but tracking subscriptions are chosen at startup. Restart after changing these toggles to apply the tracking choices consistently.
+
+The advanced panel exposes per-mode chat and audio settings, delimiters, stat toggles, and font-size clamps as validated rows. Variable language definitions and character-sheet fields currently use separate editors: `/thebasics config languages` for `Languages` and `/thebasics config charsheetfields` for `CharacterSheetFields`. These editors validate keys, bindings, options, and compatibility with saved sheets. The setup hierarchy will expand to cover more configuration choices.
 
 ## RP Proximity Chat
 
 Features:
 
-- Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat`.
+- Dedicated proximity chat group, or optional General-chat replacement via `UseGeneralChannelAsProximityChat` (see the setup below).
 - Whisper, normal, yell, and sign-language ranges. The three speech ranges accept exactly `-1` to deliver server-wide; any other negative value is rejected by config validation, and `SignLanguageRange` has no unlimited sentinel at all. An unlimited range cannot be combined with `RequireClearSoundPathForSpeech`, since the sound-path check needs a bounded range to raycast against.
 - Two independent chat axes: range (`/whisper`, `/say`, `/yell`) and sticky override kind (`/me`, `/ooc`, `/gooc`). Whispered OOC and yelled emotes are both valid combinations.
 - Sticky override modes toggle: running the same override command again returns you to speech, and running a different one replaces it. An explicit message prefix still wins for that single line.
@@ -116,6 +141,50 @@ Features:
 - Environmental messages and raycast-placed environmental messages.
 - Optional RPTTS bridge for speech text.
 - Character chatter sounds using the speaker's seraph voice instrument, with per-player opt-out.
+
+### Use General for proximity chat and remove the Proximity tab
+
+In `/basic config`, open **Chat tabs**, set **Use General as proximity chat** to **On** and save.
+Alternatively, set `"UseGeneralChannelAsProximityChat": true` in the server's
+`ModConfig/the_basics.json`. Restart the server and reconnect clients.
+General then uses proximity chat's distance and formatting rules. The configured
+proximity group is removed, including saved memberships for offline players.
+Opening chat selects General, ignoring saved choices from separate-channel mode.
+Other player-created groups remain available.
+
+```mermaid
+flowchart LR
+    GUI["/basic config: turn setting On and save"] --> Restart[Restart server]
+    File["Edit the_basics.json: set value to true"] --> Restart
+    Restart --> Reconnect[Reconnect clients]
+    Reconnect --> General["Chat in General with proximity rules"]
+```
+
+| UI setting | Config key | What it controls |
+| --- | --- | --- |
+| Use General as proximity chat | `UseGeneralChannelAsProximityChat` | Uses General for proximity chat and removes the separate configured proximity group. Requires a server restart and client reconnect. |
+| Proximity chat as default | `ProximityChatAsDefault` | Selects proximity chat when opening chat. `PreserveDefaultChatChoice` takes precedence when a valid previous selection exists in separate-channel mode. In General mode, the proximity channel is General. Does not hide tabs. |
+| Preserve default chat choice | `PreserveDefaultChatChoice` | Restores a valid saved tab in separate-channel mode, otherwise falls back to the configured default. General mode always opens General. |
+| Proximity tab position | `ProximityChatTabPosition` | `GameOrder` (default), `First`, or `AfterGeneral`. Moves only Proximity; other tabs keep their order. Saves apply live. Ignored in General mode. |
+| Prevent proximity tab switching | `PreventProximityChannelSwitching` | Stops incoming messages from automatically switching away from the active proximity channel. Manual tab selection still works. Does not hide tabs. |
+| Enable global OOC | `EnableGlobalOOC` | Allows `/gooc` and `((message))` to reach all players regardless of distance. Turn Off if you do not want this global OOC option. Does not control tab visibility. |
+
+Turning **Use General as proximity chat** Off and restarting restores the separate
+proximity group; players join it when they reconnect. If the old tab persists,
+check that the setting was saved and that `ProximityChatName` still matches the
+old group's name. This setting removes the currently configured group only.
+
+To pin the separate Proximity tab, open **Chat tabs**, choose **Proximity tab position**, and save. **First** puts it before General; **AfterGeneral** puts it directly after General and before logs. Returning to **GameOrder** restores the game's order. Tab placement does not change the selected channel.
+
+```mermaid
+flowchart LR
+    Config["/basic config"] --> Tabs[Chat tabs]
+    Tabs --> Position[Choose proximity tab position]
+    Position --> Save[Save]
+    Save --> Layout[Tabs update; selected channel stays selected]
+```
+
+The BASICs has no switch that disables General itself. Turning off global OOC removes that global speech option, but does not enforce distance restrictions on every form of communication: players with RP text disabled can use vanilla chat, and unrelated groups remain available.
 
 Player-facing commands:
 
@@ -156,6 +225,7 @@ Primary config areas:
 - `DisableRPChat`
 - `ProximityChatName`
 - `UseGeneralChannelAsProximityChat`
+- `ProximityChatTabPosition`
 - `ProximityChatAsDefault`
 - `PreserveDefaultChatChoice`
 - `PreventProximityChannelSwitching`

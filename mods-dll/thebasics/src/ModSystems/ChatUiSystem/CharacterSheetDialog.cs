@@ -14,7 +14,79 @@ namespace thebasics.ModSystems.ChatUiSystem;
 
 public class CharacterSheetDialog : GuiDialog
 {
+    public override void OnRenderGUI(float deltaTime) =>
+        GuiPopupHoverGuard.RenderBackground(SingleComposer, false, () => base.OnRenderGUI(deltaTime));
+
     private const double DialogWidth = 520;
+    // DialogWidth excludes the body's native padding.
+    internal static double TemplatePreviewRequiredWidth => DialogWidth - 10 + 2 * GuiStyle.ElementToDialogPadding;
+    private ElementBounds _templateBounds;
+    private Action<string> _templateSelected;
+    private Action<GuiComposer, ElementBounds> _templatePortrait;
+    private string _templateSelectedId;
+    private IList<CharacterSheetFieldViewMessage> _templateUnfinished = Array.Empty<CharacterSheetFieldViewMessage>();
+    private List<string> _templateFieldOrder = new();
+    internal void SetTemplateUnfinishedFields(IList<CharacterSheetFieldViewMessage> fields, IReadOnlyList<string> fieldOrder = null)
+    {
+        _templateUnfinished = fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
+        _templateFieldOrder = fieldOrder?.ToList() ?? new();
+    }
+    private bool IsUnfinished(CharacterSheetFieldViewMessage field) => _templateUnfinished.Contains(field);
+    private ElementBounds _templateScrollClip;
+    private readonly Dictionary<string, GuiElementSheetFieldSelection> _templateSelections = new();
+    internal GuiComposer TemplatePreviewComposer => _templateBounds == null ? null : SingleComposer;
+    internal IReadOnlyDictionary<string, GuiElementSheetFieldSelection> TemplateSelections => _templateSelections;
+    internal IEnumerable<string> TemplateAnswerValues => _view.Fields.Select((item, index) => GetFieldInputValue(index, item));
+
+    internal void ConfigureTemplatePreview(ElementBounds bounds, Action<string> onFieldSelected, Action<GuiComposer, ElementBounds> addPortrait)
+    {
+        _templateBounds = (bounds ?? throw new ArgumentNullException(nameof(bounds))).FlatCopy().WithFixedWidth(TemplatePreviewRequiredWidth);
+        _templateSelected = onFieldSelected;
+        _templatePortrait = addPortrait;
+        ComposeDialog();
+    }
+
+    internal void SelectTemplateField(string fieldId, bool scrollIntoView)
+    {
+        _templateSelectedId = fieldId;
+        foreach (var selection in _templateSelections.Values) selection.Selected = selection.FieldId == fieldId;
+        if (scrollIntoView) ScrollTemplateFieldIntoView(fieldId);
+    }
+
+    private void ScrollTemplateFieldIntoView(string fieldId)
+    {
+        if (!_templateSelections.TryGetValue(fieldId ?? "", out var cell) || cell.Bounds.ParentBounds != _scrollContainer?.Bounds || _templateScrollClip == null) return;
+        var top = cell.Bounds.fixedY;
+        var offset = -_scrollContainer.Bounds.fixedY;
+        var height = _templateScrollClip.fixedHeight;
+        var next = top < offset ? top : top + cell.Bounds.fixedHeight > offset + height ? top + cell.Bounds.fixedHeight - height : offset;
+        SingleComposer.GetScrollbar("scrollbar").CurrentYPosition = (float)Math.Max(0, next);
+        OnNewScrollbarValue((float)Math.Max(0, next));
+    }
+
+    internal void FocusTemplateField(string id)
+    {
+        if (!_templateSelections.TryGetValue(id, out var cell)) return;
+        if (cell.Bounds.ParentBounds == _scrollContainer.Bounds)
+        {
+            SingleComposer.FocusElement(_scrollContainer.TabIndex);
+            _scrollContainer.FocusElement(cell.TabIndex);
+        }
+        else SingleComposer.FocusElement(cell.TabIndex);
+    }
+
+    private GuiElementSheetFieldSelection Selection(string id, ElementBounds bounds)
+    {
+        var selection = new GuiElementSheetFieldSelection(capi, bounds, id, () =>
+        {
+            SelectTemplateField(id, false);
+            _templateSelected?.Invoke(id);
+        }, () => ScrollTemplateFieldIntoView(id)) { Selected = id == _templateSelectedId };
+        _templateSelections[id] = selection;
+        return selection;
+    }
+
+    private GuiElement PreviewAnswer(GuiElement element) => _templateBounds == null ? element : new GuiElementSheetPreviewAnswer(capi, element);
     private const double MaxScrollHeight = 520;
     private const int DefaultLongTextRows = 6;
     private const double ScrollContentBottomPadding = 30;
@@ -181,6 +253,9 @@ public class CharacterSheetDialog : GuiDialog
 
     private void ComposeDialog()
     {
+        var oldScroll = _templateBounds == null ? 0 : -(_scrollContainer?.Bounds.fixedY ?? 0);
+        var focusedId = _templateSelections.Values.FirstOrDefault(item => item.HasFocus)?.FieldId;
+        _templateScrollClip = null;
         ResetCompositionState();
 
         var showHeadshotSection = ShouldShowHeadshotSection();
@@ -197,11 +272,10 @@ public class CharacterSheetDialog : GuiDialog
         var layout = CreateDialogLayout(showHeadshotSection, hoistedIndices.Count, contentHeight);
         _scrollContainer = CreateScrollContainer(layout.ScrollContentBounds, scrollFields);
 
-        var composer = capi.Gui.CreateCompo("thebasics-character-sheet", layout.DialogBounds)
-            .AddShadedDialogBG(layout.BodyBounds)
-            .AddDialogTitleBar(title, OnTitleBarCloseClicked);
+        var composer = capi.Gui.CreateCompo("thebasics-character-sheet", _templateBounds ?? layout.DialogBounds);
+        if (_templateBounds == null) composer.AddShadedDialogBG(layout.BodyBounds).AddDialogTitleBar(title, OnTitleBarCloseClicked);
 
-        if (_onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
+        if (_templateBounds == null && _onSettings != null && _view?.TargetPlayerUid == capi.World?.Player?.PlayerUID)
         {
             var settingsLabel = Lang.Get("game:mainmenu-settings");
             var settingsFont = CairoFont.WhiteSmallText().WithFontSize(18).WithColor(new double[] { 1, 1, 1, 1 });
@@ -235,8 +309,8 @@ public class CharacterSheetDialog : GuiDialog
         AddScrollContent(layout.Row, scrollFields);
 
         composer.EndClip()
-            .AddVerticalScrollbar(OnNewScrollbarValue, ElementStdBounds.VerticalScrollbar(layout.ScrollClipBounds), "scrollbar")
-            .AddSmallButton(Lang.Get("Cancel"), OnCancel, ElementBounds.Fixed(0, layout.ButtonY, 120, layout.ButtonHeight))
+            .AddVerticalScrollbar(OnNewScrollbarValue, ElementStdBounds.VerticalScrollbar(layout.ScrollClipBounds), "scrollbar");
+        if (_templateBounds == null) composer.AddSmallButton(Lang.Get("Cancel"), OnCancel, ElementBounds.Fixed(0, layout.ButtonY, 120, layout.ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:guide-button"), OnGuide, ElementBounds.Fixed(130, layout.ButtonY, 120, layout.ButtonHeight));
 
         AddSaveButtonIfEditable(composer, layout.ButtonY, layout.ButtonHeight);
@@ -245,13 +319,21 @@ public class CharacterSheetDialog : GuiDialog
         SingleComposer.GetScrollbar("scrollbar").SetHeights((float)layout.ScrollHeight, (float)_scrollContainer.Bounds.fixedHeight);
         SetDeferredTextAreaValues();
         RecalculateScrolledBounds(_scrollContainer.Bounds);
+        if (_templateBounds != null)
+        {
+            _templateScrollClip = layout.ScrollClipBounds;
+            var offset = Math.Clamp(oldScroll, 0, Math.Max(0, _scrollContainer.Bounds.fixedHeight - layout.ScrollHeight));
+            SingleComposer.GetScrollbar("scrollbar").CurrentYPosition = (float)offset;
+            OnNewScrollbarValue((float)offset);
+            if (focusedId != null) FocusTemplateField(focusedId);
+        }
 
-        _headshotCallbacks?.RequestHeadshotForView?.Invoke(this, _view);
+        if (_templateBounds == null) _headshotCallbacks?.RequestHeadshotForView?.Invoke(this, _view);
     }
 
     private bool ShouldShowHeadshotSection()
     {
-        return _headshotCallbacks != null && _view?.Success == true;
+        return (_headshotCallbacks != null || _templateBounds != null) && _view?.Success == true;
     }
 
     private string GetDialogTitle()
@@ -261,7 +343,9 @@ public class CharacterSheetDialog : GuiDialog
 
     private IList<CharacterSheetFieldViewMessage> GetViewFields()
     {
-        return _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
+        return _templateBounds == null ? _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>()
+            : (_view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>()).Concat(_templateUnfinished)
+                .OrderBy(field => { var index = _templateFieldOrder.IndexOf(field.FieldId); return index < 0 ? int.MaxValue : index; }).ToList();
     }
 
     private static List<int> GetHoistedIndices(bool showHeadshotSection, IList<CharacterSheetFieldViewMessage> allFields)
@@ -275,8 +359,9 @@ public class CharacterSheetDialog : GuiDialog
         const double buttonHeight = 30;
         const double bottomPadding = 6;
 
-        var scrollHeight = Math.Min(MaxScrollHeight, Math.Max(100, contentHeight));
-        var contentTop = GuiStyle.TitleBarHeight + 10;
+        var availableHeight = _templateBounds == null ? MaxScrollHeight : Math.Max(100, _templateBounds.fixedHeight - 20 - (showHeadshotSection ? ComputeHeadshotSectionHeight(hoistedFieldCount) : 0));
+        var scrollHeight = Math.Min(availableHeight, Math.Max(100, contentHeight));
+        var contentTop = _templateBounds == null ? GuiStyle.TitleBarHeight + 10 : 0;
         var headshotSectionHeight = showHeadshotSection ? ComputeHeadshotSectionHeight(hoistedFieldCount) : 0;
         var scrollTop = contentTop + headshotSectionHeight;
         var scrollClipBounds = ElementBounds.Fixed(0, scrollTop, DialogWidth - 36, scrollHeight);
@@ -302,7 +387,7 @@ public class CharacterSheetDialog : GuiDialog
     {
         return new SafeGuiElementContainer(capi, scrollContentBounds)
         {
-            Tabbable = scrollFields.Any(f => f.Field.CanEdit),
+            Tabbable = _templateBounds != null || scrollFields.Any(f => f.Field.CanEdit),
             unscaledCellSpacing = 0
         };
     }
@@ -310,6 +395,7 @@ public class CharacterSheetDialog : GuiDialog
     private void ResetCompositionState()
     {
         SingleComposer?.Dispose();
+        _templateSelections.Clear();
         _textInputs.Clear();
         _textAreas.Clear();
         _textAreaInitialValues.Clear();
@@ -350,7 +436,7 @@ public class CharacterSheetDialog : GuiDialog
 
     private void AddSaveButtonIfEditable(GuiComposer composer, double buttonY, double buttonHeight)
     {
-        if (_view?.CanEdit == true && _view.Success)
+        if (_templateBounds == null && _view?.CanEdit == true && _view.Success)
         {
             composer.AddSmallButton(Lang.Get("Save"), OnSave, ElementBounds.Fixed(DialogWidth - 142, buttonY, 120, buttonHeight), EnumButtonStyle.Normal, "saveButton");
         }
@@ -412,7 +498,7 @@ public class CharacterSheetDialog : GuiDialog
             return;
         }
 
-        var allFields = _view?.Fields ?? Array.Empty<CharacterSheetFieldViewMessage>();
+        var allFields = GetViewFields();
         var labelFont = CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold);
         var cellWidth = (rightWidth - HeaderGridColGap * (HeaderGridCols - 1)) / HeaderGridCols;
         for (var slot = 0; slot < hoistedIndices.Count; slot++)
@@ -439,19 +525,34 @@ public class CharacterSheetDialog : GuiDialog
         composer.AddStaticText(label, labelFont, ElementBounds.Fixed(cellX, cellY, cellWidth, HeaderGridLabelHeight));
 
         var inputBounds = ElementBounds.Fixed(cellX, cellY + HeaderGridLabelHeight, cellWidth, HeaderGridInputHeight);
-        if (field.CanEdit)
+        if (IsUnfinished(field))
         {
-            AddEditableField(el => composer.AddInteractiveElement(el, $"hoistedField-{fieldIndex}"), inputBounds, field, fieldIndex);
+            var outline = Selection(field.FieldId, ElementBounds.Fixed(cellX, cellY, cellWidth, HeaderGridCellHeight));
+            outline.Unfinished = true;
+            composer.AddInteractiveElement(outline, "select-" + field.FieldId);
             return;
         }
+        if (field.CanEdit)
+        {
+            AddEditableField(el => composer.AddInteractiveElement(PreviewAnswer(el), $"hoistedField-{fieldIndex}"), inputBounds, field, fieldIndex);
+        }
 
-        var value = string.IsNullOrWhiteSpace(field.Value) ? Lang.Get("thebasics:charsheet-unset") : field.Value;
-        composer.AddRichtext(VtmlUtils.EscapeVtml(value), CairoFont.WhiteSmallText(), inputBounds);
+        else
+        {
+            var value = string.IsNullOrWhiteSpace(field.Value) ? Lang.Get("thebasics:charsheet-unset") : field.Value;
+            composer.AddRichtext(VtmlUtils.EscapeVtml(value), CairoFont.WhiteSmallText(), inputBounds);
+        }
+        if (_templateBounds != null) composer.AddInteractiveElement(Selection(field.FieldId, ElementBounds.Fixed(cellX, cellY, cellWidth, HeaderGridCellHeight)), "select-" + field.FieldId);
     }
 
     private void AddHeadshotControls(GuiComposer composer, double top, bool canEdit, bool allowUrl)
     {
         var headshotBounds = ElementBounds.Fixed(0, top, HeadshotSize, HeadshotSize);
+        if (_templateBounds != null)
+        {
+            _templatePortrait?.Invoke(composer, headshotBounds);
+            return;
+        }
         _headshotElement = new HeadshotElement(capi, headshotBounds);
         composer.AddInteractiveElement(_headshotElement, "headshot");
 
@@ -588,10 +689,17 @@ public class CharacterSheetDialog : GuiDialog
         container.Add(new GuiElementStaticText(capi, label, EnumTextOrientation.Left, labelBounds, CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold)));
 
         var inputY = topY + 22;
+        if (IsUnfinished(field))
+        {
+            var outline = Selection(field.FieldId, ElementBounds.Fixed(x, topY, width, GetCellHeight(field)));
+            outline.Unfinished = true;
+            container.Add(outline);
+            return;
+        }
         if (field.CanEdit)
         {
             var inputBounds = ElementBounds.Fixed(x, inputY, width, GetEditControlHeight(field));
-            AddEditableField(el => container.Add(el), inputBounds, field, fieldIndex);
+            AddEditableField(el => container.Add(PreviewAnswer(el)), inputBounds, field, fieldIndex);
         }
         else
         {
@@ -599,6 +707,7 @@ public class CharacterSheetDialog : GuiDialog
             var valueBounds = ElementBounds.Fixed(x, inputY, width, GetReadOnlyHeight(value));
             AddRichtext(container, VtmlUtils.EscapeVtml(value), valueBounds);
         }
+        if (_templateBounds != null) container.Add(Selection(field.FieldId, ElementBounds.Fixed(x, topY, width, GetCellHeight(field))));
     }
 
     private static bool IsHalfWidth(CharacterSheetFieldViewMessage field)
@@ -699,6 +808,7 @@ public class CharacterSheetDialog : GuiDialog
 
     private bool OnSave()
     {
+        if (_templateBounds != null) return true;
         if (!_draftState.TryBeginRequest(JsonConvert.SerializeObject(CaptureInputValues()))) return true;
         var request = new CharacterSheetSaveRequest
         {
@@ -787,6 +897,14 @@ public class CharacterSheetDialog : GuiDialog
         }
 
         return _textInputs.TryGetValue(index, out var textInput) ? textInput.GetText() : string.Empty;
+    }
+
+    internal void RestoreTemplateScroll(float value)
+    {
+        if (_templateBounds == null || _scrollContainer == null) return;
+        var scroll = SingleComposer.GetScrollbar("scrollbar");
+        scroll.CurrentYPosition = value;
+        OnNewScrollbarValue(value);
     }
 
     private void OnNewScrollbarValue(float value)

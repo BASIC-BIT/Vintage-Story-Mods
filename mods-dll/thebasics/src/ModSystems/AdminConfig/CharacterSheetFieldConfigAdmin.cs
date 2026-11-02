@@ -36,6 +36,32 @@ public static class CharacterSheetFieldConfigAdmin
         "thebasics.nickname"
     };
 
+    public static List<CharacterSheetFieldConfigEntryMessage> CloneEntries(IEnumerable<CharacterSheetFieldConfigEntryMessage> entries) =>
+        (entries ?? Enumerable.Empty<CharacterSheetFieldConfigEntryMessage>()).Select(entry => entry == null ? null : entry with { }).ToList();
+
+    public static bool EntriesEqual(IEnumerable<CharacterSheetFieldConfigEntryMessage> left, IEnumerable<CharacterSheetFieldConfigEntryMessage> right) =>
+        (left ?? Enumerable.Empty<CharacterSheetFieldConfigEntryMessage>()).Select(entry => entry == null ? null : entry with { AutoGenerateId = false })
+        .SequenceEqual((right ?? Enumerable.Empty<CharacterSheetFieldConfigEntryMessage>()).Select(entry => entry == null ? null : entry with { AutoGenerateId = false }));
+
+    public static CharacterSheetFieldConfigEntryMessage CreateBuilderEntry() => new()
+    {
+        Id = "field-" + Guid.NewGuid().ToString("N"),
+        OriginalId = string.Empty,
+        Label = string.Empty,
+        Description = string.Empty,
+        Type = CharacterSheetFieldTypes.String,
+        Optional = true,
+        Options = string.Empty,
+        BindTo = string.Empty,
+        MaxLength = "0",
+        Visibility = CharacterSheetFieldVisibilities.Public,
+        ShowInLook = true,
+        EditorRows = "0",
+        LayoutSection = CharacterSheetLayoutSections.Body,
+        Width = CharacterSheetFieldWidths.Full,
+        AutoGenerateId = false
+    };
+
     public static List<CharacterSheetFieldConfigEntryMessage> BuildEntries(ModConfig config)
     {
         return (config?.CharacterSheetFields ?? Array.Empty<CharacterSheetFieldDefinition>())

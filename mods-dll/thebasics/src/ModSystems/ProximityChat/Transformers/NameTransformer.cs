@@ -35,11 +35,15 @@ public class NameTransformer : MessageTransformerBase
     {
         string name = isIC ? GetRoleplayName(player, config) : player.PlayerName;
 
+        return FormatName(name, player.GetNicknameColor(), isIC, config,
+            receivingPlayer?.GetChatVisualPreferences().NicknameColorsEnabled ?? true);
+    }
+
+    internal static string FormatName(string name, string color, bool isIC, ModConfig config, bool recipientAllowsNameColors = true)
+    {
         // Escape user-supplied name to prevent VTML injection
         name = ChatHelper.EscapeMarkup(name);
 
-        string color = player.GetNicknameColor();
-        bool recipientAllowsNameColors = receivingPlayer?.GetChatVisualPreferences().NicknameColorsEnabled ?? true;
         bool applyColor = recipientAllowsNameColors && !string.IsNullOrEmpty(color) && (isIC ? config.ApplyColorsToNicknames : config.ApplyColorsToPlayerNames);
 
         if (config.BoldNicknames)

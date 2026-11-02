@@ -1,0 +1,64 @@
+name: GUI Captures
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mods-dll/thebasics/**'
+      - 'tools/GuiPreview/**'
+      - 'scripts/*gui*'
+      - '.github/workflows/gui-capture*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gui-captures-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: reference-source
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check report and source identity
+        run: python -B -m unittest discover -s scripts -p test_gui_capture_report.py
+      - name: Check report workflow trust boundaries
+        run: node --test scripts/test_gui_capture_workflow.mjs
+      - name: Render base and head with matching official game dependencies
+        shell: pwsh
+        run: |
+          ./scripts/collect-gui-captures.ps1 -BaselineRepo ./reference-source -CurrentRepo . -Output ./gui-captures -DependencyDirectory "$env:RUNNER_TEMP/gui-game-dependencies"
+      - name: Upload immutable base captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-captures-baseline
+          path: gui-captures/baseline/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload immutable head captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-captures-current
+          path: gui-captures/current/
+          if-no-files-found: error
+          retention-days: 90

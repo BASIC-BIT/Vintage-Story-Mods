@@ -184,6 +184,9 @@ public sealed class TypingIndicatorRenderer : IRenderer
     /// there's no value in distinguishing "chat open but empty" from "idle with text".
     /// </summary>
     private static string GetLabelForState(ChatTypingIndicatorState state, TypingIndicatorDisplayMode displayMode)
+        => BuildLabel(state, displayMode, ChatUiSystem.GetTypingIndicatorText());
+
+    internal static string BuildLabel(ChatTypingIndicatorState state, TypingIndicatorDisplayMode displayMode, string typingText)
     {
         // Typing = actively pressing keys, everything else = thinking/idle.
         var isTyping = state == ChatTypingIndicatorState.Typing;
@@ -193,7 +196,7 @@ public sealed class TypingIndicatorRenderer : IRenderer
         string textLabel;
         if (isTyping)
         {
-            textLabel = ChatUiSystem.GetTypingIndicatorText();
+            textLabel = typingText;
         }
         else
         {
@@ -276,29 +279,8 @@ public sealed class TypingIndicatorRenderer : IRenderer
             return existing;
         }
 
-        var bg = new TextBackground
-        {
-            Padding = 3,       // base (overridden below)
-            HorPadding = 5,    // more horizontal breathing room (icon needs left margin)
-            VerPadding = 3,    // balanced vertical fit
-            Radius = GuiStyle.ElementBGRadius,
-            FillColor = new[]
-            {
-                GuiStyle.DialogLightBgColor[0],
-                GuiStyle.DialogLightBgColor[1],
-                GuiStyle.DialogLightBgColor[2],
-                0.85
-            },
-            BorderWidth = 2,
-            BorderColor = ColorUtil.Hex2Doubles("#CFBA96")
-        };
-
-        // Slightly larger font for icon visibility at distance.
-        var font = CairoFont.WhiteSmallText().WithFontSize(20f);
-        // Use Left orientation to match GenRichTextTexture's contract — VS has a
-        // centering bug at inline tag boundaries (icon-to-text transitions).
-        // GenRichTextTexture centers the rendered block manually via hPad/vPad.
-        font.Orientation = EnumTextOrientation.Left;
+        var bg = CreateBackground();
+        var font = CreateFont();
 
         LoadedTexture tex;
         var hasVtml = text.Contains('<');
@@ -322,6 +304,35 @@ public sealed class TypingIndicatorRenderer : IRenderer
         }
 
         return tex;
+    }
+
+    internal static TextBackground CreateBackground() => new()
+        {
+            Padding = 3,       // base (overridden below)
+            HorPadding = 5,    // more horizontal breathing room (icon needs left margin)
+            VerPadding = 3,    // balanced vertical fit
+            Radius = GuiStyle.ElementBGRadius,
+            FillColor = new[]
+            {
+                GuiStyle.DialogLightBgColor[0],
+                GuiStyle.DialogLightBgColor[1],
+                GuiStyle.DialogLightBgColor[2],
+                0.85
+            },
+            BorderWidth = 2,
+            BorderColor = ColorUtil.Hex2Doubles("#CFBA96")
+        };
+
+    internal static CairoFont CreateFont()
+    {
+        // Slightly larger font for icon visibility at distance.
+        var font = CairoFont.WhiteSmallText().WithFontSize(20f);
+        // Use Left orientation to match GenRichTextTexture's contract — VS has a
+        // centering bug at inline tag boundaries (icon-to-text transitions).
+        // GenRichTextTexture centers the rendered block manually via hPad/vPad.
+        font.Orientation = EnumTextOrientation.Left;
+
+        return font;
     }
 
     private void FlushTextureCache()

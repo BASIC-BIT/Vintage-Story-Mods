@@ -4,9 +4,11 @@ using System.Linq;
 using Cairo;
 using Newtonsoft.Json;
 using thebasics.Gui;
+using thebasics.ModSystems.ChatUiSystem;
 using Vintagestory.API.Common;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
+using Vintagestory.API.MathTools;
 
 namespace thebasics.ModSystems.SceneDescriptions;
 
@@ -21,12 +23,17 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     private SceneTitleIconDialog _symbolIconPicker;
     private GuiDialogConfirm _clearReadConfirm;
     private SceneUnsavedCloseDialog _unsavedCloseConfirm;
+    private GuiElementColorPicker _colorPicker;
+    private readonly SceneMarkerColor _originalColor;
+    private readonly string _originalCustomColorHex;
+    private readonly string _originalColorHex;
     private string _loadedSnapshot;
     private bool _forceClose;
     private bool _closing;
     private bool _lockAfterSave;
     // Whether the composed layout carries the text distance row. It only applies to the nearby mode.
     private bool _nearbyLayout;
+    private bool _compactLayout;
     private readonly bool _canManageLock;
     private readonly Action _onUnlock;
     private readonly Action _onClearRead;
@@ -43,6 +50,9 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         _canManageLock = canManageLock;
         _onClose = onClose;
         _appearance = (data ?? new SceneDescriptionData()).Clone().Normalize();
+        _originalColor = _appearance.Color;
+        _originalCustomColorHex = _appearance.CustomColorHex;
+        _originalColorHex = SceneMarkerVisuals.ColorHex(_appearance);
         _symbolShapes = Enum.GetValues<SceneMarkerSymbol>().Select(symbol => SceneMarkerVisuals.LoadShape(capi, symbol)).ToArray();
         Compose(_appearance);
         _loadedSnapshot = Snapshot();
@@ -59,6 +69,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     public override void OnGuiClosed()
     {
+        _colorPicker?.Close();
         _iconPicker?.TryClose();
         _symbolIconPicker?.TryClose();
         _clearReadConfirm?.TryClose();
@@ -113,9 +124,12 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     private void Compose(SceneDescriptionData data)
     {
+        _colorPicker?.Close();
         SingleComposer?.Dispose();
         var top = GuiStyle.TitleBarHeight + 12;
-        var buttonY = top + 580;
+        _compactLayout = capi.Render.FrameHeight / (double)RuntimeEnv.GUIScale < 700;
+        var reduction = _compactLayout ? 128 : 0;
+        var buttonY = top + 580 - reduction;
         var bodyBounds = ElementBounds.Fixed(0, 0, DialogWidth + 290, buttonY + ButtonHeight).WithFixedPadding(GuiStyle.ElementToDialogPadding);
         var dialogBounds = ElementStdBounds.AutosizedMainDialog.WithAlignment(EnumDialogArea.CenterMiddle);
         var titleLabelBounds = ElementBounds.Fixed(90, top, DialogWidth - 110, 22);
@@ -123,7 +137,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var kindLabelBounds = ElementBounds.Fixed(0, top + 66, 180, 22);
         var kindBounds = ElementBounds.Fixed(0, top + 90, 220, 30);
         var bodyLabelBounds = ElementBounds.Fixed(0, top + 132, DialogWidth - 20, 22);
-        var textAreaBounds = ElementBounds.Fixed(0, top + 156, DialogWidth - 20, BodyHeight);
+        var textAreaBounds = ElementBounds.Fixed(0, top + 156, DialogWidth - 20, BodyHeight - reduction);
         // The text distance only applies to the nearby mode. Any other mode drops that row and pulls
         // the right column's remaining rows up into the space it used.
         _nearbyLayout = data.Display == SceneDescriptionDisplay.AlwaysNearby;
@@ -152,9 +166,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         for (var index = 0; index < _symbolShapes.Length; index++)
         {
             var symbolIndex = index;
-            SingleComposer.AddSceneDrawing(ElementBounds.Fixed(534 + index * 44, top + 252, 32, 32),
+            SingleComposer.AddSceneDrawing(ElementBounds.Fixed((_compactLayout ? 540 : 534) + index * 44,
+                top + (_compactLayout ? 138 : 252), _compactLayout ? 20 : 32, _compactLayout ? 20 : 32),
                 (ctx, surface, _) => SceneMarkerVisuals.Draw(ctx, _symbolShapes[symbolIndex], 0, 0, surface.Width,
-                    _appearance.Color, (SceneMarkerSymbol)symbolIndex), "symbolart-" + index);
+                    SceneMarkerVisuals.ResolveColor(_appearance), (SceneMarkerSymbol)symbolIndex), "symbolart-" + index);
         }
         SingleComposer.EndChildElements().Compose(focusFirstElement: false);
         ApplyValues(data);
@@ -162,60 +177,94 @@ internal sealed class SceneDescriptionDialog : GuiDialog
 
     private void ComposeRightColumn(SceneDescriptionData data, double top, int textRow)
     {
+        var reduction = _compactLayout ? 128 : 0;
+        var previewReduction = _compactLayout ? 112 : 0;
         SingleComposer
-            .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 160), DrawPreview, "preview")
-            .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212, 260, 22))
-            .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(26),
+            .AddStaticText(Lang.Get("thebasics:scene-marker-appearance"), CairoFont.WhiteSmallText().WithWeight(FontWeight.Bold), ElementBounds.Fixed(530, top + 14, 200, 22))
+            .AddInset(ElementBounds.Fixed(520, top + 38, 280, 526 - reduction), 3)
+            .AddSceneDrawing(ElementBounds.Fixed(530, top + 46, 260, 160 - previewReduction), DrawPreview, "preview")
+            .AddStaticText(Lang.Get("thebasics:scene-symbol"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 212 - previewReduction, 260, 22))
+            .AddTextToggleButtons(Enumerable.Repeat(string.Empty, _symbolShapes.Length).ToArray(), CairoFont.WhiteSmallText().WithFontSize(_compactLayout ? 18 : 26),
                 index => { _appearance.Symbol = (SceneMarkerSymbol)index; _appearance.SymbolIconName = string.Empty; RefreshPreview(); },
-                Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 246, 40, 44)).ToArray(), "symbol")
-            .AddSmallButton(Lang.Get("thebasics:scene-symbol-other"), OpenSymbolIconPicker, ElementBounds.Fixed(660, top + 212, 130, 26), key: "symbolicon")
-            .AddSceneDrawing(ElementBounds.Fixed(630, top + 214, 22, 22),
+                Enumerable.Range(0, 6).Select(index => ElementBounds.Fixed(530 + index * 44, top + 246 - previewReduction, 40, _compactLayout ? 28 : 44)).ToArray(), "symbol")
+            .AddSmallButton(Lang.Get("thebasics:scene-symbol-other"), OpenSymbolIconPicker, ElementBounds.Fixed(660, top + 212 - previewReduction, 130, 26), key: "symbolicon")
+            .AddSceneDrawing(ElementBounds.Fixed(630, top + 214 - previewReduction, 22, 22),
                 (ctx, surface, _) =>
                 {
                     // Mirror the billboard: a catalog icon that will not draw shows the fallback symbol instead of nothing.
-                    if (_appearance.SymbolIconName.Length > 0 && !SceneTitleIcons.Draw(capi, ctx, surface, _appearance.SymbolIconName, _appearance.Color))
-                        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)_appearance.Symbol], 0, 0, surface.Width, _appearance.Color, _appearance.Symbol);
+                    if (_appearance.SymbolIconName.Length > 0 && !SceneTitleIcons.Draw(capi, ctx, surface, _appearance.SymbolIconName, SceneMarkerVisuals.ResolveColor(_appearance)))
+                        SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)_appearance.Symbol], 0, 0, surface.Width, SceneMarkerVisuals.ResolveColor(_appearance), _appearance.Symbol);
                 }, "symboliconart")
-            .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 300, 90, 22))
-            .AddDropDown(new[] { "gold", "parchment", "blue", "green", "red" }, new[] { Lang.Get("thebasics:scene-color-gold"), Lang.Get("thebasics:scene-color-parchment"), Lang.Get("thebasics:scene-color-blue"), Lang.Get("thebasics:scene-color-green"), Lang.Get("thebasics:scene-color-red") }, (int)data.Color,
-                (value, _) => { _appearance.Color = value switch { "parchment" => SceneMarkerColor.Parchment, "blue" => SceneMarkerColor.Blue, "green" => SceneMarkerColor.Green, "red" => SceneMarkerColor.Red, _ => SceneMarkerColor.Gold }; RefreshPreview(); }, ElementBounds.Fixed(620, top + 298, 170, 30), "color")
+            .AddStaticText(Lang.Get("thebasics:scene-color"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 294 - reduction, 260, 22))
+            ;
+        foreach (var color in Enum.GetValues<SceneMarkerColor>())
+        {
+            var rgb = SceneMarkerVisuals.Palette(color);
+            var swatch = new MarkerColorSwatch(capi,
+                ColorUtil.ToRgba(255, (int)(rgb.R * 255), (int)(rgb.G * 255), (int)(rgb.B * 255)), (int)color,
+                ElementBounds.Fixed(530 + (int)color * 31, top + 320 - reduction, 28, 28), SelectColor)
+            {
+                TooltipText = Lang.Get("thebasics:scene-color-" + color.ToString().ToLowerInvariant()),
+                ShowToolTip = true,
+                Enabled = !data.IsLocked
+            };
+            SingleComposer.AddInteractiveElement(swatch, "color-" + (int)color);
+        }
+        _colorPicker = new GuiElementColorPicker(capi, ElementBounds.Fixed(686, top + 320 - reduction, 24, 28), _originalColorHex, color =>
+        {
+            if (_appearance.IsLocked) return;
+            if (string.Equals(color, _originalColorHex, StringComparison.OrdinalIgnoreCase)) RestoreOriginalColor();
+            else
+            {
+                _appearance.CustomColorHex = color;
+                RefreshColorControls();
+                RefreshPreview();
+            }
+        }) { Enabled = !data.IsLocked, OnRestoreOriginal = RestoreOriginalColor };
+        _colorPicker.SetValue(SceneMarkerVisuals.ColorHex(data));
+        SingleComposer.AddInteractiveElement(_colorPicker, "custom-color-picker")
+            .AddSmallButton(Lang.Get("thebasics:scene-color-custom"), OpenCustomColor, ElementBounds.Fixed(714, top + 320 - reduction, 76, 28), key: "color-custom")
+            .AddHoverText(Lang.Get("thebasics:scene-color-custom-help"), CairoFont.WhiteSmallText(), 250,
+                ElementBounds.Fixed(686, top + 320 - reduction, 104, 28));
+        SingleComposer
             // The icon distance fades the indicator in every mode, so its row is never dropped.
-            .AddStaticText(Lang.Get("thebasics:scene-icon-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 352, 260, 22))
-            .AddNumberInput(ElementBounds.Fixed(530, top + 376, 100, 30), null, CairoFont.TextInput(), "distance")
-            .AddSwitch(value => { _appearance.UnlimitedIconDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 376, 30, 30), "unlimited")
-            .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 378, 110, 28))
+            .AddStaticText(Lang.Get("thebasics:scene-icon-distance"), CairoFont.WhiteSmallText().WithFontSize(13), ElementBounds.Fixed(530, top + 352 - reduction, 260, 22))
+            .AddNumberInput(ElementBounds.Fixed(530, top + 376 - reduction, 100, 30), null, CairoFont.TextInput(), "distance")
+            .AddInteractiveElement(new GuiElementSetupToggle(capi, data.UnlimitedIconDistance, value => { _appearance.UnlimitedIconDistance = value; RefreshPreview(); }, ElementBounds.Fixed(678, top + 376 - reduction, 112, 28)), "unlimited")
+            .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(678, top + 352 - reduction, 112, 22))
             ;
         if (_nearbyLayout)
         {
             SingleComposer
-                .AddStaticText(Lang.Get("thebasics:scene-text-distance"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 418, 260, 22))
-                .AddNumberInput(ElementBounds.Fixed(530, top + 442, 100, 30), null, CairoFont.TextInput(), "textdistance")
-                .AddSwitch(value => { _appearance.UnlimitedTextDistance = value; RefreshPreview(); }, ElementBounds.Fixed(645, top + 442, 30, 30), "textunlimited")
-                .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(684, top + 444, 110, 28))
+                .AddStaticText(Lang.Get("thebasics:scene-text-distance"), CairoFont.WhiteSmallText().WithFontSize(13), ElementBounds.Fixed(530, top + 418 - reduction, 260, 22))
+                .AddNumberInput(ElementBounds.Fixed(530, top + 442 - reduction, 100, 30), null, CairoFont.TextInput(), "textdistance")
+                .AddInteractiveElement(new GuiElementSetupToggle(capi, data.UnlimitedTextDistance, value => { _appearance.UnlimitedTextDistance = value; RefreshPreview(); }, ElementBounds.Fixed(678, top + 442 - reduction, 112, 28)), "textunlimited")
+                .AddStaticText(Lang.Get("thebasics:scene-unlimited"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(678, top + 418 - reduction, 112, 22))
                 ;
         }
         SingleComposer
-            .AddStaticText(Lang.Get("thebasics:scene-height"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 495 - textRow, 150, 22))
-            .AddNumberInput(ElementBounds.Fixed(690, top + 490 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
-            .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 535 - textRow, 150, 22))
-            .AddNumberInput(ElementBounds.Fixed(690, top + 530 - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
+            .AddStaticText(Lang.Get("thebasics:scene-height"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 495 - reduction - textRow, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 490 - reduction - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "height")
+            .AddStaticText(Lang.Get("thebasics:scene-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(530, top + 535 - reduction - textRow, 150, 22))
+            .AddNumberInput(ElementBounds.Fixed(690, top + 530 - reduction - textRow, 100, 30), _ => RefreshPreview(), CairoFont.TextInput(), "size")
             ;
     }
 
     private void ComposeBottomRows(SceneDescriptionData data, double top, double buttonY)
     {
+        var reduction = _compactLayout ? 128 : 0;
         SingleComposer
-            .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450, 180, 22))
-            .AddNumberInput(ElementBounds.Fixed(185, top + 444, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
+            .AddStaticText(Lang.Get("thebasics:scene-bubble-size"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 450 - reduction, 180, 22))
+            .AddNumberInput(ElementBounds.Fixed(185, top + 444 - reduction, 80, 30), _ => RefreshPreview(), CairoFont.TextInput(), "bubblesize")
             .AddSmallButton(Lang.Get("thebasics:scene-icon-button"), OpenIconPicker, ElementBounds.Fixed(0, top + 24, 78, 30), key: "titleicon")
             .AddSceneDrawing(ElementBounds.Fixed(28, top - 1, 22, 22), (ctx, surface, _) => { if (_appearance.TitleIconName.Length > 0) SceneTitleIcons.Draw(capi, ctx, surface, _appearance.TitleIconName); }, "titleiconart")
-            .AddSwitch(value => _appearance.IdleBobbing = value, ElementBounds.Fixed(160, top + 490, 30, 30), "bobbing")
-            .AddStaticText(Lang.Get("thebasics:scene-bobbing"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 494, 150, 22))
-            .AddSwitch(value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(250, top + 90, 30, 30), "showbody")
+            .AddInteractiveElement(new GuiElementSetupToggle(capi, data.IdleBobbing, value => _appearance.IdleBobbing = value, ElementBounds.Fixed(185, top + 490 - reduction, 112, 28)), "bobbing")
+            .AddStaticText(Lang.Get("thebasics:scene-bobbing"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(0, top + 494 - reduction, 150, 22))
+            .AddInteractiveElement(new GuiElementSetupToggle(capi, data.ShowBodyInBubble, value => { _appearance.ShowBodyInBubble = value; RefreshPreview(); }, ElementBounds.Fixed(250, top + 90, 112, 28)), "showbody")
             .AddStaticText(Lang.Get("thebasics:scene-show-body"), CairoFont.WhiteSmallText(), ElementBounds.Fixed(250, top + 66, 250, 22))
-            .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(0, buttonY, 120, ButtonHeight))
-            .AddSmallButton(Lang.Get("thebasics:scene-clear-read"), OnClearRead, ElementBounds.Fixed(140, buttonY, 140, ButtonHeight), key: "clearread")
-            .AddSmallButton(Lang.Get("thebasics:scene-set-defaults"), OnSetDefaults, ElementBounds.Fixed(300, buttonY, 185, ButtonHeight), key: "setdefaults")
+            .AddSmallButton(Lang.Get("thebasics:scene-clear-read"), OnClearRead, ElementBounds.Fixed(0, buttonY, 140, ButtonHeight), key: "clearread")
+            .AddSmallButton(Lang.Get("thebasics:scene-set-defaults"), OnSetDefaults, ElementBounds.Fixed(160, buttonY, 185, ButtonHeight), key: "setdefaults")
+            .AddSmallButton(Lang.Get("thebasics:scene-description-cancel"), OnCancelButton, ElementBounds.Fixed(520, buttonY, 120, ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:scene-description-save"), OnSave, ElementBounds.Fixed(DialogWidth + 290 - 150, buttonY, 150, ButtonHeight), key: "save")
             .AddSmallButton("", OnLockButton, ElementBounds.Fixed(750, top, 36, 32), key: "lock")
             .AddSceneDrawing(ElementBounds.Fixed(756, top + 4, 24, 24), DrawLock, "lockart")
@@ -227,10 +276,10 @@ internal sealed class SceneDescriptionDialog : GuiDialog
     {
         SingleComposer.ToggleButtonsSetValue("symbol", data.SymbolIconName.Length > 0 ? -1 : (int)data.Symbol);
         SingleComposer.GetNumberInput("distance").SetValue(data.IconDistance.ToString(CultureInfo.InvariantCulture));
-        SingleComposer.GetSwitch("unlimited").SetValue(data.UnlimitedIconDistance);
+        ((GuiElementSetupToggle)SingleComposer["unlimited"]).SetValue(data.UnlimitedIconDistance);
         if (_nearbyLayout)
         {
-            SingleComposer.GetSwitch("textunlimited").SetValue(data.UnlimitedTextDistance);
+            ((GuiElementSetupToggle)SingleComposer["textunlimited"]).SetValue(data.UnlimitedTextDistance);
             SingleComposer.GetNumberInput("textdistance").SetValue(data.TextDistance.ToString(CultureInfo.InvariantCulture));
         }
         SingleComposer.GetNumberInput("height").SetValue(data.HeightOffset.ToString(CultureInfo.InvariantCulture));
@@ -241,11 +290,12 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetNumberInput("bubblesize").Enabled = !data.IsLocked;
         SingleComposer.GetButton("titleicon").Enabled = !data.IsLocked;
         SingleComposer.GetButton("symbolicon").Enabled = !data.IsLocked;
-        SingleComposer.GetDropDown("color").Enabled = !data.IsLocked;
-        SingleComposer.GetSwitch("bobbing").SetValue(data.IdleBobbing);
-        SingleComposer.GetSwitch("bobbing").Enabled = !data.IsLocked;
-        SingleComposer.GetSwitch("showbody").SetValue(data.ShowBodyInBubble);
-        SingleComposer.GetSwitch("showbody").Enabled = !data.IsLocked;
+        SingleComposer.GetButton("color-custom").Enabled = !data.IsLocked;
+        RefreshColorControls();
+        ((GuiElementSetupToggle)SingleComposer["bobbing"]).SetValue(data.IdleBobbing);
+        ((GuiElementSetupToggle)SingleComposer["bobbing"]).Enabled = !data.IsLocked;
+        ((GuiElementSetupToggle)SingleComposer["showbody"]).SetValue(data.ShowBodyInBubble);
+        ((GuiElementSetupToggle)SingleComposer["showbody"]).Enabled = !data.IsLocked;
         RefreshPreview();
         SingleComposer.GetButton("lock").Enabled = _canManageLock;
         SingleComposer.GetButton("save").Enabled = !data.IsLocked;
@@ -254,7 +304,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         SingleComposer.GetTextInput("title").Enabled = !data.IsLocked;
         SingleComposer.GetTextArea("body").Enabled = !data.IsLocked;
         SingleComposer.GetDropDown("kind").Enabled = !data.IsLocked;
-        SingleComposer.GetSwitch("unlimited").Enabled = !data.IsLocked;
+        ((GuiElementSetupToggle)SingleComposer["unlimited"]).Enabled = !data.IsLocked;
         for (var i = 0; i < _symbolShapes.Length; i++) SingleComposer.GetToggleButton("symbol-" + i).Enabled = !data.IsLocked;
         SingleComposer.GetTextInput("title").SetMaxLength(SceneDescriptionData.MaxTitleLength);
         SingleComposer.GetTextInput("title").SetValue(data.Title);
@@ -271,12 +321,151 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         if (_nearbyLayout)
         {
             SingleComposer.GetNumberInput("textdistance").Enabled = !_appearance.IsLocked && !_appearance.UnlimitedTextDistance;
-            SingleComposer.GetSwitch("textunlimited").Enabled = !_appearance.IsLocked;
+            ((GuiElementSetupToggle)SingleComposer["textunlimited"]).Enabled = !_appearance.IsLocked;
         }
         SingleComposer.GetSceneDrawing("preview").Redraw();
         SingleComposer.GetSceneDrawing("titleiconart").Redraw();
         SingleComposer.GetSceneDrawing("symboliconart").Redraw();
         for (var index = 0; index < _symbolShapes.Length; index++) SingleComposer.GetSceneDrawing("symbolart-" + index).Redraw();
+    }
+
+    private void SelectColor(int index)
+    {
+        if (_appearance.IsLocked) return;
+        _colorPicker.Close();
+        _appearance.Color = (SceneMarkerColor)index;
+        _appearance.CustomColorHex = string.Empty;
+        RefreshColorControls();
+        SingleComposer.FocusElement(SingleComposer.GetColorListPicker("color-" + index).TabIndex);
+        RefreshPreview();
+    }
+
+    private bool OpenCustomColor()
+    {
+        if (_appearance.IsLocked) return false;
+        _colorPicker.SetValue(SceneMarkerVisuals.ColorHex(_appearance));
+        SingleComposer.FocusElement(_colorPicker.TabIndex);
+        _colorPicker.Open();
+        _colorPicker.ExpandCustom();
+        return true;
+    }
+
+    private void RefreshColorControls()
+    {
+        SingleComposer.ColorListPickerSetValue("color", _appearance.CustomColorHex.Length == 0 ? (int)_appearance.Color : -1);
+        SingleComposer.GetButton("color-custom").SetActive(_appearance.CustomColorHex.Length > 0);
+        _colorPicker.SetValue(SceneMarkerVisuals.ColorHex(_appearance));
+    }
+
+    private void RestoreOriginalColor()
+    {
+        if (_appearance.IsLocked || _appearance.Color == _originalColor && _appearance.CustomColorHex == _originalCustomColorHex) return;
+        _appearance.Color = _originalColor;
+        _appearance.CustomColorHex = _originalCustomColorHex;
+        RefreshColorControls();
+        RefreshPreview();
+    }
+
+    public override void OnRenderGUI(float deltaTime)
+    {
+        GuiPopupHoverGuard.RenderBackground(SingleComposer, _colorPicker?.IsOpen == true, () => base.OnRenderGUI(deltaTime));
+        if (_colorPicker?.IsOpen != true) return;
+        _colorPicker.RenderPopup(deltaTime);
+        if (_colorPicker.IsPositionInside(capi.Input.MouseX, capi.Input.MouseY)) MouseOverCursor = _colorPicker.MouseOverCursor;
+    }
+
+    public override bool OnEscapePressed()
+    {
+        if (_colorPicker?.IsOpen != true) return base.OnEscapePressed();
+        _colorPicker.Close();
+        SingleComposer.FocusElement(SingleComposer.GetButton("color-custom").TabIndex);
+        return true;
+    }
+
+    public override void OnMouseDown(MouseEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseDown(capi, args);
+        if (!args.Handled) base.OnMouseDown(args);
+    }
+
+    public override void OnMouseMove(MouseEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseMove(capi, args);
+        if (!args.Handled) base.OnMouseMove(args);
+    }
+
+    public override void OnMouseUp(MouseEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseUp(capi, args);
+        if (!args.Handled) base.OnMouseUp(args);
+    }
+
+    public override void OnMouseWheel(MouseWheelEventArgs args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnMouseWheel(capi, args);
+        if (!args.IsHandled) base.OnMouseWheel(args);
+    }
+
+    public override void OnKeyDown(KeyEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnKeyDown(capi, args);
+        if (!args.Handled) base.OnKeyDown(args);
+    }
+
+    public override void OnKeyPress(KeyEvent args)
+    {
+        if (_colorPicker?.IsOpen == true) _colorPicker.OnKeyPress(capi, args);
+        if (!args.Handled) base.OnKeyPress(args);
+    }
+
+    private sealed class MarkerColorSwatch : GuiElementColorListPicker
+    {
+        private readonly int index;
+        private readonly Action<int> choose;
+
+        internal MarkerColorSwatch(ICoreClientAPI api, int color, int index, ElementBounds bounds, Action<int> choose)
+            : base(api, color, bounds)
+        {
+            this.index = index;
+            this.choose = choose;
+            MouseOverCursor = "linkselect";
+        }
+
+        public override bool Enabled
+        {
+            get => enabled;
+            set
+            {
+                enabled = value;
+                MouseOverCursor = value ? "linkselect" : null;
+                if (!value) OnFocusLost();
+            }
+        }
+
+        public override void OnMouseDownOnElement(ICoreClientAPI api, MouseEvent args)
+        {
+            if (!enabled || args.Handled || args.Button != EnumMouseButton.Left) return;
+            choose(index);
+            args.Handled = true;
+            api.Gui.PlaySound("toggleswitch");
+        }
+
+        public override void OnKeyDown(ICoreClientAPI api, KeyEvent args)
+        {
+            if (!enabled || !HasFocus || args.Handled) return;
+            var selected = args.KeyCode switch
+            {
+                (int)GlKeys.Left => Math.Max(0, index - 1),
+                (int)GlKeys.Right => Math.Min((int)SceneMarkerColor.Red, index + 1),
+                (int)GlKeys.Home => 0,
+                (int)GlKeys.End => (int)SceneMarkerColor.Red,
+                (int)GlKeys.Space or (int)GlKeys.Enter or (int)GlKeys.KeypadEnter => index,
+                _ => -1
+            };
+            if (selected < 0) return;
+            choose(selected);
+            args.Handled = true;
+        }
     }
 
     // The distance rows appear and disappear with the mode, so that switch has to rebuild the
@@ -356,7 +545,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var (textWidth, textHeight) = text == null ? (0f, 0f) : SceneBubbleLayout.Size(text.Width, text.Height, RuntimeEnv.GUIScale, preview.BubbleRenderScale);
         // The tile is a legibility check, not a scale model. Size everything from the bubble - the part
         // that has to stay readable - and draw the symbol at a fraction of its world size beside it.
-        const double bubbleHeightShare = 0.16;
+        var bubbleHeightShare = _compactLayout ? 0.32 : 0.16;
         const double symbolShare = 0.675;
         var gap = text == null ? 0 : 10;
         var scale = Math.Min((width - 24) / Math.Max(1.2, textWidth), height * bubbleHeightShare / Math.Max(textHeight, 0.001));
@@ -369,7 +558,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var symbolX = width / 2.0 - symbolPixels / 2;
         if (!DrawSymbolIcon(ctx, preview, symbolX, symbolY, symbolPixels))
             SceneMarkerVisuals.Draw(ctx, _symbolShapes[(int)preview.Symbol], symbolX, symbolY, symbolPixels,
-                preview.Color, preview.Symbol, SceneMarkerVisuals.IndicatorOpacity);
+                SceneMarkerVisuals.ResolveColor(preview), preview.Symbol, SceneMarkerVisuals.IndicatorOpacity);
         if (text != null)
         {
             ctx.Save();
@@ -388,7 +577,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
         var pixels = (int)Math.Ceiling(size);
         using var icon = new ImageSurface(Format.Argb32, pixels, pixels);
         using (var iconCtx = new Context(icon))
-            if (!SceneTitleIcons.Draw(capi, iconCtx, icon, preview.SymbolIconName, preview.Color)) return false;
+            if (!SceneTitleIcons.Draw(capi, iconCtx, icon, preview.SymbolIconName, SceneMarkerVisuals.ResolveColor(preview))) return false;
         ctx.Save();
         ctx.Translate(x, y);
         ctx.Scale(size / pixels, size / pixels);
@@ -518,6 +707,7 @@ internal sealed class SceneDescriptionDialog : GuiDialog
             HeightOffset = height,
             IndicatorScale = indicatorScale,
             Color = _appearance.Color,
+            CustomColorHex = _appearance.CustomColorHex,
             IdleBobbing = _appearance.IdleBobbing,
             ShowBodyInBubble = _appearance.ShowBodyInBubble,
             BubbleScale = bubbleScale,

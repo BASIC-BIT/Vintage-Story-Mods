@@ -37,41 +37,18 @@ public class DistanceFontSizeTransformer : MessageTransformerBase
     public int GetFontSize(IServerPlayer sendingPlayer, IServerPlayer receivingPlayer,
         ProximityChatMode chatMode, int occlusionPenalty = 0)
     {
-        // Doesn't check if the system is disabled, that's up to the consumer
-
-        // Matches the obfuscation gradient: occluding geometry reads as extra distance.
-        var maxRange = _config.GetModeDistance(chatMode);
-        var defaultSize = _config.GetModeDefaultFontSize(chatMode);
-
-        // Unlimited range has no far edge to scale against, so every listener reads it at full size.
-        // Checked before reading positions so this never depends on both players having entities.
-        if (ModConfig.IsUnlimitedRange(maxRange))
-        {
-            return GetClampedFontSize(defaultSize);
-        }
-
-        var distance = sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
-
-        var minFontSize = ClampFontSizes.Min();
-
-        var unclampedSize = ((defaultSize - minFontSize) * (1.0d - (distance / maxRange))) + minFontSize;
-
-        var clampedSize = GetClampedFontSize(unclampedSize);
-
-        return clampedSize;
+        // Unlimited speech does not need player positions.
+        var distance = ModConfig.IsUnlimitedRange(_config.GetModeDistance(chatMode)) ? 0 : sendingPlayer.GetDistance(receivingPlayer) + occlusionPenalty;
+        return CalculateFontSize(_config, chatMode, distance);
     }
 
-    // Reads the config's own default rather than repeating it. A fallback that does not equal the
-    // real default silently retunes any server that falls back to it.
-    private int[] ClampFontSizes =>
-        _config.ProximityChatClampFontSizes is { Length: > 0 }
-            ? _config.ProximityChatClampFontSizes
-            : ModConfig.DefaultClampFontSizes;
-
-    private int GetClampedFontSize(double unclamped)
+    internal static int CalculateFontSize(ModConfig config, ProximityChatMode mode, double distance)
     {
-        // Closest allowed size to the computed one. A hand-edited empty array survives the ??=
-        // default, so this reads through the guarded accessor rather than the config directly.
-        return ClampFontSizes.MinBy(size => Math.Abs(size - unclamped));
+        var range = config.GetModeDistance(mode);
+        var defaultSize = config.GetModeDefaultFontSize(mode);
+        var sizes = config.ProximityChatClampFontSizes is { Length: > 0 } ? config.ProximityChatClampFontSizes : ModConfig.DefaultClampFontSizes;
+        var size = ModConfig.IsUnlimitedRange(range) ? defaultSize :
+            ((defaultSize - sizes.Min()) * (1.0d - distance / range)) + sizes.Min();
+        return sizes.MinBy(candidate => Math.Abs(candidate - size));
     }
 }

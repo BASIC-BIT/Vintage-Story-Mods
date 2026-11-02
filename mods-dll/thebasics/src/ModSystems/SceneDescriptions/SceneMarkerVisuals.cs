@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -78,6 +79,23 @@ internal static class SceneMarkerVisuals
         SceneMarkerColor.Red => (0.94, 0.30, 0.28),
         _ => (1, 0.82, 0.30),
     };
+
+    internal static (double R, double G, double B) ResolveColor(SceneDescriptionData data)
+    {
+        var custom = data.CustomColorHex;
+        if (string.IsNullOrEmpty(custom) || !SceneDescriptionData.IsValidCustomColor(custom)) return Palette(data.Color);
+        return (byte.Parse(custom.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture) / 255d,
+            byte.Parse(custom.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture) / 255d,
+            byte.Parse(custom.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture) / 255d);
+    }
+
+    internal static string ColorHex(SceneDescriptionData data)
+    {
+        if (!string.IsNullOrEmpty(data.CustomColorHex) && SceneDescriptionData.IsValidCustomColor(data.CustomColorHex))
+            return data.CustomColorHex.ToUpperInvariant();
+        var rgb = Palette(data.Color);
+        return $"#{(int)(rgb.R * 255):X2}{(int)(rgb.G * 255):X2}{(int)(rgb.B * 255):X2}";
+    }
 
     // Shared artwork for the billboard and editor preview.
     internal const float IndicatorOpacity = 0.68f;

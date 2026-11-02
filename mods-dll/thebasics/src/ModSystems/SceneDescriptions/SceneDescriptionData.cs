@@ -68,6 +68,7 @@ public sealed class SceneDescriptionData
     // Half the indicator, plus the 10 percent it grows while targeted, plus a small margin.
     internal float SelectionHalfExtent => IndicatorBlocks * 0.55f * IndicatorScale + 0.05f;
     public SceneMarkerColor Color { get; set; }
+    public string CustomColorHex { get; set; } = string.Empty;
     public SceneMarkerEffect Effect { get; set; }
     public bool IdleBobbing { get; set; } = true;
     public bool ShowBodyInBubble { get; set; }
@@ -85,6 +86,15 @@ public sealed class SceneDescriptionData
         foreach (var ch in value)
             if (char.IsControl(ch)) return string.Empty;
         return value;
+    }
+
+    internal static bool IsValidCustomColor(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return true;
+        if (value.Length != 7 || value[0] != '#') return false;
+        for (var index = 1; index < value.Length; index++)
+            if (!Uri.IsHexDigit(value[index])) return false;
+        return true;
     }
 
     public float GetTextOpacity(double distance) => GetOpacity(distance, TextDistance, UnlimitedTextDistance);
@@ -146,6 +156,7 @@ public sealed class SceneDescriptionData
         HeightOffset = edited.HeightOffset;
         IndicatorScale = edited.IndicatorScale;
         Color = edited.Color;
+        CustomColorHex = edited.CustomColorHex;
         Effect = edited.Effect;
         IdleBobbing = edited.IdleBobbing;
         ShowBodyInBubble = edited.ShowBodyInBubble;
@@ -180,6 +191,7 @@ public sealed class SceneDescriptionData
         if (TitleIconName.Length == 0 && TitleIcon > 0) TitleIconName = "thebasics-scene-title-" + TitleIcon;
         TitleIcon = 0; // Consume the legacy selection once so clearing the name stays cleared.
         if (!Enum.IsDefined(Color)) Color = SceneMarkerColor.Gold;
+        CustomColorHex = IsValidCustomColor(CustomColorHex) ? CustomColorHex?.ToUpperInvariant() ?? string.Empty : string.Empty;
 
         if (!Enum.IsDefined(Kind))
         {
@@ -211,6 +223,7 @@ public sealed class SceneDescriptionData
             HeightOffset = HeightOffset,
             IndicatorScale = IndicatorScale,
             Color = Color,
+            CustomColorHex = CustomColorHex,
             Effect = Effect,
             IdleBobbing = IdleBobbing,
             ShowBodyInBubble = ShowBodyInBubble,
@@ -225,6 +238,7 @@ public sealed class SceneDescriptionData
         Symbol = Symbol,
         SymbolIconName = SymbolIconName,
         Color = Color,
+        CustomColorHex = CustomColorHex,
         Effect = Effect,
         IdleBobbing = IdleBobbing,
         ShowBodyInBubble = ShowBodyInBubble,
@@ -264,6 +278,7 @@ public sealed class SceneDescriptionData
         attributes.SetFloat("sceneHeightOffset", HeightOffset);
         attributes.SetFloat("sceneIndicatorScale", IndicatorScale);
         attributes.SetInt("sceneColor", (int)Color);
+        attributes.SetString("sceneCustomColor", CustomColorHex);
         attributes.SetInt("sceneEffect", (int)Effect);
         attributes.SetBool("sceneIdleBobbing", IdleBobbing);
         attributes.SetBool("sceneShowBodyInBubble", ShowBodyInBubble);
@@ -300,6 +315,7 @@ public sealed class SceneDescriptionData
             HeightOffset = attributes.GetFloat("sceneHeightOffset"),
             IndicatorScale = attributes.GetFloat("sceneIndicatorScale", 1),
             Color = (SceneMarkerColor)attributes.GetInt("sceneColor"),
+            CustomColorHex = attributes.GetString("sceneCustomColor", string.Empty),
             Effect = (SceneMarkerEffect)attributes.GetInt("sceneEffect"),
             IdleBobbing = attributes.GetBool("sceneIdleBobbing", true),
             ShowBodyInBubble = attributes.GetBool("sceneShowBodyInBubble"),

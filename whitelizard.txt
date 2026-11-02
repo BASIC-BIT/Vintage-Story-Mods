@@ -52,3 +52,21 @@ DimensionTransferService::SyncClientTransfer
 
 # Cavern spike helper samples several terrain inputs; keep local until a second generator needs it.
 CavernBlockSource::AddSpikes
+
+# Setup topic icons are declarative Cairo vector commands, kept together for drawing order.
+GuiElementSetupTopicCard::DrawIcon
+
+# Language input wiring accepts label/value, bounds, update callback, and optional UI hints.
+SetupWizardLanguageEditor::Input
+
+# Language toggle wiring accepts label/value, bounds, update callback, and hover help.
+SetupWizardLanguageEditor::Toggle
+
+# Records preview text adapter forwards label, bounds, font size, and weight to native text.
+NativeRecordsElement::Text
+
+# Sheet selector wiring accepts native options, bounds, selection callback, and enabled state.
+SetupWizardSheetEditor::Select
+
+# Setup dialog construction wires client dependencies, lifecycle callbacks, and capture seams.
+SetupWizardDialog::SetupWizardDialog

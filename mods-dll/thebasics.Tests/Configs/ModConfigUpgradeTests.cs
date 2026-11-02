@@ -209,7 +209,7 @@ public class ModConfigUpgradeTests
     [InlineData(false)]
     public void ChatFormattingIsolation_PreservesServerChoiceInJsonAndWire(bool enabled)
     {
-        var config = new ModConfig { IsolateChatMessageFormatting = enabled };
+        var config = new ModConfig { IsolateChatMessageFormatting = enabled, ProximityChatTabPosition = "AfterGeneral" };
         var json = JsonConvert.SerializeObject(config);
         var fromJson = JsonConvert.DeserializeObject<ModConfig>(json)!;
         fromJson.InitializeDefaultsIfNeeded();
@@ -218,7 +218,26 @@ public class ModConfigUpgradeTests
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, config);
         stream.Position = 0;
-        Serializer.Deserialize<ModConfig>(stream).IsolateChatMessageFormatting.Should().Be(enabled);
+        var restored = Serializer.Deserialize<ModConfig>(stream);
+        restored.IsolateChatMessageFormatting.Should().Be(enabled);
+        restored.ProximityChatTabPosition.Should().Be("AfterGeneral");
+        stream.Position = 0;
+        Serializer.Deserialize<PublishedChatFormattingConfig>(stream).IsolateChatMessageFormatting.Should().Be(enabled);
+
+        using var publishedStream = new MemoryStream();
+        Serializer.Serialize(publishedStream, new PublishedChatFormattingConfig { IsolateChatMessageFormatting = enabled });
+        publishedStream.Position = 0;
+        var fromPublished = Serializer.Deserialize<ModConfig>(publishedStream);
+        fromPublished.IsolateChatMessageFormatting.Should().Be(enabled);
+        fromPublished.ProximityChatTabPosition.Should().Be("GameOrder");
+    }
+
+    [ProtoContract]
+    public sealed class PublishedChatFormattingConfig
+    {
+        [ProtoMember(159)]
+        [System.ComponentModel.DefaultValue(true)]
+        public bool IsolateChatMessageFormatting { get; set; } = true;
     }
 
     [ProtoContract]
@@ -261,6 +280,8 @@ public class ModConfigUpgradeTests
         // ModConfig is ProtoContract because it is synced to clients. New ProtoMember ids must not
         // collide with existing ones, which would silently corrupt an unrelated field.
         var config = LoadLegacyConfig();
+        config.ProximityChatTabPosition.Should().Be("GameOrder");
+        config.ProximityChatTabPosition = "AfterGeneral";
         config.ProximityChatModeQuestionVerbs[ProximityChatMode.Normal] = ["inquires"];
         config.RequireClearSoundPathForSpeech[ProximityChatMode.Yell] = true;
         config.SpeechOcclusionWallPenaltyBlocks = 7;
@@ -280,6 +301,7 @@ public class ModConfigUpgradeTests
         stream.Position = 0;
         var restored = Serializer.Deserialize<ModConfig>(stream);
 
+        restored.ProximityChatTabPosition.Should().Be("AfterGeneral");
         restored.ProximityChatModeQuestionVerbs[ProximityChatMode.Normal].Should().BeEquivalentTo(["inquires"]);
         restored.RequireClearSoundPathForSpeech[ProximityChatMode.Yell].Should().BeTrue();
         restored.SpeechOcclusionWallPenaltyBlocks.Should().Be(7);

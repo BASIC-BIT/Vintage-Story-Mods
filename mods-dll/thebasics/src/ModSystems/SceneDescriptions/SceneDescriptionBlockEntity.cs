@@ -200,6 +200,11 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             return;
         }
 
+        if (!SceneDescriptionData.IsValidCustomColor(packet?.CustomColorHex))
+        {
+            Api.Logger.Warning("[THEBASICS] Rejected invalid scene marker color at {0}.", Pos);
+            return;
+        }
         if (packet?.LockAfterSave == true && !Data.CanLock(player.PlayerUID, HasClaimAccess(player)))
         {
             (player as IServerPlayer)?.SendIngameError("scene-description-no-access", Lang.Get("thebasics:scene-description-no-access"));
@@ -242,6 +247,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
         Enum.IsDefined((SceneDescriptionDisplay)packet.Display) &&
         Enum.IsDefined((SceneMarkerSymbol)packet.Symbol) &&
         Enum.IsDefined((SceneMarkerColor)packet.Color) &&
+        SceneDescriptionData.IsValidCustomColor(packet.CustomColorHex) &&
         float.IsFinite(packet.IndicatorScale) && packet.IndicatorScale is >= 0.25f and <= 3 &&
         float.IsFinite(packet.BubbleScale) && packet.BubbleScale is >= 0.4f and <= 3.5f &&
         float.IsFinite(packet.HeightOffset) && packet.HeightOffset is >= -2 and <= 4 &&
@@ -419,6 +425,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             HeightOffset = data.HeightOffset,
             IndicatorScale = data.IndicatorScale,
             Color = (int)data.Color,
+            CustomColorHex = data.CustomColorHex,
             Effect = (int)data.Effect,
             IdleBobbing = data.IdleBobbing,
             ShowBodyInBubble = data.ShowBodyInBubble,
@@ -448,6 +455,7 @@ public sealed class SceneDescriptionBlockEntity : BlockEntity
             HeightOffset = packet.HeightOffset,
             IndicatorScale = packet.IndicatorScale,
             Color = (SceneMarkerColor)packet.Color,
+            CustomColorHex = packet.CustomColorHex,
             Effect = (SceneMarkerEffect)packet.Effect,
             IdleBobbing = packet.IdleBobbing,
             ShowBodyInBubble = packet.ShowBodyInBubble,

@@ -262,11 +262,11 @@ public class SceneReviewRegressionTests
         var textures = Enumerable.Range(0, SceneMarkerIconRenderer.MaxCachedIcons + 3)
             .Select(_ => new LoadedTexture(api)).ToArray();
         for (var i = 0; i < textures.Length; i++)
-            renderer.CacheIcon(("untrusted-icon-" + i, SceneMarkerColor.Gold), textures[i]);
+            renderer.CacheIcon(("untrusted-icon-" + i, "preset:0"), textures[i]);
         var field = typeof(SceneMarkerIconRenderer).GetField("_icons", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var cache = (System.Collections.IDictionary)field.GetValue(renderer)!;
         cache.Count.Should().Be(SceneMarkerIconRenderer.MaxCachedIcons);
-        cache.Contains(("untrusted-icon-0", SceneMarkerColor.Gold)).Should().BeFalse();
-        cache.Contains(("untrusted-icon-130", SceneMarkerColor.Gold)).Should().BeTrue();
+        cache.Contains(("untrusted-icon-0", "preset:0")).Should().BeFalse();
+        cache.Contains(("untrusted-icon-130", "preset:0")).Should().BeTrue();
     }
 }
