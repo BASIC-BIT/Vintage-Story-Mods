@@ -1,0 +1,317 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "girder": "game:block/metal/riveted/iron1",
+    "shaft": "game:block/metal/plate/steel"
+  },
+  "elements": [
+    {
+      "name": "anglewn",
+      "from": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "to": [
+        2.0,
+        16.0,
+        2.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      },
+      "//": "Four corner angles running the full height of the cell. This leg REPLACES a post column, so it carries the tower as well as the machinery and cannot be open at the corners."
+    },
+    {
+      "name": "anglews",
+      "from": [
+        0.0,
+        0.0,
+        14.0
+      ],
+      "to": [
+        2.0,
+        16.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "angleen",
+      "from": [
+        14.0,
+        0.0,
+        0.0
+      ],
+      "to": [
+        16.0,
+        16.0,
+        2.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "anglees",
+      "from": [
+        14.0,
+        0.0,
+        14.0
+      ],
+      "to": [
+        16.0,
+        16.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "//": "Waist band, so the leg reads as a lattice rather than four loose sticks. INSET by 0.4 rather than flush or proud, and both halves of that matter. Flush shares four planes with the angles' outer faces, which is a z-fight. Proud was tried and reverted: this leg stands at tower-local x +3 exactly where a post does, and a cabin turning square at a tower sweeps to within 0.037 blocks of the post inner face, so 0.4 unit proud eats two thirds of that margin. Inset spends nothing.",
+      "name": "bandlow",
+      "from": [
+        0.4,
+        3.0,
+        0.4
+      ],
+      "to": [
+        15.6,
+        4.4,
+        15.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "bandhigh",
+      "from": [
+        0.4,
+        12.0,
+        0.4
+      ],
+      "to": [
+        15.6,
+        13.4,
+        15.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "//": "The vertical shaft, running the whole height of the cell so a stack of three is one shaft and not three.",
+      "name": "shaft",
+      "from": [
+        6.4,
+        0.0,
+        6.4
+      ],
+      "to": [
+        9.6,
+        16.0,
+        9.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "name": "collar",
+      "from": [
+        5.4,
+        7.2,
+        5.4
+      ],
+      "to": [
+        10.6,
+        9.2,
+        10.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    }
+  ]
+}

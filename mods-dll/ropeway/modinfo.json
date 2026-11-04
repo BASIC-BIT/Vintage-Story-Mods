@@ -1,0 +1,13 @@
+{
+  "type": "code",
+  "modid": "ropeway",
+  "name": "Cable Car",
+  "authors": ["BASIC"],
+  "description": "Aerial ropeway. Build towers, string a haul rope, ride the cabin across the valley.",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": "",
+    "survival": ""
+  },
+  "side": "universal"
+}

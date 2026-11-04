@@ -1,0 +1,396 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "girder": "game:block/metal/riveted/iron1",
+    "machine": "game:block/metal/tarnished/iron",
+    "shaft": "game:block/metal/plate/steel",
+    "rope": "game:block/cloth/reedrope"
+  },
+  "elements": [
+    {
+      "//": "brace.json's girder profile, copied box for box. A machine cell is a brace cell with gear on top of it, so the crossarm has to read continuous across the join or the tower looks like two structures bolted together.",
+      "name": "foot",
+      "from": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "to": [
+        16.0,
+        2.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "beam",
+      "from": [
+        2.0,
+        2.0,
+        5.0
+      ],
+      "to": [
+        14.0,
+        14.0,
+        11.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "flangewest",
+      "from": [
+        0.0,
+        2.0,
+        4.0
+      ],
+      "to": [
+        2.0,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "flangeeast",
+      "from": [
+        14.0,
+        2.0,
+        4.0
+      ],
+      "to": [
+        16.0,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "//": "The sheave's centre is chosen rather than drawn. At (12, 25.7-4) with radius 4 its TOP tangent is 25.7, the lay shaft's own height, and its WEST tangent is x 8, the guide's own hanger column - so both ends of the wrap terminate on members that already exist. Centred in the cell, the rope left both of them and the counterweight read as a separate object parked beside a tower.",
+      "name": "pedestal",
+      "from": [
+        9.5,
+        14.0,
+        6.4
+      ],
+      "to": [
+        14.5,
+        19.7,
+        9.6
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "bearingnorth",
+      "from": [
+        10.0,
+        19.2,
+        5.1
+      ],
+      "to": [
+        14.0,
+        24.2,
+        6.4
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "name": "bearingsouth",
+      "from": [
+        10.0,
+        19.2,
+        9.6
+      ],
+      "to": [
+        14.0,
+        24.2,
+        10.9
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "name": "sheave",
+      "from": [
+        8.0,
+        17.7,
+        6.6
+      ],
+      "to": [
+        16.0,
+        25.7,
+        9.4
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "//": "Metal, not rope, and collinear with the lay shaft it runs into. Drawn in rope texture first, which made the two halves of one member look like two different things.",
+      "name": "tierod",
+      "from": [
+        0.0,
+        24.7,
+        7.0
+      ],
+      "to": [
+        12.0,
+        26.7,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "//": "The rope leaving the sheave's west tangent straight down the guide's hanger column, into the counterweight three cells below.",
+      "name": "hangdown",
+      "from": [
+        7.0,
+        0.6,
+        7.0
+      ],
+      "to": [
+        9.0,
+        21.7,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rope"
+        },
+        "east": {
+          "texture": "#rope"
+        },
+        "south": {
+          "texture": "#rope"
+        },
+        "west": {
+          "texture": "#rope"
+        },
+        "up": {
+          "texture": "#rope"
+        },
+        "down": {
+          "texture": "#rope"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "//": "The line's mechanical intake, and cell [3,0,0] of a ropeway:drivestation - the foot of the machine leg, on the ground. It carries the MPConsumer the bullwheel used to; getting an axle four blocks up cost sixteen vanilla blocks of scaffold and made the tower read as two structures. It stood FREE for one round, bound to whichever line had the nearest footing within eight blocks, and that is what this change deletes: a housing that is not a cell of a station drives nothing at all, whatever it is standing beside. The cost of that is honest and is written down - a mill's hub is four to eleven blocks up and the intake no longer climbs to meet it, so a windmill drive now runs an axle column down the drive leg, which ropeway:driveshaft's sidesolid is what makes possible. See docs/POWER-AND-STORAGE.md.",
+  "code": "drivehousing",
+  "class": "BlockDriveHousing",
+  "entityClass": "DriveHousing",
+  "//novariant": "No side variant, deliberately: BlockDriveHousing.HasMechPowerConnectorAt takes an axle on ANY horizontal face, so orientation decides nothing - and a block with no orientation cannot be placed 90 degrees out. The shape is 4-fold symmetric to match.",
+  "//entityBehaviors": "MPConsumer is registered by vanilla (SurvivalCoreSystem), so the mod registers nothing for it. mechPartShape null is MANDATORY, not decoration: BEBehaviorMPBase.Initialize defaults Shape to Block.Shape and then unconditionally calls AddDeviceForRender, so without it the whole housing model joins the instanced spinning renderer and turns about an axis nothing derived. resistance is the schedule's floor - BEDriveHousing rewrites it every second to RopewayPower.Resistance, which is this idle figure unless the line has a cabin trying to move.",
+  "entityBehaviors": [
+    {
+      "name": "MPConsumer",
+      "properties": {
+        "resistance": 0.005,
+        "mechPartShape": null
+      }
+    }
+  ],
+  "shape": {
+    "base": "ropeway:block/drivehousing"
+  },
+  "textures": {
+    "stone": { "base": "game:block/stone/rock/andesite1" },
+    "machine": { "base": "game:block/metal/tarnished/iron" },
+    "girder": { "base": "game:block/metal/riveted/iron1" }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Metal",
+  "creativeinventory": { "general": [ "*" ], "construction": [ "*" ] },
+  "attributes": {
+    "handbook": {
+      "groupBy": [ "drivehousing" ]
+    },
+    "reinforcable": false
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": { "all": false },
+  "sideopaque": { "all": false },
+  "collisionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.9375, "z2": 1 },
+  "selectionbox": { "x1": 0, "y1": 0, "z1": 0, "x2": 1, "y2": 0.9375, "z2": 1 },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/anvil",
+    "hit": "game:block/anvil",
+    "byTool": {
+      "Pickaxe": { "hit": "game:block/rock-hit-pickaxe", "break": "game:block/rock-break-pickaxe" }
+    }
+  },
+  "guiTransform": {
+    "rotation": { "x": -22.6, "y": 45, "z": 0 },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

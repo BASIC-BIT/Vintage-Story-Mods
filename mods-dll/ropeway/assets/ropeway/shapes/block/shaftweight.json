@@ -1,0 +1,143 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "girder": "game:block/metal/riveted/iron1",
+    "stone": "game:block/stone/rock/andesite1",
+    "shaft": "game:block/metal/plate/steel"
+  },
+  "elements": [
+    {
+      "name": "shoe",
+      "from": [
+        1,
+        0,
+        1
+      ],
+      "to": [
+        15,
+        2,
+        15
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "mass",
+      "from": [
+        2,
+        2,
+        2
+      ],
+      "to": [
+        14,
+        38,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#stone"
+        },
+        "east": {
+          "texture": "#stone"
+        },
+        "south": {
+          "texture": "#stone"
+        },
+        "west": {
+          "texture": "#stone"
+        },
+        "up": {
+          "texture": "#stone"
+        },
+        "down": {
+          "texture": "#stone"
+        }
+      }
+    },
+    {
+      "name": "crown",
+      "from": [
+        1,
+        38,
+        1
+      ],
+      "to": [
+        15,
+        40,
+        15
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "rod",
+      "from": [
+        7,
+        40,
+        7
+      ],
+      "to": [
+        9,
+        56,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    }
+  ]
+}

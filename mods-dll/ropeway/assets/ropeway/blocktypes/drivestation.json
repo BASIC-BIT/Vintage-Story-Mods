@@ -1,0 +1,157 @@
+{
+  "code": "drivestation",
+  "//": "A tower whose crossarm carries a drive train. It is the SAME sixteen cells as ropeway:pylonbase - same footprint, same 5-wide passage, same footing position, same 0-2 spans, walked by RopewayLine.WalkChain like any other tower - and eight of those cells want machinery instead of posts and braces. A station REPLACES a tower in the chain; it does not extend one. Same class and same block entity as the plain footing: BEPylonBase reads whichever multiblockStructure its own block carries, so there is no new C# for this.",
+  "class": "BlockPylonBase",
+  "entityClass": "PylonBase",
+  "//rope": "Cable texture. BuildHalfCable flat-samples ONE point of it - see pylonbase.json. Keep comments OUT of \"textures\".",
+  "behaviors": [
+    {
+      "name": "HorizontalOrientable"
+    }
+  ],
+  "variantgroups": [
+    {
+      "code": "side",
+      "states": [
+        "north",
+        "east",
+        "south",
+        "west"
+      ]
+    }
+  ],
+  "shapeByType": {
+    "*-north": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 0
+    },
+    "*-east": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 270
+    },
+    "*-south": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 180
+    },
+    "*-west": {
+      "base": "ropeway:block/pylonbase",
+      "rotateY": 90
+    }
+  },
+  "//shape": "The footing reuses the plain one's model. A distinct model was considered and dropped: the block-info panel, the build overlay and the item name all already say which footing you are holding, and the footing is buried in the archway floor where nobody looks. What names a station from across the valley is its machine leg.",
+  "//metal": "NOT this footing's own decoration. `metal` is the STATION RAIL and the outrigger plates, which BEPylonBase.OnTesselation draws in C# off textures[\"metal\"] (BEPylonBase.cs:603) and flat-samples like the cable - Array.Fill(mesh.Uv, 0.5f) at :989 - so only this sprite's CENTRE texel is ever seen and it must stay in the plate/ family, whose centre is within 1 L of its own mean. riveted/iron1 fails that by 6.5 L. It is plate/IRON and not the plate/steel `shaft` wears, which is a SECOND rule and a rendered one: SpanMath.TrimForTowers draws eight blocks of 2.2x4-unit bar at every tower on every line, so this is the longest continuous geometry the mod has, and steel's flat sample of 126.5 L made it the brightest object on a tower - 37% brighter than the crossarm it hangs under, with the haul cable a thread beside it (renders/palette/zoom-rail.png). plate/iron flat-samples 95.0: one step UNDER `shaft`, 2.5 L off the riveted crossarm's own mean, still 21 L clear of the rope, and it reads as a bar rather than a highlight. The footing's own plate and boss are on `shaft` instead, so a cosmetic edit to the footing cannot silently repaint every rail on every line. A key no shape face uses still bakes into the atlas (Block.cs:2514); `rope` here has always worked that way.",
+  "textures": {
+    "stone": {
+      "base": "game:block/stone/rock/andesite1"
+    },
+    "shaft": {
+      "base": "game:block/metal/plate/steel"
+    },
+    "metal": {
+      "base": "game:block/metal/plate/iron"
+    },
+    "rope": {
+      "base": "game:block/cloth/reedrope"
+    }
+  },
+  "drawtype": "json",
+  "blockmaterial": "Stone",
+  "creativeinventory": {
+    "general": [
+      "*-north"
+    ],
+    "construction": [
+      "*-north"
+    ]
+  },
+  "attributes": {
+    "handbook": {
+      "groupBy": [
+        "drivestation-*"
+      ]
+    },
+    "reinforcable": false,
+    "maxSpan": 48,
+    "maxLineLength": 320,
+    "ropePerBlock": 0.25,
+    "maxCandidates": 16,
+    "//driveIntakeCell": "Which block number of the structure below is the mechanical intake. BEPylonBase.Intake looks the cell up by this number rather than by a hardcoded offset, so the C# and this JSON cannot drift apart - RopewayAssetContractTests.TheDriveIntakeCellIsTheOneTheStationNames is what pins that it resolves to ropeway:drivehousing.",
+    "driveIntakeCell": 7,
+    "//multiblockStructure": "EXACTLY the fifteen offsets pylonbase.json has, byte for byte; only the block numbers differ. That is the whole affordability of a station: every geometric number the tower was tuned against - the 5-wide passage, SpanMath.TowerClearance, the cabin's 2.463-block turning sweep against post inner faces at 2.5, the 0.25 roof clearance - is a property of the OFFSETS, and no offset moves. RopewayAssetContractTests.AllThreeFootingsShareOneCellList is what keeps that true. The machine leg is always at tower-local +X, which is the crossarm axis, so the four side variants already give the leg either side of a line without a mirrored blocktype.",
+    "//drivehead": "The -* stays a WILDCARD here and is narrowed at runtime, per tower, by BEPylonBase.OwnTheHeadCell: a north-facing station wants drivehead-north and an east-facing one drivehead-east. Writing an exact code here instead would make all four variants demand the same facing. The narrowing is what stops two stations sharing one machine leg - RopewayAssetContractTests.ASharedMachineLegSatisfiesAtMostOneStation fails either way round.",
+    "multiblockStructure": {
+      "blockNumbers": {
+        "ropeway:bullwheel-*": 1,
+        "ropeway:brace-*": 2,
+        "game:@(log-placed-.*|debarkedlog-.*|planks-.*|rock-.*|cobblestone-.*|drystone-.*|rockpolished-.*|stonebricks-.*)": 3,
+        "ropeway:layshaft-*": 4,
+        "ropeway:drivehead-*": 5,
+        "ropeway:driveshaft": 6,
+        "ropeway:drivehousing": 7
+      },
+      "offsets": [
+        { "x": 0, "y": 4, "z": 0, "w": 1 },
+        { "x": -3, "y": 4, "z": 0, "w": 2 },
+        { "x": -2, "y": 4, "z": 0, "w": 2 },
+        { "x": -1, "y": 4, "z": 0, "w": 2 },
+        { "x": 1, "y": 4, "z": 0, "w": 4 },
+        { "x": 2, "y": 4, "z": 0, "w": 4 },
+        { "x": 3, "y": 4, "z": 0, "w": 5 },
+        { "x": -3, "y": 0, "z": 0, "w": 3 },
+        { "x": -3, "y": 1, "z": 0, "w": 3 },
+        { "x": -3, "y": 2, "z": 0, "w": 3 },
+        { "x": -3, "y": 3, "z": 0, "w": 3 },
+        { "x": 3, "y": 0, "z": 0, "w": 7 },
+        { "x": 3, "y": 1, "z": 0, "w": 6 },
+        { "x": 3, "y": 2, "z": 0, "w": 6 },
+        { "x": 3, "y": 3, "z": 0, "w": 6 }
+      ]
+    }
+  },
+  "replaceable": 500,
+  "resistance": 4.5,
+  "lightAbsorption": 0,
+  "sidesolid": {
+    "all": false
+  },
+  "sideopaque": {
+    "all": false
+  },
+  "collisionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
+  "selectionbox": {
+    "x1": 0,
+    "y1": 0,
+    "z1": 0,
+    "x2": 1,
+    "y2": 0.5,
+    "z2": 1
+  },
+  "sounds": {
+    "walk": "game:walk/stone*",
+    "place": "game:block/anvil",
+    "break": "game:block/rock-break-pickaxe",
+    "hit": "game:block/rock-hit-pickaxe",
+    "byTool": {
+      "Pickaxe": {
+        "hit": "game:block/rock-hit-pickaxe",
+        "break": "game:block/rock-break-pickaxe"
+      }
+    }
+  },
+  "guiTransform": {
+    "rotation": {
+      "x": -22.6,
+      "y": 45,
+      "z": 0
+    },
+    "scale": 1.6,
+    "rotate": true
+  }
+}

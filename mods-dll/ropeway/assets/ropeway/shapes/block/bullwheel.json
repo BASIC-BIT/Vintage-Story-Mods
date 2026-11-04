@@ -1,0 +1,506 @@
+{
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "girder": "game:block/metal/riveted/iron1",
+    "machine": "game:block/metal/tarnished/iron",
+    "shaft": "game:block/metal/plate/steel"
+  },
+  "elements": [
+    {
+      "name": "footwest",
+      "from": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "to": [
+        3.2,
+        2.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "footeast",
+      "from": [
+        12.8,
+        0.0,
+        0.0
+      ],
+      "to": [
+        16.0,
+        2.0,
+        16.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "beamwest",
+      "from": [
+        0.0,
+        2.0,
+        5.0
+      ],
+      "to": [
+        3.2,
+        14.0,
+        11.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "beameast",
+      "from": [
+        12.8,
+        2.0,
+        5.0
+      ],
+      "to": [
+        16.0,
+        14.0,
+        11.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder"
+        },
+        "east": {
+          "texture": "#girder"
+        },
+        "south": {
+          "texture": "#girder"
+        },
+        "west": {
+          "texture": "#girder"
+        },
+        "up": {
+          "texture": "#girder"
+        },
+        "down": {
+          "texture": "#girder"
+        }
+      }
+    },
+    {
+      "name": "sheavecheekwest",
+      "from": [
+        3.2,
+        0.0,
+        2.0
+      ],
+      "to": [
+        5.4,
+        15.0,
+        14.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "sheavecheekeast",
+      "from": [
+        10.6,
+        0.0,
+        2.0
+      ],
+      "to": [
+        12.8,
+        15.0,
+        14.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "drivehousing",
+      "from": [
+        5.4,
+        10.6,
+        4.0
+      ],
+      "to": [
+        10.6,
+        15.0,
+        12.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "driveboss",
+      "from": [
+        6.5,
+        15.0,
+        6.5
+      ],
+      "to": [
+        9.5,
+        16.0,
+        9.5
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#machine"
+        },
+        "east": {
+          "texture": "#machine"
+        },
+        "south": {
+          "texture": "#machine"
+        },
+        "west": {
+          "texture": "#machine"
+        },
+        "up": {
+          "texture": "#machine"
+        },
+        "down": {
+          "texture": "#machine"
+        }
+      }
+    },
+    {
+      "name": "bearingstandwest",
+      "from": [
+        3.2,
+        15.0,
+        6.0
+      ],
+      "to": [
+        5.4,
+        23.0,
+        10.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "name": "bearingstandeast",
+      "from": [
+        10.6,
+        15.0,
+        6.0
+      ],
+      "to": [
+        12.8,
+        23.0,
+        10.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "name": "bearingcapwest",
+      "from": [
+        3.2,
+        23.0,
+        5.25
+      ],
+      "to": [
+        6.3,
+        28.5,
+        10.75
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "name": "bearingcapeast",
+      "from": [
+        9.7,
+        23.0,
+        5.25
+      ],
+      "to": [
+        12.8,
+        28.5,
+        10.75
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "//": "The wheel's axle line, and the one element that makes the wheel read as driven rather than decorative. Its height is the rim's own rotation centre, so it IS the axle the rim turns about, and it runs out to the cell's east face to meet the lay shaft next door with no seam. Thinner than the rim's hub bore (y 23.5..27.9, z 5.8..10.2) and buried inside both bearing caps, so no face of it is ever coplanar with the turning mesh.",
+      "name": "hubaxle",
+      "from": [
+        2.0,
+        24.7,
+        7.0
+      ],
+      "to": [
+        16.0,
+        26.7,
+        9.0
+      ],
+      "rotationOrigin": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shaft"
+        },
+        "east": {
+          "texture": "#shaft"
+        },
+        "south": {
+          "texture": "#shaft"
+        },
+        "west": {
+          "texture": "#shaft"
+        },
+        "up": {
+          "texture": "#shaft"
+        },
+        "down": {
+          "texture": "#shaft"
+        }
+      }
+    }
+  ]
+}
