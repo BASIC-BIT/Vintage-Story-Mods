@@ -1,0 +1,7 @@
+[
+  {
+    "type": "extension.invoke",
+    "operation": "selection.describe",
+    "arguments": {}
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "type": "code",
+  "modid": "agentcontrolsample",
+  "name": "Agent Control Sample",
+  "authors": ["BASIC"],
+  "description": "Sample third-party Agent Control extension implementing selection.describe.",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": "1.22.7",
+    "agentcontrol": "0.1.0"
+  },
+  "side": "client"
+}

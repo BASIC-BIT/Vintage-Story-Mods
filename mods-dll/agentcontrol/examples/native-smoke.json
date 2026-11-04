@@ -1,0 +1,18 @@
+[
+  {
+    "type": "look",
+    "yaw": 1.5,
+    "pitch": 0.1
+  },
+  {
+    "type": "control",
+    "controls": {
+      "forward": true
+    },
+    "durationMs": 250
+  },
+  {
+    "type": "wait",
+    "durationMs": 100
+  }
+]
