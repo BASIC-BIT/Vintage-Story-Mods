@@ -1,0 +1,17 @@
+{
+  "name": "flywheel-stand-compact-fp-transform",
+  "representation": "first-person-held-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/compact-flywheel-frame-horizontal.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/tarnished/sheet/iron1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/blocktypes/flywheelstand.json",
+    "property": "fpHandTransform",
+    "variantCode": "flywheelstand-compact-ud",
+    "reference": "grip-proxy"
+  }
+}

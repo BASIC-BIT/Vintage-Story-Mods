@@ -1,0 +1,15 @@
+{
+  "name": "flywheel-rim-full-ground-transform",
+  "representation": "ground-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-rim-full.json"
+  ],
+  "textures": {
+    "rim": "game:block/metal/ingot/meteoriciron"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/flywheelrim.json",
+    "property": "groundTransform",
+    "variantCode": "flywheelrim-full-meteoriciron"
+  }
+}

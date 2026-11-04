@@ -1,0 +1,21 @@
+{
+  "name": "flywheel-assembly-full-fp-transform",
+  "representation": "first-person-held-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/flywheel-wheel-coupled.json",
+    "../assets/flywheelpower/shapes/block/flywheel-axle.json"
+  ],
+  "textures": {
+    "wheel": "game:block/metal/ingot/iron",
+    "metal": "game:block/metal/ingot/steel",
+    "bearing": "game:block/metal/ingot/steel",
+    "chalk": "game:block/cloth/wool/red1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/blocktypes/flywheel.json",
+    "property": "fpHandTransform",
+    "variantCode": "flywheel-iron-steel-ud",
+    "reference": "grip-proxy"
+  }
+}

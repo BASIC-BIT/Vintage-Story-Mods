@@ -1,0 +1,20 @@
+{
+  "name": "flywheel-stand-full-seraph-held",
+  "representation": "third-person-seraph-held-scene",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/flywheel-frame-horizontal.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/tarnished/sheet/iron1",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "seraphHeldScene": {
+    "collectibleDefinition": "../assets/flywheelpower/blocktypes/flywheelstand.json",
+    "transformProperty": "tpHandTransform",
+    "variantCode": "flywheelstand-full-ud",
+    "seraphShape": "game:entity/humanoid/seraph-hairless",
+    "seraphTexture": "game:entity/humanoid/seraph-naked-hairless",
+    "attachment": "RightHand",
+    "animationFrame": 0
+  }
+}

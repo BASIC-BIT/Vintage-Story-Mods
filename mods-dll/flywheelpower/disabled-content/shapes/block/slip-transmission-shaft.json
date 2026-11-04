@@ -1,0 +1,39 @@
+{
+  "editor": {
+    "allAngles": false,
+    "entityTextureMode": false
+  },
+  "textureWidth": 16,
+  "textureHeight": 16,
+  "textures": {
+    "metal": "game:block/metal/ingot/iron"
+  },
+  "elements": [
+    {
+      "name": "ShaftA",
+      "from": [0.0, 7.0, 6.0],
+      "to": [16.01, 9.0, 10.0],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 2.0] },
+        "east": { "texture": "#metal", "uv": [0.0, 0.0, 4.0, 2.0] },
+        "south": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 2.0] },
+        "west": { "texture": "#metal", "uv": [0.0, 0.0, 4.0, 2.0] },
+        "up": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 4.0] },
+        "down": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 4.0] }
+      }
+    },
+    {
+      "name": "ShaftB",
+      "from": [0.01, 6.0, 7.0],
+      "to": [16.0, 10.0, 9.0],
+      "faces": {
+        "north": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 4.0] },
+        "east": { "texture": "#metal", "uv": [0.0, 0.0, 2.0, 4.0] },
+        "south": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 4.0] },
+        "west": { "texture": "#metal", "uv": [0.0, 0.0, 2.0, 4.0] },
+        "up": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 2.0] },
+        "down": { "texture": "#metal", "uv": [0.0, 0.0, 16.0, 2.0] }
+      }
+    }
+  ]
+}

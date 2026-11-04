@@ -1,0 +1,15 @@
+{
+  "name": "flywheel-bearing-fitting-gui-transform",
+  "representation": "gui-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/bearing-fitting.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/sheet/iron1"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/bearingfittings.json",
+    "property": "guiTransform",
+    "variantCode": "bearingfittings-iron"
+  }
+}
