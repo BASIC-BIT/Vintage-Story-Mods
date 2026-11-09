@@ -700,7 +700,10 @@ public class ChatHistorySystem : BaseBasicModSystem
     private void Event_GameWorldSave()
     {
         FlushQueued();
-        ApplyRetention();
+        if (Config.EnableChatHistory && (Config.ChatHistoryRetentionDays > 0 || Config.ChatHistoryMaxEntries > 0))
+        {
+            ApplyRetention();
+        }
     }
 
     private void FlushQueued()
