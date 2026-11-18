@@ -1,0 +1,12 @@
+{
+  "block-sliptransmission": "Slip Transmission",
+  "block-sliptransmission-*-source": "Slip Transmission",
+  "block-sliptransmission-*-load": "Slip Transmission",
+  "flywheelpower:sliptransmission-ratio-set": "Slip transmission ratio set to {0}:1.",
+  "flywheelpower:sliptransmission-info-engaged": "Slip transmission: Engaged",
+  "flywheelpower:sliptransmission-info-disengaged": "Slip transmission: Disengaged",
+  "flywheelpower:sliptransmission-info-ratio": "Slip transmission ratio: {0}:1",
+  "flywheelpower:sliptransmission-info-speed": "Port speed: {0} rps, target: {1} rps",
+  "flywheelpower:sliptransmission-info-transfer": "Transfer torque: {0}, resistance: {1}",
+  "flywheelpower:sliptransmission-info-adjust": "Sneak-right-click to change ratio."
+}

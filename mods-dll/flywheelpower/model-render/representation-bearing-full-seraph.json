@@ -1,0 +1,21 @@
+{
+  "name": "flywheel-bearing-full-seraph-held",
+  "representation": "third-person-seraph-held-scene",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-bearing-full.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/ingot/steel",
+    "bearing": "game:block/metal/ingot/steel",
+    "wood": "game:block/wood/planks/generic"
+  },
+  "seraphHeldScene": {
+    "collectibleDefinition": "../assets/flywheelpower/itemtypes/flywheelbearing.json",
+    "transformProperty": "tpHandTransform",
+    "variantCode": "flywheelbearing-full-steel",
+    "seraphShape": "game:entity/humanoid/seraph-hairless",
+    "seraphTexture": "game:entity/humanoid/seraph-naked-hairless",
+    "attachment": "RightHand",
+    "animationFrame": 0
+  }
+}

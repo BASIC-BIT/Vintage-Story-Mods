@@ -1,0 +1,22 @@
+{
+  code: "flywheelpart",
+  class: "BlockFlywheelPart",
+  entityClass: "FlywheelPart",
+  shape: { base: "game:block/basic/nothing" },
+  blockmaterial: "Metal",
+  drops: [],
+  sidesolid: { all: false },
+  sideopaque: { all: false },
+  rainPermeable: true,
+  resistance: 5,
+  lightAbsorption: 0,
+  selectionBox: { x1: 0, y1: 0, z1: 0, x2: 1, y2: 1, z2: 1 },
+  collisionBox: { x1: 0, y1: 0, z1: 0, x2: 1, y2: 1, z2: 1 },
+  particleCollisionBox: { x1: 0, y1: 0, z1: 0, x2: 1, y2: 1, z2: 1 },
+  sounds: {
+    hit: "game:block/metalhit",
+    break: "game:block/metalbreak",
+    place: "game:block/metalplace",
+    walk: "game:walk/stone"
+  }
+}

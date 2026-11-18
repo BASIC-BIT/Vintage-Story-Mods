@@ -1,0 +1,12 @@
+{
+  "name": "flywheel-full-curved-tyre-third-person-transform",
+  "representation": "third-person-held-transform",
+  "shapes": ["../assets/flywheelpower/shapes/item/flywheel-rim-full.json"],
+  "textures": {"rim": "game:block/metal/ingot/meteoriciron"},
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/flywheelrim.json",
+    "property": "tpHandTransform",
+    "variantCode": "flywheelrim-full-meteoriciron",
+    "reference": "grip-proxy"
+  }
+}

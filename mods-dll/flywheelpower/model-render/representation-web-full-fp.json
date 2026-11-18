@@ -1,0 +1,16 @@
+{
+  "name": "flywheel-web-full-fp-transform",
+  "representation": "first-person-held-transform",
+  "shapes": [
+    "../assets/flywheelpower/shapes/item/flywheel-web-full.json"
+  ],
+  "textures": {
+    "wood": "game:block/wood/planks/generic"
+  },
+  "collectibleTransform": {
+    "definition": "../assets/flywheelpower/itemtypes/flywheelweb.json",
+    "property": "fpHandTransform",
+    "variantCode": "flywheelweb-full",
+    "reference": "grip-proxy"
+  }
+}

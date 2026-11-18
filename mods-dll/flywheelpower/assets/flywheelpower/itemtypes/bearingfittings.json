@@ -1,0 +1,141 @@
+{
+  "code": "bearingfittings",
+  "variantgroups": [
+    {
+      "code": "metal",
+      "states": [
+        "copper",
+        "tinbronze",
+        "bismuthbronze",
+        "blackbronze",
+        "iron",
+        "meteoriciron",
+        "steel"
+      ]
+    }
+  ],
+  "shape": {
+    "base": "flywheelpower:item/bearing-fitting"
+  },
+  "textures": {
+    "metal": {
+      "base": "game:block/metal/sheet/iron1"
+    }
+  },
+  "texturesByType": {
+    "*-copper": {
+      "metal": {
+        "base": "game:block/metal/sheet/copper1"
+      }
+    },
+    "*-tinbronze": {
+      "metal": {
+        "base": "game:block/metal/sheet/tinbronze1"
+      }
+    },
+    "*-bismuthbronze": {
+      "metal": {
+        "base": "game:block/metal/sheet/bismuthbronze1"
+      }
+    },
+    "*-blackbronze": {
+      "metal": {
+        "base": "game:block/metal/sheet/blackbronze1"
+      }
+    },
+    "*-iron": {
+      "metal": {
+        "base": "game:block/metal/sheet/iron1"
+      }
+    },
+    "*-meteoriciron": {
+      "metal": {
+        "base": "game:block/metal/sheet/meteoriciron1"
+      }
+    },
+    "*-steel": {
+      "metal": {
+        "base": "game:block/metal/sheet/steel1"
+      }
+    }
+  },
+  "creativeinventory": {
+    "general": [
+      "*"
+    ],
+    "items": [
+      "*"
+    ],
+    "mechanics": [
+      "*"
+    ]
+  },
+  "maxstacksize": 32,
+  "guiTransform": {
+    "rotation": {
+      "x": -20,
+      "y": -35,
+      "z": -15
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 1.8
+  },
+  "groundTransform": {
+    "translation": {
+      "x": 0,
+      "y": 0.05,
+      "z": 0
+    },
+    "rotation": {
+      "x": 90,
+      "y": 0,
+      "z": 0
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 1.5
+  },
+  "fpHandTransform": {
+    "translation": {
+      "x": 0.05,
+      "y": 0,
+      "z": 0
+    },
+    "rotation": {
+      "x": 180,
+      "y": 90,
+      "z": -30
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 0.9
+  },
+  "tpHandTransform": {
+    "translation": {
+      "x": -1.25,
+      "y": -1.25,
+      "z": -1.15
+    },
+    "rotation": {
+      "x": 0,
+      "y": -62,
+      "z": 18
+    },
+    "origin": {
+      "x": 0.5,
+      "y": 0.5,
+      "z": 0.5
+    },
+    "scale": 0.42
+  }
+}

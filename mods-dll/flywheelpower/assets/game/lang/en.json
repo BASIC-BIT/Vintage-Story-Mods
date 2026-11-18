@@ -1,0 +1,5 @@
+{
+  "placefailure-flywheelrequiresclearance": "Requires a clear 3x3 area around the flywheel plane.",
+  "placefailure-flywheelrequiresfoundation": "The flywheel stand requires solid ground beneath its full footing.",
+  "placefailure-flywheelrequiresstand": "Place a grounded flywheel stand first, then install this wheel assembly into it."
+}

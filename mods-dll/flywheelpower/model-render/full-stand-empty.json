@@ -1,0 +1,11 @@
+{
+  "name": "flywheel-full-empty-stand",
+  "representation": "placed-empty-stand",
+  "shapes": [
+    "../assets/flywheelpower/shapes/block/flywheel-frame-horizontal.json"
+  ],
+  "textures": {
+    "metal": "game:block/metal/tarnished/sheet/iron1",
+    "wood": "game:block/wood/planks/generic"
+  }
+}

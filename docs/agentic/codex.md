@@ -21,6 +21,7 @@ Current wrappers:
 - `rp-culture`
 - `vintage-story-agent-control`
 - `vintage-story-ci-dependencies`
+- `vintage-story-model-renderer`
 - `vintage-story-workspace`
 
 Keep `.opencode/skills` as the detailed source of truth. Keep `.codex/skills` as thin compatibility shims with only `name` and `description` in frontmatter.
