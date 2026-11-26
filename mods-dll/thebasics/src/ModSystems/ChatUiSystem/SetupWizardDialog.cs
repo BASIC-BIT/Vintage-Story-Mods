@@ -387,7 +387,8 @@ public sealed class SetupWizardDialog : GuiDialog
         composer.BeginChildElements(ElementBounds.Fixed(ContentOffset, 0, Width, BodyHeight));
         if (_searching)
         {
-            _search.Add(composer, capi, Width, StatusY, result => QueueNavigation(() => FocusSearchResult(result)));
+            _search.Add(composer, capi, Width, StatusY, result => QueueNavigation(() => FocusSearchResult(result)),
+                () => QueueNavigation(() => { ComposeDialog(); _search.FocusSelection(SingleComposer); }));
             composer.AddSmallButton(_search.NewOnly ? "Show all settings" : "New settings", () =>
             {
                 QueueNavigation(() => { _search.NewOnly = !_search.NewOnly; ShowSearch(); });

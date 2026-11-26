@@ -12,18 +12,29 @@ namespace thebasics.ModSystems.ChatUiSystem;
 
 internal sealed class SetupWizardSearchPanel
 {
+    private const int ResultBatchSize = 16;
     private readonly Dictionary<object, string> _identities = new(ReferenceEqualityComparer.Instance);
     private readonly SetupWizardSettingsForm _form = new();
+    private int _resultLimit = ResultBatchSize;
     private bool _newOnly;
     internal bool NewOnly
     {
         get => _newOnly;
-        set { if (_newOnly == value) return; _newOnly = value; Selection = 0; _form.Reset("search"); }
+        set { if (_newOnly == value) return; _newOnly = value; ResetResults(); }
     }
     internal IReadOnlyCollection<string> ReviewedKeys { get; set; }
     internal string Query { get; private set; } = "";
     internal int Selection { get; private set; }
     internal IReadOnlyList<ConfigSearchResult> Results { get; private set; } = Array.Empty<ConfigSearchResult>();
+    private int VisibleCount => Math.Min(Results.Count, _resultLimit);
+
+    private void ResetResults()
+    {
+        Selection = 0;
+        _resultLimit = ResultBatchSize;
+        _form.Reset("search");
+    }
+
     private string Identity(object entry)
     {
         if (!_identities.TryGetValue(entry, out var id)) _identities[entry] = id = (_identities.Count + 1).ToString(CultureInfo.InvariantCulture);
@@ -40,9 +51,16 @@ internal sealed class SetupWizardSearchPanel
     internal void Search(SetupWizardDraft draft, string query)
     {
         var previous = Results.Count > Selection ? Results[Selection] : null;
+        query ??= "";
         var changed = Query != query;
-        if (changed) { Selection = 0; _form.Reset("search"); }
-        Query = query ?? "";
+        if (changed) ResetResults();
+        Query = query;
+        if (!NewOnly && string.IsNullOrWhiteSpace(Query))
+        {
+            Results = Array.Empty<ConfigSearchResult>();
+            Selection = 0;
+            return;
+        }
         var entries = Index(draft);
         if (NewOnly)
             entries = ReviewedKeys == null ? new() : entries.Where(entry => entry.Destination == ConfigSearchDestination.Setting &&
@@ -53,15 +71,16 @@ internal sealed class SetupWizardSearchPanel
             var index = Results.ToList().FindIndex(result => result.Destination == previous.Destination && result.EntryId == previous.EntryId && result.Key == previous.Key);
             if (index >= 0) Selection = index;
         }
-        Selection = Math.Clamp(Selection, 0, Math.Max(0, Results.Count - 1));
+        Selection = Math.Clamp(Selection, 0, Math.Max(0, VisibleCount - 1));
     }
-    internal void Add(GuiComposer composer, ICoreClientAPI api, double width, double bottom, Action<ConfigSearchResult> select)
+    internal void Add(GuiComposer composer, ICoreClientAPI api, double width, double bottom, Action<ConfigSearchResult> select, Action showMore)
     {
         composer.AddStaticText(NewOnly ? "New settings" : "Search settings", CairoFont.WhiteSmallText().WithFontSize(20), ElementBounds.Fixed(0, 48, width, 28));
         composer.AddStaticText(Results.Count == 0 ? NewOnly ? "No new settings match." : string.IsNullOrWhiteSpace(Query) ? "Search names, config keys, help or draft values." : "No matching settings." : $"{Results.Count} matches",
             CairoFont.WhiteSmallText().WithFontSize(14), ElementBounds.Fixed(0, 84, width, 26));
         _form.Begin(composer, "search", ElementBounds.Fixed(0, 120, width, bottom - 128));
-        for (var i = 0; i < Results.Count; i++)
+        var visible = VisibleCount;
+        for (var i = 0; i < visible; i++)
         {
             var index = i; var result = Results[i];
             var button = new SetupWizardViewportButton(api, Short(result.Label, 64), () => { Selection = index; select(result); return true; },
@@ -74,20 +93,33 @@ internal sealed class SetupWizardSearchPanel
             composer.AddInteractiveElement(new SetupWizardViewportRichtext(api, VtmlUtils.EscapeVtml(context + "\n" + Short(result.Value, 70) + (result.Unsaved ? " (unsaved)" : "")),
                 CairoFont.WhiteSmallText().WithFontSize(13), ElementBounds.Fixed(2, i * 86 + 32, width - 28, 48)), "search-context-" + i);
         }
-        _form.End(composer, api, Results.Count * 86, () => { });
+        var height = visible * 86;
+        if (visible < Results.Count)
+        {
+            var more = new SetupWizardViewportButton(api, "Show more results", () =>
+            {
+                Selection = visible;
+                _resultLimit += ResultBatchSize;
+                showMore();
+                return true;
+            }, ElementBounds.Fixed(0, height, width - 24, 28));
+            composer.AddInteractiveElement(more, "search-more");
+            height += 36;
+        }
+        _form.End(composer, api, height, () => { });
     }
-    internal bool HasResultFocus(GuiComposer composer) => Enumerable.Range(0, Results.Count).Any(index => composer.GetElement("search-result-" + index)?.HasFocus == true);
+    internal bool HasResultFocus(GuiComposer composer) => Enumerable.Range(0, VisibleCount).Any(index => composer.GetElement("search-result-" + index)?.HasFocus == true);
 
     internal void RememberFocus(GuiComposer composer)
     {
-        for (var i = 0; i < Results.Count; i++)
+        for (var i = 0; i < VisibleCount; i++)
             if (composer.GetElement("search-result-" + i)?.HasFocus == true) { Selection = i; break; }
     }
     internal void Move(GuiComposer composer, int offset)
     {
         RememberFocus(composer);
         if (Results.Count == 0) return;
-        Selection = Math.Clamp(Selection + offset, 0, Results.Count - 1);
+        Selection = Math.Clamp(Selection + offset, 0, VisibleCount - 1);
         FocusSelection(composer);
     }
     internal void FocusSelection(GuiComposer composer)

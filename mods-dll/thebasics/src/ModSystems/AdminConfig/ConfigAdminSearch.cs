@@ -23,7 +23,11 @@ internal static class ConfigAdminSearch
     {
         var words = (query ?? string.Empty).Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
         if (words.Length == 0) return new();
-        return entries.Where(entry => words.All(word => entry.SearchText.Contains(word, StringComparison.OrdinalIgnoreCase)))
+        return entries.Where(entry =>
+            {
+                var text = entry.SearchText;
+                return words.All(word => text.Contains(word, StringComparison.OrdinalIgnoreCase));
+            })
             .OrderBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase).ThenBy(entry => entry.Group).ToList();
     }
 
