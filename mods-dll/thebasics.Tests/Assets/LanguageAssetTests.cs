@@ -18,7 +18,11 @@ public class LanguageAssetTests
         "chatprefs-langcolor-usage",
         "chatprefs-color-usage",
         "notes-error-admin-usage",
-        "charsheet-required-warning"
+        "charsheet-required-warning",
+        "update-available",
+        "update-available-untagged",
+        "update-retracted",
+        "update-silence-hint"
     ];
 
     [Fact]
