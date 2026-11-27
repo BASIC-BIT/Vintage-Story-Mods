@@ -332,7 +332,7 @@ namespace thebasics.ModSystems.UpdateCheck
                 var info = UpdateCheck.ParseInstallInfo(await GetBodyAsync(urlA).ConfigureAwait(false));
                 var needsReleases = UpdateCheck.NeedsReleaseList(info);
                 current = urlB;
-                var releases = needsReleases ? UpdateCheck.ParseReleases(await GetBodyAsync(urlB).ConfigureAwait(false)) : null;
+                var releases = needsReleases ? UpdateCheck.ParseReleases(await TryGetBodyAsync(urlB).ConfigureAwait(false)) : null;
                 var decision = UpdateCheck.Decide(_installed, _gameVersion, info, releases, _cached);
 
                 API.Logger.Debug($"The BASICs update check: GET {urlA}{(needsReleases ? $" and {urlB}" : "")} -> {DescribeOutcome(decision)}");
@@ -376,6 +376,21 @@ namespace thebasics.ModSystems.UpdateCheck
             return response.StatusCode == HttpStatusCode.OK
                 ? await response.Content.ReadAsStringAsync().ConfigureAwait(false)
                 : null;
+        }
+
+        // A failed release-list fetch must still reach Decide: a retraction already confirmed by the
+        // first call is reported on top of the cached result instead of being dropped with the exception.
+        private async Task<string> TryGetBodyAsync(string url)
+        {
+            try
+            {
+                return await GetBodyAsync(url).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                API.Logger.Debug($"The BASICs update check: GET {url} failed ({e.GetType().Name})");
+                return null;
+            }
         }
 
         private void ApplyResult(UpdateCheck.Decision decision)

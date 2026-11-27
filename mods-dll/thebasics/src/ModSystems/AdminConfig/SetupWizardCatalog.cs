@@ -82,8 +82,6 @@ public static class SetupWizardCatalog
             "EnableSleepNotifications", "SleepNotificationThreshold", "TEXT_SleepNotification"),
         Page("notifications.deaths", "notifications", "Nearby deaths", "Show deaths to members of the nearby chat channel inside the Talk range (35 blocks when Talk is unlimited). Distance counts blocks along the grid. This only controls nearby re-sent notices.",
             "EnableNearbyDeathMessagesInProximityChat"),
-        Page("notifications.updates", "notifications", "Mod updates", "On dedicated servers, check the Vintage Story ModDB every few hours for a newer stable version of The BASICs and tell admins in chat. Nothing is downloaded or installed.",
-            "EnableUpdateCheck"),
         Page("appearance.bubbles", "appearance", "Overhead speech", "Show formatted speech above players, use the game's plain bubbles, or turn overhead bubbles off. Formatted bubbles need roleplay features. Minimum time applies to custom bubbles.",
             "OverheadChatBubbleMode", "SpeechBubbleMinimumDisplayMilliseconds"),
         Page("appearance.typing", "appearance", "Typing indicators", "Show when nearby players have chat open, are composing, or are typing. Indicators need a clear view and stay hidden for sneaking players and spectators. A range of 0 hides them.",
@@ -125,8 +123,8 @@ public static class SetupWizardCatalog
             "MaxNoteLength", "MaxFreeformNoteLength"),
         Page("server.stats", "server", "Player activity stats", "Record player activity for /playerstats. The tracking switch takes effect after restart. Choose who can clear saved statistics.",
             "PlayerStatSystem", "PlayerStatClearPermission", "PlayerStatToggles.BlockBreaks", "PlayerStatToggles.Deaths", "PlayerStatToggles.DistanceTravelled", "PlayerStatToggles.NpcKills", "PlayerStatToggles.PlayerKills", "PlayerStatDistanceTravelledTimer"),
-        Page("server.integrations", "server", "Integrations", "Allow the optional th3essentials Discord relay. The integration must also be installed and configured on the server. You can configure this switch in advance.",
-            "EnableTh3EssentialsDiscordRelay"),
+        Page("server.integrations", "server", "Integrations", "Allow the optional th3essentials Discord relay. The integration must also be installed and configured on the server. You can configure this switch in advance. On dedicated servers, The BASICs can also check the Vintage Story ModDB every few hours for a newer stable version and tell admins in chat; nothing is downloaded or installed.",
+            "EnableTh3EssentialsDiscordRelay", "EnableUpdateCheck"),
         Page("server.diagnostics", "server", "Diagnostics", "Write extra BASICs diagnostic and performance messages to the server logs. Enable this while investigating a problem.",
             "DebugMode")
     });
