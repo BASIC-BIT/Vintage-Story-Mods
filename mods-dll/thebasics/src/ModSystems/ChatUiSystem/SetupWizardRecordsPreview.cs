@@ -182,13 +182,14 @@ public static class SetupWizardRecordsPreview
                 composer.AddInset(ElementBounds.Fixed(13, 43, 102, entryHeight), 3)
                     .AddInset(ElementBounds.Fixed(122, 43, 175, entryHeight), 3);
                 Text(composer, "Entries", "note-entries-label", 19, 49, 90, 18, 12, true);
-                Button(composer, "10/15 North gate", "note-entry-0", 19, 73, 90, 25);
-                Button(composer, "10/16 West trail", "note-entry-1", 19, 102, 90, 25);
+                Button(composer, personal ? "10/15 North gate" : "10/15 Chat", "note-entry-0", 19, 73, 90, 25);
+                Button(composer, personal ? "10/16 West trail" : "10/16 Follow-up", "note-entry-1", 19, 102, 90, 25);
                 Text(composer, "Created 10/15 14:20", "note-meta", 129, 49, 161, 18, 10);
                 var title = new GuiElementTextInput(api, ElementBounds.Fixed(129, 70, 161, 24), null, CairoFont.TextInput().WithFontSize(12));
                 composer.AddInteractiveElement(title, "note-title");
-                composer.OnComposed += () => title.SetValue("At the north gate");
-                TextArea(composer, "Met Mara at the north gate.\nShe knows the northern roads.", "note-body", 129, 101, 161, entryHeight - 65);
+                composer.OnComposed += () => title.SetValue(personal ? "At the north gate" : "Chat reminder");
+                TextArea(composer, personal ? "Met Mara at the north gate.\nShe knows the northern roads."
+                    : "Reminded Mara to keep disputes out of local RP chat.", "note-body", 129, 101, 161, entryHeight - 65);
             }
             if (_frame.Notebook)
             {
@@ -196,7 +197,8 @@ public static class SetupWizardRecordsPreview
                 var height = Bounds.fixedHeight - y - 12;
                 composer.AddInset(ElementBounds.Fixed(13, y, 284, height), 3);
                 Text(composer, personal ? "Private Freeform Notes" : "Staff Notes", "notes-freeform-label", 20, y + 5, 270, 18, 12, true);
-                TextArea(composer, "Western trail\nBring rope. Check the old bridge.\nAsk Mara about herbs.", "notes-freeform", 20, y + 26, 270, height - 34);
+                TextArea(composer, personal ? "Western trail\nBring rope. Check the old bridge.\nAsk Mara about herbs."
+                    : "10/16: Followed up on the chat reminder.\nNo further action needed.", "notes-freeform", 20, y + 26, 270, height - 34);
             }
         }
 

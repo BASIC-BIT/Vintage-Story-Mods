@@ -70,3 +70,6 @@ SetupWizardSheetEditor::Select
 
 # Setup dialog construction wires client dependencies, lifecycle callbacks, and capture seams.
 SetupWizardDialog::SetupWizardDialog
+
+# Setup dialog composition lays out every wizard region in one pass (CCN 29 after the 5.10.0 polish).
+SetupWizardDialog::ComposeDialog

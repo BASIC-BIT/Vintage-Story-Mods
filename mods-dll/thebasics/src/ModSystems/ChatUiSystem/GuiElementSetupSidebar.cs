@@ -42,13 +42,15 @@ public sealed class GuiElementSetupSidebar : GuiElementControl
     public override bool Focusable => enabled;
     public override double DrawOrder => 0.5;
     internal double ScrollOffset => scrollOffset;
+    internal string TopicId => topicId;
     internal double MaxScrollOffset => Math.Max(0, branchContentHeight - branchHeight);
     internal ElementBounds BranchBounds => LocalBounds(24, branchTop, LogicalWidth - 31, branchHeight);
     internal string FocusedDestination => focused;
 
     public void SetState(string pageId, string topicId, IReadOnlyCollection<string> changedKeys)
     {
-        var selectionChanged = this.pageId != pageId || this.topicId != topicId;
+        var topicChanged = this.topicId != topicId;
+        var selectionChanged = this.pageId != pageId || topicChanged;
         this.pageId = pageId ?? "hub";
         this.topicId = topicId;
         dirtyPages.Clear();
@@ -62,7 +64,7 @@ public sealed class GuiElementSetupSidebar : GuiElementControl
         }
         if (selectionChanged)
         {
-            scrollOffset = 0;
+            if (topicChanged) scrollOffset = 0;
             focused = this.pageId == "hub" ? "hub" : SetupWizardCatalog.TryGetPage(this.pageId, out _)
                 ? this.pageId : topicId != null ? "topic:" + topicId : "hub";
         }
@@ -73,6 +75,8 @@ public sealed class GuiElementSetupSidebar : GuiElementControl
         }
         needsTexture = true;
     }
+
+    internal void RestoreScrollOffset(double value) => scrollOffset = value;
 
     internal bool IsDestinationDirty(string destination) => destination.StartsWith("topic:", StringComparison.Ordinal)
         ? dirtyTopics.Contains(destination[6..]) : dirtyPages.Contains(destination);

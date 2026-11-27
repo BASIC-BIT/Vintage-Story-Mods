@@ -51,8 +51,10 @@ public class ChatHistoryFormattingTests : IDisposable
     {
         var apiField = AccessTools.Field(typeof(ChatUiModSystem), "_api");
         var configField = AccessTools.Field(typeof(ChatUiModSystem), "_config");
+        var hudField = AccessTools.Field(typeof(ChatUiModSystem), "_chatTabDialog");
         var previousApi = apiField.GetValue(null);
         var previousConfig = configField.GetValue(null);
+        var previousHud = hudField.GetValue(null);
         var api = Substitute.For<ICoreClientAPI>();
         // Initialize only the native HUD/world state used by UpdateText; GPU uploads stay mocked.
         var game = (ClientMain)RuntimeHelpers.GetUninitializedObject(typeof(ClientMain));
@@ -86,6 +88,7 @@ public class ChatHistoryFormattingTests : IDisposable
         {
             apiField.SetValue(null, api);
             configField.SetValue(null, config);
+            hudField.SetValue(null, hud);
             harmony.Patch(original,
                 prefix: new HarmonyMethod(typeof(ChatUiModSystem), nameof(ChatUiModSystem.HudDialogChat_UpdateText_Prefix)),
                 postfix: new HarmonyMethod(typeof(ChatUiModSystem), nameof(ChatUiModSystem.HudDialogChat_UpdateText_Postfix)));
@@ -120,12 +123,37 @@ public class ChatHistoryFormattingTests : IDisposable
             richtext.Components.OfType<RichTextComponent>().Single(c => c.DisplayText == "later-marker")
                 .Font.FontWeight.Should().Be(FontWeight.Normal);
             scrollChanges.Last().Should().Be((float)richtext.Bounds.fixedHeight + 5 - 80);
+
+            foreach (var (clear, undo, isolated) in new[] { (".clear", "/clearundo", true), ("/clear", ".clearundo", false) })
+            {
+                config.IsolateChatMessageFormatting = isolated;
+                Send(clear).Should().Be(EnumHandling.PreventSubsequent);
+                Text().Should().NotContain("plain-marker");
+                history.Count.Should().BeGreaterThan(1);
+                history.Add("while-hidden");
+                original.Invoke(hud, null);
+                Text().Should().Contain("while-hidden").And.NotContain("plain-marker");
+                Send(undo).Should().Be(EnumHandling.PreventSubsequent);
+                Text().Should().Contain("plain-marker").And.Contain("while-hidden");
+            }
+            Send("/clear all").Should().Be(EnumHandling.PassThrough);
+
+            EnumHandling Send(string command)
+            {
+                object[] args = [groupId, command, EnumHandling.PassThrough];
+                AccessTools.Method(typeof(ChatUiModSystem), "OnClearChatCommand").Invoke(null, args);
+                return (EnumHandling)args[2];
+            }
+
+            string Text() => string.Concat(richtext.Components.OfType<RichTextComponent>().Select(component => component.DisplayText));
         }
         finally
         {
+            ChatUiModSystem.ResetLocalChatClear();
             harmony.Unpatch(original, HarmonyPatchType.All, harmony.Id);
             apiField.SetValue(null, previousApi);
             configField.SetValue(null, previousConfig);
+            hudField.SetValue(null, previousHud);
         }
     }
 

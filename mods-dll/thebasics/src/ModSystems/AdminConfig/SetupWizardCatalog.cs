@@ -101,7 +101,7 @@ public static class SetupWizardCatalog
             "EnableRpCharacterSlots", "MaxRpCharacterSlots"),
         Page("roleplay.dice", "roleplay", "Dice rolls", "Public rolls follow the player's speech range. Private rolls go only to the roller. Dice sounds reach eligible listeners within 8 blocks, and players can mute them.",
             "EnableDiceRolling", "EnableDiceRollSounds"),
-        Page("roleplay.descriptions", "roleplay", "Placed descriptions", "Set how far a player can aim when placing environmental text. Distance is measured in blocks. This controls placed chat descriptions, separately from scene markers.",
+        Page("roleplay.descriptions", "roleplay", "Placed descriptions", "Aim at a surface and use /envhere or the default !! shortcut to place environmental text. Set how far away the surface can be.",
             "MaxEnvironmentPlacementDistance"),
         Page("roleplay.scenemarkers", "roleplay", "Scene markers", "Let players leave descriptions in the world. Turning markers off stops crafting, placement, and editing while keeping existing markers and their text.",
             "EnableSceneMarkers"),

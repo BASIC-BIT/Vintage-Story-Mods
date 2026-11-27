@@ -80,6 +80,22 @@ public class SetupWizardSearchRenderTests
         using var wizard = new SetupWizardDialog(host.Api, draft, "search", true, () => { }, (_, _, _) => { }, () => { }, layoutOnly: true, captureOnly: true, actorFactory: host.CreateGuide);
         wizard.TryOpen();
         wizard.ShowSearch(""); Capture("empty");
+        wizard.OnKeyPress(new KeyEvent { KeyChar = 'a', KeyCode = (int)GlKeys.A });
+        Assert.True(wizard.SearchPanel.Results.Count > 16);
+        Assert.True(wizard.SingleComposer.GetTextInput("setup-search").HasFocus);
+        Assert.NotNull(wizard.SingleComposer.GetElement("search-result-15"));
+        Assert.Null(wizard.SingleComposer.GetElement("search-result-16"));
+        wizard.SingleComposer.GetScrollbar("settings-scroll").ScrollToBottom();
+        var more = wizard.SingleComposer["search-more"];
+        var moreX = (int)(more.Bounds.renderX + more.Bounds.InnerWidth / 2);
+        var moreY = (int)(more.Bounds.renderY + more.Bounds.InnerHeight / 2);
+        wizard.OnMouseDown(new MouseEvent(moreX, moreY, Vintagestory.API.Common.EnumMouseButton.Left, 0));
+        wizard.OnMouseUp(new MouseEvent(moreX, moreY, Vintagestory.API.Common.EnumMouseButton.Left, 0));
+        Assert.True(wizard.SingleComposer["search-result-16"].HasFocus);
+        wizard.ShowSearch("e");
+        Assert.True(wizard.SearchPanel.Results.Count > 16);
+        Assert.Null(wizard.SingleComposer.GetElement("search-result-16"));
+        wizard.ShowSearch("");
         foreach (var character in "chat") wizard.OnKeyPress(new KeyEvent { KeyChar = character, KeyCode = character });
         Assert.Equal("chat", wizard.SearchPanel.Query);
         Assert.True(wizard.SingleComposer.GetTextInput("setup-search").HasFocus);
@@ -156,7 +172,7 @@ public class SetupWizardSearchRenderTests
         Assert.True(wizard.IsOpened());
         wizard.OnKeyDown(new KeyEvent { KeyCode = (int)GlKeys.Escape });
         Assert.True(wizard.IsOpened());
-        Assert.All(host.RecordedEffects, effect => Assert.Equal("sound:tick", effect));
+        Assert.All(host.RecordedEffects, effect => Assert.Contains(effect, new[] { "sound:tick", "sound:menubutton_down" }));
         Assert.Empty(host.UnsupportedCalls);
 
         void Capture(string name)

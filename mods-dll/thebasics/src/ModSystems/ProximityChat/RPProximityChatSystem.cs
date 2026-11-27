@@ -435,7 +435,10 @@ public partial class RPProximityChatSystem : BaseBasicModSystem, ITheBasicsProxi
 
     private static TextCommandResult HandleTheBasicsHelpCommand(TextCommandCallingArgs args)
     {
-        return TextCommandResult.Success(Lang.Get("thebasics:thebasics-help"));
+        var help = Lang.Get("thebasics:thebasics-help");
+        if (args.Caller.Player is IServerPlayer player && player.HasPrivilege(Privilege.root))
+            help = Lang.Get("thebasics:thebasics-help-setup") + "\n\n" + help;
+        return TextCommandResult.Success(help);
     }
 
     private static TextCommandResult HandleTheBasicsGuideCommand(TextCommandCallingArgs args)
