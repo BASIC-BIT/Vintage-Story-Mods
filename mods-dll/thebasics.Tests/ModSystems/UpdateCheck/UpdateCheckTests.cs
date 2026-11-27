@@ -303,6 +303,22 @@ public class UpdateCheckTests
             """{"data":{"thebasics":{"recommendedUpgrade":"5.9.1","retractionReason":"Breaks <b>worlds</b>","errorCode":4101}}}""");
 
         info.Should().Be(new Rules.InstallInfo("5.9.1", 4101, "Breaks <b>worlds</b>"));
+
+        // The v1 API quotes its status code; a quoted errorCode must not hide a retraction.
+        Rules.ParseInstallInfo("""{"data":{"thebasics":{"retractionReason":"Bad","errorCode":"4101"}}}""")
+            .Should().Be(new Rules.InstallInfo(null, 4101, "Bad"));
+        Rules.ParseInstallInfo("""{"data":{"thebasics":{"errorCode":"nope"}}}""")
+            .Should().Be(new Rules.InstallInfo(null, null, null));
+    }
+
+    [Fact]
+    public void ReleaseListWithNoReadableVersionsIsAFailureNotUpToDate()
+    {
+        // What a renamed modversion field looks like after parsing.
+        var unreadable = new List<Rules.Release> { R(null, "1.22.7"), R(null, "1.22.6") };
+
+        Rules.Decide("5.9.0", "1.22.8", NoUpgrade, unreadable).Should().BeNull();
+        Rules.Decide("5.9.0", "1.22.8", NoUpgrade, new List<Rules.Release>()).Should().Be(Rules.Decision.None);
     }
 
     [Fact]

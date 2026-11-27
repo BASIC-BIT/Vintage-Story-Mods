@@ -57,7 +57,7 @@ namespace thebasics.ModSystems.UpdateCheck
 
                 return new InstallInfo(
                     StringOrNull(entry["recommendedUpgrade"]),
-                    entry["errorCode"]?.Type == JTokenType.Integer ? entry.Value<int>("errorCode") : null,
+                    ErrorCodeOrNull(entry["errorCode"]),
                     StripControlChars(StringOrNull(entry["retractionReason"])));
             }
             catch (Exception)
@@ -127,7 +127,9 @@ namespace thebasics.ModSystems.UpdateCheck
                 return recommended > current ? new Decision(recommended.ToString(), null, retracted, reason) : quiet;
             }
 
-            if (releases == null)
+            // A list in which no release has a readable version means the v1 shape changed: that is a
+            // failure, not "up to date".
+            if (releases == null || (releases.Count > 0 && !releases.Any(r => TryVersion(r?.ModVersion, out _))))
             {
                 return retracted ? (cached ?? Decision.None) with { Retracted = true, RetractionReason = reason } : null;
             }
@@ -203,6 +205,14 @@ namespace thebasics.ModSystems.UpdateCheck
             }
         }
 
+        // The v1 API quotes its status code as a string; accept either form here.
+        private static int? ErrorCodeOrNull(JToken token) => token?.Type switch
+        {
+            JTokenType.Integer => (int)token,
+            JTokenType.String => int.TryParse((string)token, out var code) ? code : null,
+            _ => null,
+        };
+
         private static string StringOrNull(JToken token) => token?.Type == JTokenType.String ? (string)token : null;
     }
 
@@ -218,6 +228,7 @@ namespace thebasics.ModSystems.UpdateCheck
         private const int FirstCheckMaxDelayMs = 90_000;
         private const int CheckIntervalMs = 6 * 60 * 60 * 1000;
         private const int CheckJitterMs = 30 * 60 * 1000;
+        private const int FailuresBeforeWarning = 4;
         private const int MaxReasonLength = 200;
 
         private readonly HashSet<string> _notified = new();
@@ -226,6 +237,7 @@ namespace thebasics.ModSystems.UpdateCheck
         private string _gameVersion;
         private long? _callbackId;
         private int _checkInFlight;
+        private int _consecutiveFailures;
         private volatile bool _disposed;
         private volatile UpdateCheck.Decision _cached;
 
@@ -247,7 +259,7 @@ namespace thebasics.ModSystems.UpdateCheck
                 return;
             }
 
-            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(10), MaxResponseContentBufferSize = 1_000_000 };
+            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(10), MaxResponseContentBufferSize = 4_000_000 };
             _http.DefaultRequestHeaders.UserAgent.ParseAdd($"thebasics-updatecheck/{_installed}");
 
             API.Event.PlayerNowPlaying += OnPlayerNowPlaying;
@@ -336,16 +348,32 @@ namespace thebasics.ModSystems.UpdateCheck
                 var decision = UpdateCheck.Decide(_installed, _gameVersion, info, releases, _cached);
 
                 API.Logger.Debug($"The BASICs update check: GET {urlA}{(needsReleases ? $" and {urlB}" : "")} -> {DescribeOutcome(decision)}");
+                NoteOutcome(decision != null);
 
                 API.Event.EnqueueMainThreadTask(() => ApplyResult(decision), "thebasics-updatecheck");
             }
             catch (Exception e)
             {
                 API.Logger.Debug($"The BASICs update check: GET {current} failed ({e.GetType().Name}), keeping previous result");
+                NoteOutcome(false);
             }
             finally
             {
                 Interlocked.Exchange(ref _checkInFlight, 0);
+            }
+        }
+
+        // Failures are Debug-only so a network blip stays quiet, but a check that has been broken for
+        // about a day says so once where operators will see it.
+        private void NoteOutcome(bool succeeded)
+        {
+            if (succeeded)
+            {
+                _consecutiveFailures = 0;
+            }
+            else if (++_consecutiveFailures == FailuresBeforeWarning)
+            {
+                API.Logger.Warning($"The BASICs update check has failed {FailuresBeforeWarning} times in a row, so update notices may be missing. See the debug log for the cause, or turn it off with EnableUpdateCheck.");
             }
         }
 
