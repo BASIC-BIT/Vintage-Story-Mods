@@ -10,6 +10,7 @@ New guide/help strings in non-English locale files intentionally use English fal
 ## Player Commands
 
 - `/me`, `/it`, `/envhere`, `/ooc`, `/gooc`, `/say`, `/yell`, `/whisper` - RP chat commands.
+- `.clear` (or `/clear`) hides earlier messages in the current chat tab. `.clearundo` (or `/clearundo`) shows messages still in that tab's buffer. Both commands run locally.
 - `/nick`, `/clearnick`, `/nickcolor`, `/clearnickcolor` - Manage RP nickname identity when enabled.
 - `/rptext`, `/emotemode`, `/chatter` - Per-player RP chat presentation toggles.
 - `/chatprefs` - View or change local chat accessibility and color preferences.

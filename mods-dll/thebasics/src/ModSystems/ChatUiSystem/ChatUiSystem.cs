@@ -39,6 +39,7 @@ public class ChatUiSystem : ModSystem
     private static int? _lastSelectedGroupId = null;
     private static ModConfig _config = null;
     private static HudDialogChat _chatTabDialog;
+    private static readonly ChatDisplayClear ClearedChat = new();
     private static GuiTab[] _chatTabGameOrder;
     private static readonly System.Collections.Generic.List<System.Action> _pendingConfigActions = new System.Collections.Generic.List<System.Action>();
 
@@ -147,6 +148,7 @@ public class ChatUiSystem : ModSystem
         // Register event handlers
         _api.Event.PlayerJoin += OnPlayerJoin;
         _api.Event.PlayerEntitySpawn += OnPlayerEntitySpawn;
+        _api.Event.OnSendChatMessage += OnClearChatCommand;
         // Initialize Harmony patches if needed
         if (!Harmony.HasAnyPatches(Mod.Info.ModID))
         {
@@ -162,6 +164,20 @@ public class ChatUiSystem : ModSystem
         api.Input.RegisterHotKey("thebasicscharsheet", Lang.Get("thebasics:charsheet-gui-title"), GlKeys.B, HotkeyType.HelpAndOverlays, altPressed: false, ctrlPressed: true, shiftPressed: true);
         api.Input.SetHotKeyHandler("thebasicscharsheet", OnCharacterSheetHotkey);
         HookCharacterDialog(api);
+    }
+
+    private static void OnClearChatCommand(int groupId, ref string message, ref EnumHandling handling)
+    {
+        var command = message.Trim();
+        var clear = command.Equals("/clear", StringComparison.OrdinalIgnoreCase) || command.Equals(".clear", StringComparison.OrdinalIgnoreCase);
+        var undo = command.Equals("/clearundo", StringComparison.OrdinalIgnoreCase) || command.Equals(".clearundo", StringComparison.OrdinalIgnoreCase);
+        if ((!clear && !undo) || _chatTabDialog == null || _api?.World is not ClientMain game ||
+            !game.ChatHistoryByPlayerGroup.TryGetValue(groupId, out var history)) return;
+
+        handling = EnumHandling.PreventSubsequent;
+        if (clear) ClearedChat.Clear(history);
+        else ClearedChat.Undo(history);
+        AccessTools.Method(typeof(HudDialogChat), "UpdateText").Invoke(_chatTabDialog, null);
     }
 
     private static bool OnCharacterSheetHotkey(KeyCombination combination)
@@ -2337,12 +2353,25 @@ public class ChatUiSystem : ModSystem
      */
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HudDialogChat), "OnNewServerToClientChatLine")]
-    public static void OnNewServerToClientChatLine_PreventAutoSwitch(ref long __state)
+    public static void OnNewServerToClientChatLine_PreventAutoSwitch(int groupId, ref long __state)
     {
         __state = 0;
         if (IsDebugModeEnabled())
         {
             __state = PerfStats.Timestamp();
+        }
+
+        if (_api?.World is ClientMain world)
+        {
+            if (groupId == GlobalConstants.AllChatGroups)
+            {
+                foreach (var history in world.ChatHistoryByPlayerGroup.Values) ClearedChat.BeforeAppend(history);
+            }
+            else if (world.ChatHistoryByPlayerGroup.TryGetValue(
+                groupId == GlobalConstants.CurrentChatGroup ? world.currentGroupid : groupId, out var history))
+            {
+                ClearedChat.BeforeAppend(history);
+            }
         }
 
         if (_config?.PreventProximityChannelSwitching == true && _proximityGroupId.HasValue)
@@ -2385,6 +2414,10 @@ public class ChatUiSystem : ModSystem
     }
 
     [HarmonyPrefix]
+    [HarmonyPatch(typeof(HudDialogChat), "CmdClearChat")]
+    public static void ResetLocalChatClear() => ClearedChat.Reset();
+
+    [HarmonyPrefix]
     [HarmonyPatch(typeof(HudDialogChat), "UpdateText")]
     public static bool HudDialogChat_UpdateText_Prefix(HudDialogChat __instance, ref long __state)
     {
@@ -2394,16 +2427,24 @@ public class ChatUiSystem : ModSystem
             __state = PerfStats.Timestamp();
         }
 
-        if (_api == null || _config?.IsolateChatMessageFormatting != true) return true;
+        if (_api?.World is not ClientMain game ||
+            !game.ChatHistoryByPlayerGroup.TryGetValue(game.currentGroupid, out var history)) return true;
+        var isolate = _config?.IsolateChatMessageFormatting == true;
+        if (!isolate && ClearedChat.HiddenCount(history) == 0) return true;
 
-        var game = (ClientMain)_api.World;
         var richtext = __instance.Composers["chat-group-" + game.currentGroupid].GetRichtext("chathistory");
-        var components = BuildChatHistoryComponents(_api, game.ChatHistoryByPlayerGroup[game.currentGroupid], CairoFont.WhiteDetailText().WithFontSize(17f));
-        foreach (var component in richtext.Components ?? Array.Empty<RichTextComponentBase>())
+        var font = CairoFont.WhiteDetailText().WithFontSize(17f);
+        var messages = ClearedChat.Visible(history);
+        if (isolate)
         {
-            component?.Dispose();
+            var components = BuildChatHistoryComponents(_api, messages, font);
+            foreach (var component in richtext.Components ?? Array.Empty<RichTextComponentBase>())
+            {
+                component?.Dispose();
+            }
+            richtext.SetNewText(components);
         }
-        richtext.SetNewText(components);
+        else richtext.SetNewText(string.Join("\r\n", messages), font);
 
         // Preserve vanilla scroll behavior when replacing its joined-history parsing.
         var scrollbar = __instance.Composers["chat"].GetCompactScrollbar("scrollbar");
@@ -2523,6 +2564,7 @@ public class ChatUiSystem : ModSystem
 
     public override void Dispose()
     {
+        ClearedChat.Reset();
         _chatTabDialog = null;
         _chatTabGameOrder = null;
         _proximityGroupId = null;
@@ -2536,6 +2578,7 @@ public class ChatUiSystem : ModSystem
                 _setupWizardController = null;
                 _api.Event.PlayerJoin -= OnPlayerJoin;
                 _api.Event.PlayerEntitySpawn -= OnPlayerEntitySpawn;
+                _api.Event.OnSendChatMessage -= OnClearChatCommand;
                 if (_headshotFileDropSubscribed)
                 {
                     _api.Event.FileDrop -= _headshotFileDropHandler ?? OnFileDropped;
