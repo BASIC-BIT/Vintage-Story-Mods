@@ -181,6 +181,7 @@ public class SetupWizardStateTests
         current.DisableRPChat = true;
         current.ChatHistoryFlushIntervalMilliseconds += 100;
         current.EnableChatter = false;
+        current.EnableGlobalOOC = false;
         var expected = new[] { "DisableRPChat", "ChatHistoryFlushIntervalMilliseconds" };
         state.GetPendingRestartKeys(current).Should().BeEquivalentTo(expected);
         state.TryValidatePatch(current, Request([], []), out var reopened, out var changed, out _, out _)
