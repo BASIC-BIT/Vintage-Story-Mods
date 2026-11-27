@@ -15,8 +15,8 @@ public class SetupWizardCoverageTests
     [Fact]
     public void CatalogAndPendingInventoryPartitionTheScalarRegistry()
     {
-        RegisteredKeys.Should().HaveCount(210).And.OnlyHaveUniqueItems();
-        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(210);
+        RegisteredKeys.Should().HaveCount(211).And.OnlyHaveUniqueItems();
+        CoveredKeys.Distinct(StringComparer.Ordinal).Should().HaveCount(211);
         PendingMigrationKeys.Should().BeEmpty();
         CoverageErrors(RegisteredKeys, CoveredKeys, PendingMigrationKeys).Should().BeEmpty();
         foreach (var key in PendingMigrationKeys)

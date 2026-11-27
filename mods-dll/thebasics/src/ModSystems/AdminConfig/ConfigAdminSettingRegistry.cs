@@ -261,6 +261,7 @@ public static class ConfigAdminSettingRegistry
             Bool("EnableSleepNotifications", "Server Notifications", "Send sleep reminders", "Send a chat reminder when sleepers reach the threshold and other players remain awake. This does not change when the game skips the night.", ConfigAdminReloadBehavior.Live, c => c.EnableSleepNotifications, (c, v) => c.EnableSleepNotifications = v),
             Decimal("SleepNotificationThreshold", "Server Notifications", "Sleep reminder threshold (0 to 1)", "Fraction of online players who must be in bed to trigger a reminder. 0.5 means 50%. Values of 0 and 1 send no reminder.", ConfigAdminReloadBehavior.Live, (c => c.SleepNotificationThreshold, (c, v) => c.SleepNotificationThreshold = v), (0, 1)),
             Text("TEXT_SleepNotification", "Server Notifications", "Sleep reminder text", "Message sent when sleepers reach the reminder threshold.", ConfigAdminReloadBehavior.Live, c => c.TEXT_SleepNotification, (c, v) => c.TEXT_SleepNotification = v),
+            Bool("EnableUpdateCheck", "Server Notifications", "Check for mod updates", "Ask the Vintage Story ModDB every few hours whether a newer stable version of The BASICs exists and tell server admins in chat. Nothing is downloaded or installed.", ConfigAdminReloadBehavior.Live, c => c.EnableUpdateCheck, (c, v) => c.EnableUpdateCheck = v),
         });
     }
 

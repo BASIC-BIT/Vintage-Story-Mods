@@ -66,6 +66,12 @@ public class ModConfigUpgradeTests
     }
 
     [Fact]
+    public void LegacyConfigGainsUpdateCheckEnabled()
+    {
+        LoadLegacyConfig().EnableUpdateCheck.Should().BeTrue();
+    }
+
+    [Fact]
     public void LegacyConfigGainsOcclusionDefaultsThatKeepBothExperimentsOff()
     {
         var config = LoadLegacyConfig();
@@ -295,6 +301,7 @@ public class ModConfigUpgradeTests
         config.SightBlockingBlockCodePatterns = ["decorplus:privacy-curtain-*"];
         config.EnableSceneMarkers = false;
         config.CharacterSheetAutoOpenOnCharacterScreen = false;
+        config.EnableUpdateCheck = false;
 
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, config);
@@ -315,6 +322,7 @@ public class ModConfigUpgradeTests
         restored.SightBlockingBlockCodePatterns.Should().Equal("decorplus:privacy-curtain-*");
         restored.EnableSceneMarkers.Should().BeFalse();
         restored.CharacterSheetAutoOpenOnCharacterScreen.Should().BeFalse();
+        restored.EnableUpdateCheck.Should().BeFalse();
 
         // Neighbouring fields must be untouched by the new ids.
         restored.ProximityChatModeVerbs[ProximityChatMode.Yell].Should().BeEquivalentTo(["yells", "shouts"]);

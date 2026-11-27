@@ -123,8 +123,8 @@ public static class SetupWizardCatalog
             "MaxNoteLength", "MaxFreeformNoteLength"),
         Page("server.stats", "server", "Player activity stats", "Record player activity for /playerstats. The tracking switch takes effect after restart. Choose who can clear saved statistics.",
             "PlayerStatSystem", "PlayerStatClearPermission", "PlayerStatToggles.BlockBreaks", "PlayerStatToggles.Deaths", "PlayerStatToggles.DistanceTravelled", "PlayerStatToggles.NpcKills", "PlayerStatToggles.PlayerKills", "PlayerStatDistanceTravelledTimer"),
-        Page("server.integrations", "server", "Integrations", "Allow the optional th3essentials Discord relay. The integration must also be installed and configured on the server. You can configure this switch in advance.",
-            "EnableTh3EssentialsDiscordRelay"),
+        Page("server.integrations", "server", "Integrations", "Allow the optional th3essentials Discord relay. The integration must also be installed and configured on the server. You can configure this switch in advance. On dedicated servers, The BASICs can also check the Vintage Story ModDB every few hours for a newer stable version and tell admins in chat; nothing is downloaded or installed.",
+            "EnableTh3EssentialsDiscordRelay", "EnableUpdateCheck"),
         Page("server.diagnostics", "server", "Diagnostics", "Write extra BASICs diagnostic and performance messages to the server logs. Enable this while investigating a problem.",
             "DebugMode")
     });
