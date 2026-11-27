@@ -209,6 +209,7 @@
   "thebasics-cmd-desc": "The BASICs help and administration commands",
   "thebasics-cmd-help-desc": "Show common The BASICs commands",
   "thebasics-cmd-guide-desc": "Open The BASICs Survival Handbook guide",
+  "thebasics-help-setup": "Run /basic setup to configure chat, teleportation, and notifications.",
   "thebasics-help": "The BASICs commands\nGuide: /thebasics guide, /thebasics help\nRP Chat: /say, /whisper, /yell, /me, /it, /envhere, /ooc, /gooc, /rptext, /chatter, /chatprefs, /nick, /nickcolor, /nametagbgcolor, /nametagbordercolor\nCharacters: /charsheet, /look, /bio, /character, /setcharsheet, /clearcharsheet\nTeleport: /home, /sethome, /homes, /delhome, /spawn, /back, /top, /stuck, /tpa, /tpahere, /tpaccept, /tpdeny\nNotes and utility: /notes, /playerstats\nStaff: /setspawn, /adminnotes &lt;player&gt;, /chatlog, /adminviewcharsheet &lt;player&gt;, /adminsetcharsheet &lt;player&gt; &lt;field&gt; &lt;value&gt;, /adminsetnick &lt;player&gt; &lt;nickname&gt;\nServer: /thebasics config, /thebasics config languages, /thebasics config charsheetfields, /thebasics reloadconfig\nTip: press H and choose The BASICs for the full guide.",
   "thebasics-guide-link": "Open The BASICs guide in the Survival Handbook: <a href=\"handbook://thebasics-guide\">The BASICs Guide</a>\nYou can also press H and choose The BASICs in the handbook.",
   "guide-button": "Guide",

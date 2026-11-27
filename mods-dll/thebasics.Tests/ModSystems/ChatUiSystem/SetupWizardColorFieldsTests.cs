@@ -12,7 +12,7 @@ public class SetupWizardColorFieldsTests
     [VisualTheory]
     [InlineData(1.0)]
     [InlineData(1.25)]
-    public void NametagColorsOfferPickersAlongsideTheirOriginalTextFields(double scale)
+    public void NametagColorsOpenThePickerFromTheirReadOnlyValues(double scale)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
             Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
@@ -23,24 +23,27 @@ public class SetupWizardColorFieldsTests
         foreach (var key in new[] { "NametagBackgroundColor", "NametagBorderColor" })
         {
             Assert.NotNull(wizard.SingleComposer.GetElement("color-picker-" + key));
-            Assert.Equal(wizard.Draft.Get(key), wizard.SingleComposer.GetTextInput(key).GetText());
+            var value = Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer[key]);
+            Assert.Equal(string.IsNullOrEmpty(wizard.Draft.Get(key)) ? "Default" : wizard.Draft.Get(key), value.Text);
         }
         var background = Assert.IsType<GuiElementColorPicker>(wizard.SingleComposer.GetElement("color-picker-NametagBackgroundColor"));
-        wizard.SingleComposer.GetTextInput("NametagBackgroundColor").SetValue("#40352980");
+        Click(wizard, wizard.SingleComposer["NametagBackgroundColor"].Bounds);
+        Assert.True(background.IsOpen);
+        background.ExpandCustom();
+        background.PopupComposer.GetTextInput("hex").SetValue("#40352980");
         Assert.Equal("#40352980", background.Value);
-        background.Open();
         background.PopupComposer.GetTextInput("number-3").SetValue("25");
         Assert.Equal("#40352940", wizard.Draft.Get("NametagBackgroundColor"));
         Click(wizard, background.PopupComposer["theme"].Bounds);
         Assert.Empty(wizard.Draft.Get("NametagBackgroundColor"));
-        Assert.Empty(wizard.SingleComposer.GetTextInput("NametagBackgroundColor").GetText());
+        Assert.Equal("Default", Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer["NametagBackgroundColor"]).Text);
         Assert.Empty(host.UnsupportedCalls);
     }
 
     [VisualTheory]
     [InlineData(1.0)]
     [InlineData(1.25)]
-    public void ChatColorsPreserveTypedValuesAndUpdateDraftFromPalette(double scale)
+    public void ChatColorsUpdateDraftAndReadOnlyValueFromPalette(double scale)
     {
         using var host = new PreviewHost(Environment.GetEnvironmentVariable("VINTAGE_STORY")!,
             Environment.GetEnvironmentVariable("THEBASICS_GUI_ASSETS")!, 1280, 720, scale);
@@ -49,19 +52,14 @@ public class SetupWizardColorFieldsTests
         wizard.ShowPage("chat.colors");
         foreach (var key in new[] { "EmoteColor", "OOCColor", "GlobalOOCColor" })
             Assert.IsType<GuiElementColorPicker>(wizard.SingleComposer.GetElement("color-picker-" + key));
-        var input = wizard.SingleComposer.GetTextInput("OOCColor");
-        input.SetValue("navy");
-        Assert.Equal("navy", wizard.Draft.Get("OOCColor"));
         host.RenderGuiDialog(wizard, 0);
-        input.SetValue("\"unfinished");
-        host.RenderGuiDialog(wizard, 0);
-        Assert.Equal("\"unfinished", wizard.Draft.Get("OOCColor"));
+        var value = Assert.IsAssignableFrom<GuiElementTextButton>(wizard.SingleComposer["OOCColor"]);
         var picker = Assert.IsType<GuiElementColorPicker>(wizard.SingleComposer.GetElement("color-picker-OOCColor"));
         picker.Open();
         var bounds = picker.PopupComposer["palette-6"].Bounds;
         Click(wizard, bounds);
         Assert.Equal("#7EAFE0", wizard.Draft.Get("OOCColor"));
-        Assert.Equal("#7EAFE0", input.GetText());
+        Assert.Equal("#7EAFE0", value.Text);
         picker.ExpandCustom();
         host.RenderGuiDialog(wizard, 0);
         Assert.True(picker.PopupBounds.absY + picker.PopupBounds.OuterHeight <= 720);

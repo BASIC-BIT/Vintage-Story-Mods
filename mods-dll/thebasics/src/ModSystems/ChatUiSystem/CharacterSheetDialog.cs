@@ -308,8 +308,13 @@ public class CharacterSheetDialog : GuiDialog
 
         AddScrollContent(layout.Row, scrollFields);
 
-        composer.EndClip()
-            .AddVerticalScrollbar(OnNewScrollbarValue, ElementStdBounds.VerticalScrollbar(layout.ScrollClipBounds), "scrollbar");
+        var scrollTrack = ElementStdBounds.VerticalScrollbar(layout.ScrollClipBounds);
+        if (_templateBounds != null)
+        {
+            scrollTrack.fixedHeight += scrollTrack.fixedY - layout.HeadshotTop;
+            scrollTrack.fixedY = layout.HeadshotTop;
+        }
+        composer.EndClip().AddVerticalScrollbar(OnNewScrollbarValue, scrollTrack, "scrollbar");
         if (_templateBounds == null) composer.AddSmallButton(Lang.Get("Cancel"), OnCancel, ElementBounds.Fixed(0, layout.ButtonY, 120, layout.ButtonHeight))
             .AddSmallButton(Lang.Get("thebasics:guide-button"), OnGuide, ElementBounds.Fixed(130, layout.ButtonY, 120, layout.ButtonHeight));
 

@@ -182,6 +182,13 @@ public class SetupWizardStateTests
         current.ChatHistoryFlushIntervalMilliseconds += 100;
         current.EnableChatter = false;
         current.EnableGlobalOOC = false;
+        current.MaxLanguagesPerPlayer++;
+        current.SignLanguageRange++;
+        current.RequireLineOfSightForSignLanguage = !current.RequireLineOfSightForSignLanguage;
+        current.RemoveGrantedLanguagesOnChange = !current.RemoveGrantedLanguagesOnChange;
+        current.ProximityChatAsDefault = !current.ProximityChatAsDefault;
+        current.PreserveDefaultChatChoice = !current.PreserveDefaultChatChoice;
+        current.PreventProximityChannelSwitching = !current.PreventProximityChannelSwitching;
         var expected = new[] { "DisableRPChat", "ChatHistoryFlushIntervalMilliseconds" };
         state.GetPendingRestartKeys(current).Should().BeEquivalentTo(expected);
         state.TryValidatePatch(current, Request([], []), out var reopened, out var changed, out _, out _)

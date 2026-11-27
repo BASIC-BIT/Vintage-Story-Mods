@@ -109,12 +109,17 @@ public class LanguageEditorFixtureTests
         host.RenderGuiDialog(wizard, 0);
         var before = Text(wizard, "language-editor-unfamiliar");
 
-        wizard.SingleComposer.GetTextInput("language-editor-Syllables").SetValue("zu");
+        var sounds = wizard.SingleComposer["language-editor-Syllables"].Bounds;
+        var x = (int)(sounds.absX + sounds.OuterWidth / 2);
+        var y = (int)(sounds.absY + sounds.OuterHeight / 2);
+        wizard.OnMouseDown(new MouseEvent(x, y, Vintagestory.API.Common.EnumMouseButton.Left, 0));
+        wizard.OnMouseUp(new MouseEvent(x, y, Vintagestory.API.Common.EnumMouseButton.Left, 0));
+        wizard.SingleComposer.GetTextArea("language-editor-Syllables").SetValue("zu\nzu");
         wizard.SingleComposer.GetTextInput("language-editor-Color").SetValue("#e6b267");
         wizard.SingleComposer.GetTextInput("language-editor-Prefix").SetValue("Harbor");
         host.RenderGuiDialog(wizard, 0);
 
-        Assert.Equal("zu", wizard.Draft.Languages[0].Syllables);
+        Assert.Equal("zu, zu", wizard.Draft.Languages[0].Syllables);
         Assert.Equal("#e6b267", wizard.Draft.Languages[0].Color);
         Assert.Equal("Harbor", wizard.Draft.Languages[0].Prefix);
         Assert.NotEqual(before, Text(wizard, "language-editor-unfamiliar"));
@@ -123,7 +128,7 @@ public class LanguageEditorFixtureTests
             component => Math.Abs(component.Font.Color[0] - 0xe6 / 255d) < 0.01 && Math.Abs(component.Font.Color[1] - 0xb2 / 255d) < 0.01);
 
         wizard.SingleComposer.GetTextInput("language-editor-Color").SetValue("blue");
-        wizard.SingleComposer.GetTextInput("language-editor-Syllables").SetValue("");
+        wizard.SingleComposer.GetTextArea("language-editor-Syllables").SetValue("");
         host.RenderGuiDialog(wizard, 0);
         Assert.NotEmpty(Text(wizard, "language-editor-errors"));
         Assert.Empty(Text(wizard, "language-editor-understood"));
@@ -131,7 +136,7 @@ public class LanguageEditorFixtureTests
         Assert.Equal("blue", wizard.Draft.Languages[0].Color);
         Assert.Equal("", wizard.Draft.Languages[0].Syllables);
         Assert.False(wizard.Draft.IsSavePending);
-        Assert.Empty(host.RecordedEffects);
+        Assert.All(host.RecordedEffects, effect => Assert.Equal("sound:menubutton_down", effect));
         Assert.Empty(host.UnsupportedCalls);
     }
 

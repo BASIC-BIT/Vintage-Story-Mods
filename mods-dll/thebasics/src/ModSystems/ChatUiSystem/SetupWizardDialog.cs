@@ -213,8 +213,6 @@ public sealed class SetupWizardDialog : GuiDialog
         if (page == null) return false;
         ShowPage(page.Id);
         _searchFocusKey = key;
-        if (key is "SendServerSaveAnnouncement" or "ServerSaveAnnouncementAsNotification" or "SendServerSaveFinishedAnnouncement" or "ServerSaveFinishedAsNotification")
-            return FocusControl("announcement-mode", ConfigAdminSettingRegistry.Settings.First(setting => setting.Key == key).Label);
         if (SingleComposer.GetElement(key) == null) ComposeDialog();
         return FocusControl(key, ConfigAdminSettingRegistry.Settings.First(setting => setting.Key == key).Label);
     }
@@ -329,6 +327,7 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void ComposeDialog()
     {
+        var sidebarScroll = _sidebar?.TopicId == _activeTopicId ? _sidebar?.ScrollOffset ?? 0 : 0;
         _sheetEditor?.Detach();
         SingleComposer?.Dispose();
         _privilegePickers.Clear();
@@ -375,6 +374,7 @@ public sealed class SetupWizardDialog : GuiDialog
                 QueueNavigation(() => ShowPage(page), true);
             });
         _sidebar.SetState(CurrentStepId, _activeTopicId, Draft.ChangedKeys);
+        _sidebar.RestoreScrollOffset(sidebarScroll);
         composer.AddInteractiveElement(_sidebar, "setup-sidebar");
         composer.AddStaticElement(new GuiElementCustomDraw(capi, ElementBounds.Fixed(0, FooterY - 14, DialogWidth, 1),
             (context, _, bounds) =>
@@ -429,6 +429,7 @@ public sealed class SetupWizardDialog : GuiDialog
     {
         var finished = !_searching && CurrentStepId == "finish";
         var reviewing = !_searching && CurrentStepId == "review";
+        var actionY = finished ? (NeedsRestart ? 273 : 195) : FooterY;
         composer.AddSmallButton("Old settings", () =>
         {
             if (_onAdvanced == null) return false;
@@ -443,7 +444,7 @@ public sealed class SetupWizardDialog : GuiDialog
             ElementBounds.Fixed(232, FooterY + 6, DialogWidth - 552, 24), "footer-draft-count");
         composer.AddSmallButton(finished ? NeedsRestart ? "Later" : "Done" : "Close",
             () => { QueueNavigation(() => TryClose()); return true; },
-            ElementBounds.Fixed(DialogWidth - 300, FooterY, 110, 30), key: "close");
+            ElementBounds.Fixed(DialogWidth - 300, actionY, 110, 30), key: "close");
         var save = reviewing && !IsCaptureOnly;
         composer.AddSmallButton(finished ? "Back to setup" : save ? _pending ? "Saving..." : "Save settings" : "Review changes", () =>
         {
@@ -460,7 +461,7 @@ public sealed class SetupWizardDialog : GuiDialog
                 }
             });
             return true;
-        }, ElementBounds.Fixed(DialogWidth - 180, FooterY, 180, 30), key: "review");
+        }, ElementBounds.Fixed(DialogWidth - 180, actionY, 180, 30), key: "review");
         composer.GetButton("review").Enabled = !_pending && !(reviewing && IsCaptureOnly) && !(save && HasSaveValidationErrors());
     }
 
@@ -478,7 +479,13 @@ public sealed class SetupWizardDialog : GuiDialog
 
     private void RefreshNavigation()
     {
-        _sidebar?.SetState(CurrentStepId, _activeTopicId, Draft.ChangedKeys);
+        var changed = Draft.ChangedKeys;
+        _sidebar?.SetState(CurrentStepId, _activeTopicId, changed);
+        if (SetupWizardCatalog.TryGetPage(CurrentStepId, out var page))
+        {
+            foreach (var key in page.SettingKeys)
+                SingleComposer?.GetRichtext("setting-change-" + key)?.SetNewText(changed.Contains(key) ? "•" : "", SettingChangeFont());
+        }
         _draftStatus?.SetNewText(DraftStatusText(), CairoFont.WhiteSmallText().WithFontSize(14));
     }
 
@@ -628,18 +635,21 @@ public sealed class SetupWizardDialog : GuiDialog
             y += 70;
             return;
         }
+        if (definition.ReloadBehavior == ConfigAdminReloadBehavior.RestartRequired) label += " (after restart)";
+        var labelWidth = SettingsWidth - 14;
         if (_inSettingsForm)
         {
             var font = CairoFont.WhiteSmallText().WithFontSize(14);
             if (CurrentStepId == "server.stats" && (key.StartsWith("PlayerStatToggles.", StringComparison.Ordinal) || key == "PlayerStatDistanceTravelledTimer") &&
                 (!Bool("PlayerStatSystem") || key == "PlayerStatDistanceTravelledTimer" && !Bool("PlayerStatToggles.DistanceTravelled"))) font.Color[3] = .35;
             composer.AddInteractiveElement(new SetupWizardViewportRichtext(capi, VtmlUtils.EscapeVtml(label), font,
-                ElementBounds.Fixed(SettingsX, y, SettingsWidth, 21)), "setting-label-" + key);
+                ElementBounds.Fixed(SettingsX, y, labelWidth, 21)), "setting-label-" + key);
         }
         else if (key is "MapHideOtherPlayers" or "MapPlayerRenderDistance")
             composer.AddStaticText(label, CairoFont.WhiteSmallText().WithFontSize(14),
-                ElementBounds.Fixed(SettingsX, y, SettingsWidth, 21), "setting-label-" + key);
-        else Text(composer, label, SettingsX, y, SettingsWidth, 21);
+                ElementBounds.Fixed(SettingsX, y, labelWidth, 21), "setting-label-" + key);
+        else Text(composer, label, SettingsX, y, labelWidth, 21);
+        AddSettingChangeDot(composer, key, y);
         var bounds = ElementBounds.Fixed(SettingsX, y + 23, SettingsWidth, 28);
         var value = Draft.Get(key);
         AddSettingControl(composer, key, definition, bounds, value, ref y);
@@ -661,6 +671,15 @@ public sealed class SetupWizardDialog : GuiDialog
         y += CurrentStepId == "chat.basics" ? (CompactLayout ? 50 : 61) : CompactLayout ? 54 : 65;
     }
 
+    private static CairoFont SettingChangeFont() => CairoFont.WhiteSmallText().WithFontSize(14).WithColor([.97, .75, .38, 1]);
+
+    private void AddSettingChangeDot(GuiComposer composer, string key, double y)
+    {
+        composer.AddInteractiveElement(new SetupWizardViewportRichtext(capi,
+            Draft.ChangedKeys.Contains(key) ? "•" : "", SettingChangeFont(),
+            ElementBounds.Fixed(SettingsX + SettingsWidth - 14, y, 14, 21)), "setting-change-" + key);
+    }
+
     private void AddSettingControl(GuiComposer composer, string key, ConfigAdminSettingDefinition definition,
         ElementBounds bounds, string value, ref double y)
     {
@@ -671,7 +690,8 @@ public sealed class SetupWizardDialog : GuiDialog
             composer.AddInteractiveElement(new GuiElementSetupToggle(capi, Bool(key) != inverted,
                 on =>
                 {
-                    Changed(key, on != inverted ? "1" : "0", on ? "on" : "off", key is not ("MapHideOtherPlayers" or "ManageMapPlayerVisibility"));
+                    Changed(key, on != inverted ? "1" : "0", on ? "on" : "off",
+                        key is not ("MapHideOtherPlayers" or "ManageMapPlayerVisibility" or "SendServerSaveAnnouncement" or "SendServerSaveFinishedAnnouncement"));
                     if (key is "MapHideOtherPlayers" or "ManageMapPlayerVisibility") RefreshMapControls(composer);
                 }, bounds), key);
         }
@@ -694,7 +714,7 @@ public sealed class SetupWizardDialog : GuiDialog
         }
         else if (key is "EmoteColor" or "OOCColor" or "GlobalOOCColor" or "NametagBackgroundColor" or "NametagBorderColor")
         {
-            AddColorSetting(composer, key, definition, bounds, value);
+            AddColorSetting(composer, key, bounds, value);
         }
         else if (definition.IsPrivilege)
         {
@@ -718,32 +738,27 @@ public sealed class SetupWizardDialog : GuiDialog
         }
     }
 
-    private void AddColorSetting(GuiComposer composer, string key, ConfigAdminSettingDefinition definition,
-        ElementBounds bounds, string value)
+    private void AddColorSetting(GuiComposer composer, string key, ElementBounds bounds, string value)
     {
         var mode = key.StartsWith("Nametag", StringComparison.Ordinal) ? ColorPickerMode.RgbaWithTheme : ColorPickerMode.Rgb;
-        var updating = false;
         var picker = new GuiElementColorPicker(capi, ElementBounds.Fixed(bounds.fixedX, bounds.fixedY, 32, 28), value, choice =>
         {
-            updating = true;
-            try { composer.GetTextInput(key)?.SetValue(choice); }
-            finally { updating = false; }
+            if (composer.GetElement(key) is GuiElementTextButton button) button.Text = ColorValueLabel(choice);
             Changed(key, choice, "edited", false);
         }, mode);
         bounds.fixedX += 39;
         bounds.fixedWidth -= 39;
-        var input = new SetupWizardViewportTextInput(capi, bounds, choice =>
-        {
-            if (updating) return;
-            picker.SetValue(choice);
-            Changed(key, choice, "edited", false);
-        }, CairoFont.TextInput());
-        input.SetMaxLength(definition.Kind == ConfigAdminSettingKind.Text ? Math.Max(2048, value?.Length ?? 0) : 32);
-        input.SetValue(value);
         _colorPickers.Add(picker);
         composer.AddInteractiveElement(picker, "color-picker-" + key);
-        composer.AddInteractiveElement(input, key);
+        composer.AddInteractiveElement(new SetupWizardViewportButton(capi, ColorValueLabel(value), () =>
+        {
+            composer.FocusElement(picker.TabIndex);
+            picker.Open();
+            return true;
+        }, bounds), key);
     }
+
+    private static string ColorValueLabel(string value) => string.IsNullOrEmpty(value) ? "Default" : value;
 
     private void SetStatsControlsEnabled(GuiComposer composer)
     {
@@ -786,23 +801,18 @@ public sealed class SetupWizardDialog : GuiDialog
         var enabled = started ? "SendServerSaveAnnouncement" : "SendServerSaveFinishedAnnouncement";
         var popup = started ? "ServerSaveAnnouncementAsNotification" : "ServerSaveFinishedAsNotification";
         var text = started ? "TEXT_ServerSaveAnnouncement" : "TEXT_ServerSaveFinished";
-        if (!Draft.Contains(enabled) || !Draft.Contains(popup))
+        AddSetting(composer, enabled, ref y);
+        if (!Draft.Contains(popup))
         {
-            AddSetting(composer, enabled, ref y);
             AddSetting(composer, popup, ref y);
             AddSetting(composer, text, ref y);
             return;
         }
-        Text(composer, "Announcement", SettingsX, y, SettingsWidth, 21);
-        composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "off", "chat", "popup" }, new[] { "Off", "Chat", "Chat notification" },
-            !Bool(enabled) ? 0 : Bool(popup) ? 2 : 1, (choice, _) =>
-            {
-                Draft.Set(enabled, choice == "off" ? "0" : "1");
-                if (choice != "off") Draft.Set(popup, choice == "popup" ? "1" : "0");
-                Track("choice", choice);
-                RefreshNavigation();
-                RefreshPreview();
-            }, ElementBounds.Fixed(SettingsX, y + 23, SettingsWidth, 28), CairoFont.WhiteSmallText(), false), "announcement-mode");
+        Text(composer, "Display as", SettingsX, y, SettingsWidth - 14, 21);
+        AddSettingChangeDot(composer, popup, y);
+        composer.AddInteractiveElement(new GuiElementDropDown(capi, new[] { "chat", "popup" }, new[] { "Chat message", "Chat notification" },
+            Bool(popup) ? 1 : 0, (choice, _) => Changed(popup, choice == "popup" ? "1" : "0", choice, false),
+            ElementBounds.Fixed(SettingsX, y + 23, SettingsWidth, 28), CairoFont.WhiteSmallText(), false), popup);
         y += CompactLayout ? 54 : 65;
         AddSetting(composer, text, ref y);
     }
@@ -940,7 +950,6 @@ public sealed class SetupWizardDialog : GuiDialog
             Text(composer, "Restart needed", 0, 103, Width, 27, true);
             var names = _restartKeys.Select(key => ConfigAdminSettingRegistry.TryGet(key, out var setting) ? SettingLabel(setting) : key);
             Text(composer, _runtimeApplyFailed ? "Restart the server to apply the saved settings.\n" + string.Join(", ", names) : string.Join(", ", names), 0, 139, Width, 126);
-            Text(composer, RestartInstructions(), 0, 290, Width, 90);
         }
     }
 
@@ -1190,12 +1199,12 @@ public sealed class SetupWizardDialog : GuiDialog
             _preview?.SetAnimation(AnimationCode(), Time % 60);
             RefreshPreview();
             return true;
-        }, ElementBounds.Fixed(146, y + 2, 158, 20), "preview-time");
+        }, ElementBounds.Fixed(146, y + 2, 77, 20), "preview-time");
         var slider = composer.GetSlider("preview-time");
         slider.OnSliderTooltip = _ => PreviewClockText();
         slider.SetValues(0, 0, 1000, 1);
         composer.AddRichtext(PreviewClockText(), CairoFont.WhiteSmallText().WithFontSize(12),
-            ElementBounds.Fixed(318, y + 4, 154, 20), "preview-clock");
+            ElementBounds.Fixed(232, y + 4, 78, 20), "preview-clock");
         composer.AddHoverText("Restart this example.", CairoFont.WhiteSmallText(), 260,
             ElementBounds.Fixed(3, y, 64, 24), "preview-replay-help");
         composer.AddHoverText("Pause or resume this example.", CairoFont.WhiteSmallText(), 260,
@@ -1235,7 +1244,8 @@ public sealed class SetupWizardDialog : GuiDialog
     }
 
     private string PlacementRangeText() => Number("MaxEnvironmentPlacementDistance") >= 10
-        ? "Target at 10 blocks: within placement range." : "Target at 10 blocks: out of placement range.";
+        ? "Surface at 10 blocks: the bubble appears where you aimed."
+        : "Surface at 10 blocks: out of range. The bubble appears above you.";
 
     private void RefreshPreview()
     {
@@ -1262,7 +1272,8 @@ public sealed class SetupWizardDialog : GuiDialog
         if (CurrentStepId == "chat.textappearance") return string.Join("<br>", SetupWizardTextAppearancePreview.Messages(Draft));
         if (CurrentStepId == "chat.occlusion") return SetupWizardTextAppearancePreview.Feedback(Draft, CurrentStepId).Length > 0 ? "" : SetupWizardSpeechPreview.Message(CurrentStepId, Draft, Time);
         if (SetupWizardChatTextEditor.Supports(CurrentStepId)) return SetupWizardChatTextEditor.Preview(CurrentStepId, Draft);
-        if (CurrentStepId == "roleplay.descriptions") return "The old gate creaks in the wind.";
+        if (CurrentStepId == "roleplay.descriptions")
+            return (Bool("AttributeFreeformMessagesToPlayerName") ? "[PipPlayer] " : "") + ChatHelper.Italic("The old gate creaks in the wind.");
         if (CurrentStepId == "notifications.deaths") return Bool("EnableNearbyDeathMessagesInProximityChat") ? "PipPlayer died nearby." : "Nearby death messages are off.";
         if (CurrentStepId == "chat.colors")
             return ChatHelper.Color("Pip waves.", PreviewColor("EmoteColor")) + "<br>" +

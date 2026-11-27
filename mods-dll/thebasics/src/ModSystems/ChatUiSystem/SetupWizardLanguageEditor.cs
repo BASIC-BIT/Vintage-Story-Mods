@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Cairo;
 using thebasics.Configs;
+using thebasics.Gui;
 using thebasics.Models;
 using thebasics.ModSystems.AdminConfig;
 using thebasics.Utilities;
@@ -23,6 +24,7 @@ public sealed class SetupWizardLanguageEditor
     private GuiElementColorPicker _colorPicker;
     private string[] _selectorNames;
     private bool _updating;
+    private bool _soundsExpanded;
     private float _scroll;
     private int _composedIndex = -1;
 
@@ -43,7 +45,11 @@ public sealed class SetupWizardLanguageEditor
         _composer = composer;
         _colorPicker = null;
         SelectedIndex = Math.Clamp(SelectedIndex, 0, Math.Max(0, _draft.Languages.Count - 1));
-        if (_composedIndex != SelectedIndex) _scroll = 0;
+        if (_composedIndex != SelectedIndex)
+        {
+            _scroll = 0;
+            _soundsExpanded = false;
+        }
         _composedIndex = SelectedIndex;
         var bottomY = compact ? 420 : 442;
         Text(composer, "Languages", 0, 48, width, 27, 20, true);
@@ -77,13 +83,15 @@ public sealed class SetupWizardLanguageEditor
         composer.AddRichtext(string.Empty, Font(18).WithColor(new[] { .95, .72, .3, 1d }),
             ElementBounds.Fixed(x, 78, formWidth, 27), "language-editor-title");
         var clip = ElementBounds.Fixed(x, 112, formWidth, compact ? 284 : 318);
-        var content = ElementBounds.Fixed(0, -_scroll, formWidth, 607);
+        var soundsHeight = _soundsExpanded ? 90 : 0;
+        var content = ElementBounds.Fixed(0, -_scroll, formWidth, 607 + soundsHeight);
         composer.BeginClip(clip).BeginChildElements(content);
         if (Selected != null)
         {
-            AddDetails(composer, 0, formWidth);
-            Text(composer, "Starting speakers", 0, 328, formWidth, 26, 17, true);
-            AddGrants(composer, 0, formWidth);
+            AddDetails(composer, 0, formWidth, soundsHeight);
+            Text(composer, "Starting speakers", 0, 328 + soundsHeight, formWidth, 26, 17, true);
+            AddGrants(composer, 0, formWidth, soundsHeight);
+            if (_soundsExpanded) AddSoundsEditor(composer, clip, formWidth);
         }
         composer.EndChildElements().EndClip();
         var scrollbar = new SetupWizardSheetEditor.BuilderScrollbar(_api, value =>
@@ -115,7 +123,7 @@ public sealed class SetupWizardLanguageEditor
         composer.OnComposed += RefreshPreview;
     }
 
-    private void AddDetails(GuiComposer composer, double x, double width)
+    private void AddDetails(GuiComposer composer, double x, double width, int soundsHeight)
     {
         Input(composer, "Name", "Language name", Selected.Name, x, 0, width, 64, value => Selected.Name = value);
         const double rowHeight = 58;
@@ -141,30 +149,65 @@ public sealed class SetupWizardLanguageEditor
             _colorPicker.SetValue(value);
         }, "A hex color such as #E9DDCE.", leading: 39);
         Input(composer, "Description", "Description", Selected.Description, x, rowHeight * 2, width, 256, value => Selected.Description = value);
-        Input(composer, "Syllables", "Unfamiliar sounds", Selected.Syllables, x, rowHeight * 3, width, 512, value => Selected.Syllables = value,
-            "Separate syllables with commas. Players who don't know this language see words made from these syllables.");
-        Toggle(composer, "Hidden", "Hide until known", Selected.Hidden, x, rowHeight * 4, width, value => Selected.Hidden = value,
+        AddSounds(composer, x, rowHeight * 3, width);
+        Toggle(composer, "Hidden", "Hide until known", Selected.Hidden, x, rowHeight * 4 + soundsHeight, width, value => Selected.Hidden = value,
             "Hide this language from players who don't know it. Known or granted languages remain usable.");
     }
 
-    private void AddGrants(GuiComposer composer, double x, double width)
+    private void AddSounds(GuiComposer composer, double x, double y, double width)
     {
-        Toggle(composer, "Default", "Everyone starts with it", Selected.Default, x, 360, width, value =>
+        const string key = "language-editor-Syllables";
+        Text(composer, "Unfamiliar sounds", x, y, width, 20, 13);
+        var list = UnfamiliarSounds(Selected);
+        var button = new SetupWizardViewportButton(_api, _soundsExpanded ? "Hide sounds" : $"Edit sounds ({list.Length})",
+            () => { Queue(() => _soundsExpanded = !_soundsExpanded); return true; }, ElementBounds.Fixed(x, y + 22, width, 28));
+        composer.AddInteractiveElement(button, _soundsExpanded ? key + "-toggle" : key);
+        if (_soundsExpanded) Text(composer, "One sound per line", x, y + 53, width, 16, 12);
+    }
+
+    private void AddSoundsEditor(GuiComposer composer, ElementBounds formClip, double width)
+    {
+        const string key = "language-editor-Syllables";
+        var entry = Selected;
+        // Compose the nested clip after the other form controls so they retain the outer clip.
+        composer.AddScrollableTextArea(ElementBounds.Fixed(0, 244, width, 70), value =>
+        {
+            if (_updating) return;
+            entry.Syllables = string.Join(", ", value.Split(['\r', '\n', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries));
+            NotifyChanged();
+        }, CairoFont.TextInput().WithFontSize(15), key);
+        var editor = composer.GetScrollableTextArea(key);
+        editor.Scrollbar.InsideClipBounds = formClip;
+        editor.SetMaxLength(Math.Max(512, entry.Syllables?.Length ?? 0));
+        composer.OnComposed += () =>
+        {
+            _updating = true;
+            try { editor.SetValue(string.Join("\n", UnfamiliarSounds(entry))); }
+            finally { _updating = false; }
+        };
+    }
+
+    private static string[] UnfamiliarSounds(LanguageConfigEntryMessage entry) =>
+        (entry.Syllables ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private void AddGrants(GuiComposer composer, double x, double width, int offset)
+    {
+        Toggle(composer, "Default", "Everyone starts with it", Selected.Default, x, 360 + offset, width, value =>
         {
             Selected.Default = value;
             Queue(() => { });
         }, "All characters know this language. Turn this off to choose starting speakers below.");
         Text(composer, Selected.Default ? "Everyone knows this language. Turn this off to use the rules below." :
-            "Characters matching any rule below start with this language.", x, 417, width, 30, 13);
+            "Characters matching any rule below start with this language.", x, 417 + offset, width, 30, 13);
         var half = (width - 18) / 2;
         Grant("GrantedToClasses", "Character classes", Selected.GrantedToClasses, x, 455, value => Selected.GrantedToClasses = value);
         Grant("GrantedToTraits", "Character traits", Selected.GrantedToTraits, x + half + 18, 455, value => Selected.GrantedToTraits = value);
         Grant("GrantedToModels", "Character models", Selected.GrantedToModels, x, 515, value => Selected.GrantedToModels = value);
         Grant("GrantedToModelGroups", "Model groups", Selected.GrantedToModelGroups, x + half + 18, 515, value => Selected.GrantedToModelGroups = value);
-        Text(composer, "Use exact IDs, separated by commas. Leave unused rules blank.", x, 575, width, 30, 12);
+        Text(composer, "Use exact IDs, separated by commas. Leave unused rules blank.", x, 575 + offset, width, 30, 12);
 
         void Grant(string key, string label, string value, double left, double top, Action<string> update) =>
-            Input(composer, key, label, value, left, top, half, 512, update,
+            Input(composer, key, label, value, left, top + offset, half, 512, update,
                 Selected.Default ? "Turn off Everyone starts with it to edit starting-speaker rules. Your saved IDs are kept." :
                 "Enter exact IDs, separated by commas. A match in any of these lists grants the language.",
                 enabled: !Selected.Default);

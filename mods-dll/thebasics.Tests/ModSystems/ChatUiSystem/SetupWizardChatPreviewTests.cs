@@ -837,20 +837,21 @@ public class SetupWizardChatPreviewTests
             Assert.Equal("General", Assert.Single(tabs.tabs).Name);
             Assert.Equal(0, tabs.activeElement);
             AssertDisabledInput(host, wizard);
-            var mode = Assert.IsType<GuiElementDropDown>(wizard.SingleComposer["announcement-mode"]);
-            Assert.Equal(new[] { "off", "chat", "popup" }, mode.listMenu.Values);
-            Assert.Equal(new[] { "Off", "Chat", "Chat notification" }, mode.listMenu.Names);
-
-            SelectAnnouncementMode(host, mode, 0);
+            var mode = Assert.IsType<GuiElementDropDown>(wizard.SingleComposer[notification]);
+            Assert.Equal(new[] { "chat", "popup" }, mode.listMenu.Values);
+            Assert.Equal(new[] { "Chat message", "Chat notification" }, mode.listMenu.Names);
+            if (draft.Get(enabled) == "1") ClickElement(host, wizard, wizard.SingleComposer[enabled]);
             Assert.Equal("0", draft.Get(enabled));
             Assert.Equal("", PreviewText(wizard));
-            SelectAnnouncementMode(host, mode, 1);
+            SelectAnnouncementMode(host, mode, 0);
+            Assert.Equal("0", draft.Get(enabled));
+            ClickElement(host, wizard, wizard.SingleComposer[enabled]);
             Assert.Equal("1", draft.Get(enabled));
             Assert.Equal("0", draft.Get(notification));
             Assert.Equal(draft.Get(wording), PreviewText(wizard));
             var normal = ChatComposer(wizard).GetRichtext("preview-text").Components.OfType<RichTextComponent>().Single().Font.Color.ToArray();
 
-            SelectAnnouncementMode(host, mode, 2);
+            SelectAnnouncementMode(host, mode, 1);
             Assert.Equal("1", draft.Get(enabled));
             Assert.Equal("1", draft.Get(notification));
             Assert.Equal(draft.Get(wording), PreviewText(wizard));
@@ -871,7 +872,7 @@ public class SetupWizardChatPreviewTests
     [VisualTheory]
     [InlineData(1.0)]
     [InlineData(1.25)]
-    public void RestartDetailsStayInReviewWithHumanReadableValues(double scale)
+    public void RestartDetailsAppearOnSettingAndInReview(double scale)
     {
         using var host = CreateHost(scale);
         var draft = new SetupWizardDraft(SetupWizardCaptureScenes.DefaultValues());
@@ -881,9 +882,9 @@ public class SetupWizardChatPreviewTests
         wizard.ShowPage("chat.basics");
         wizard.TryOpen();
         var labels = Elements(wizard).Values.OfType<GuiElementStaticText>().Select(element => element.Text).ToArray();
-        Assert.Contains("Use General as proximity chat", labels);
-        Assert.DoesNotContain(labels, label => label.Contains("(restart)", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(labels, label => label.Contains("After restart", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("Use General as proximity chat (after restart)", labels);
+        var dot = wizard.SingleComposer.GetRichtext("setting-change-UseGeneralChannelAsProximityChat");
+        Assert.Contains(dot.Components.OfType<RichTextComponent>(), component => component.DisplayText == "•");
 
         wizard.ShowPage("review");
         labels = ReviewText(wizard);

@@ -97,8 +97,9 @@ public class SetupWizardRecordsPreviewTests
         Assert.IsType<GuiElementTextInput>(native["note-title"]);
         Assert.IsAssignableFrom<GuiElementTextArea>(native["note-body"]);
         Assert.IsAssignableFrom<GuiElementTextArea>(native["notes-freeform"]);
-        Assert.Contains("north gate", native.GetTextArea("note-body").GetText());
-        Assert.Contains("Western trail", native.GetTextArea("notes-freeform").GetText());
+        var personal = page == "server.personalnotes";
+        Assert.Contains(personal ? "north gate" : "local RP chat", native.GetTextArea("note-body").GetText());
+        Assert.Contains(personal ? "Western trail" : "No further action", native.GetTextArea("notes-freeform").GetText());
         Assert.False(preview.Focusable);
         foreach (var key in new[] { "note-title", "note-body", "notes-freeform" })
         {
