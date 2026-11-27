@@ -6,9 +6,9 @@ namespace thebasics.Tests.ModSystems;
 
 public class UpdateCheckTests
 {
-    private static Rules.InstallInfo NoUpgrade => new(null, null, null);
+    private static Rules.InstallInfo NoUpgrade => new(null, null);
 
-    private static Rules.InstallInfo Upgrade(string version) => new(version, null, null);
+    private static Rules.InstallInfo Upgrade(string version) => new(version, null);
 
     private static Rules.Release R(string version, params string[] tags) => new(version, tags);
 
@@ -34,7 +34,6 @@ public class UpdateCheckTests
 
         d!.UpgradeVersion.Should().Be("5.9.1");
         d.TaggedForGameVersion.Should().BeNull();
-        d.Retracted.Should().BeFalse();
         d.HasNotice.Should().BeTrue();
         Rules.NeedsReleaseList(Upgrade("5.9.1")).Should().BeFalse();
     }
@@ -129,52 +128,26 @@ public class UpdateCheckTests
     [InlineData(4002)]
     [InlineData(4031)]
     [InlineData(4032)]
-    public void ErrorCodesOtherThanRetractionAreQuietAndSkipTheReleaseList(int errorCode)
+    public void ErrorCodesOtherThanInstalledRetractedAreQuietAndSkipTheReleaseList(int errorCode)
     {
-        var info = new Rules.InstallInfo("5.9.1", errorCode, null);
+        var info = new Rules.InstallInfo("5.9.1", errorCode);
 
         Rules.NeedsReleaseList(info).Should().BeFalse();
         Rules.Decide("5.9.0", "1.22.7", info, null).Should().Be(Rules.Decision.None);
     }
 
-    [Fact]
-    public void RetractionCarriesReasonAndUpgrade()
+    [Theory]
+    [InlineData(4101)]
+    [InlineData(4102)]
+    public void InstalledRetractedCodesGiveTheOrdinaryUpdateNotice(int errorCode)
     {
-        var info = new Rules.InstallInfo("5.9.1", 4101, "Corrupts saves");
+        var withUpgrade = new Rules.InstallInfo("5.9.1", errorCode);
+        Rules.NeedsReleaseList(withUpgrade).Should().BeFalse();
+        Rules.Decide("5.9.0", "1.22.7", withUpgrade, null).Should().Be(new Rules.Decision("5.9.1", null));
 
-        Rules.NeedsReleaseList(info).Should().BeFalse();
-        var d = Rules.Decide("5.9.0", "1.22.7", info, null);
-
-        d!.Retracted.Should().BeTrue();
-        d.RetractionReason.Should().Be("Corrupts saves");
-        d.UpgradeVersion.Should().Be("5.9.1");
-    }
-
-    [Fact]
-    public void ModeratorRetractionStillUsesFallback()
-    {
-        var info = new Rules.InstallInfo(null, 4102, "Malware");
-
-        Rules.NeedsReleaseList(info).Should().BeTrue();
-        var d = Rules.Decide("5.9.0", "1.22.8", info, Today());
-
-        d!.Retracted.Should().BeTrue();
-        d.RetractionReason.Should().Be("Malware");
-        d.UpgradeVersion.Should().Be("5.9.1");
-        d.TaggedForGameVersion.Should().Be("1.22.7");
-    }
-
-    [Fact]
-    public void RetractionWithoutUpgradeIsStillAnAlert()
-    {
-        var info = new Rules.InstallInfo(null, 4101, "Broken");
-        List<Rules.Release> releases = [R("5.9.0", "1.22.6")]; // 5.9.1 itself is hidden by v1
-
-        var d = Rules.Decide("5.9.1", "1.22.7", info, releases);
-
-        d!.Retracted.Should().BeTrue();
-        d.UpgradeVersion.Should().BeNull();
-        d.HasNotice.Should().BeTrue();
+        var withoutUpgrade = new Rules.InstallInfo(null, errorCode);
+        Rules.NeedsReleaseList(withoutUpgrade).Should().BeTrue();
+        Rules.Decide("5.9.0", "1.22.8", withoutUpgrade, Today()).Should().Be(new Rules.Decision("5.9.1", "1.22.7"));
     }
 
     [Fact]
@@ -185,22 +158,9 @@ public class UpdateCheckTests
     }
 
     [Fact]
-    public void MissingReleaseListMeansFailureAndKeepsCachedUpgrade()
+    public void MissingReleaseListMeansFailure()
     {
         Rules.Decide("5.9.0", "1.22.8", NoUpgrade, null).Should().BeNull();
-
-        var cached = new Rules.Decision("5.9.1", "1.22.7", false, null);
-        var retraction = new Rules.InstallInfo(null, 4101, "Broken");
-
-        var withCache = Rules.Decide("5.9.0", "1.22.8", retraction, null, cached);
-        withCache!.UpgradeVersion.Should().Be("5.9.1");
-        withCache.TaggedForGameVersion.Should().Be("1.22.7");
-        withCache.Retracted.Should().BeTrue();
-        withCache.RetractionReason.Should().Be("Broken");
-
-        var noCache = Rules.Decide("5.9.0", "1.22.8", retraction, null);
-        noCache!.UpgradeVersion.Should().BeNull();
-        noCache.Retracted.Should().BeTrue();
     }
 
     [Fact]
@@ -284,31 +244,28 @@ public class UpdateCheckTests
         // Live bodies from mods.vintagestory.at on 2026-11-26.
         var withUpgrade = Rules.ParseInstallInfo(
             """{"data":{"thebasics":{"recommendedUpgrade":"5.9.1","fileName":"thebasics-v5.9.0.zip","fileUrl":"\/download\/114262\/thebasics-v5.9.0.zip"}}}""");
-        withUpgrade.Should().Be(new Rules.InstallInfo("5.9.1", null, null));
+        withUpgrade.Should().Be(new Rules.InstallInfo("5.9.1", null));
 
         var without = Rules.ParseInstallInfo(
             """{"data":{"thebasics":{"fileName":"thebasics-v5.9.1.zip","fileUrl":"\/download\/119463\/thebasics-v5.9.1.zip"}}}""");
-        without.Should().Be(new Rules.InstallInfo(null, null, null));
+        without.Should().Be(new Rules.InstallInfo(null, null));
 
         var notFound = Rules.ParseInstallInfo("""{"data":{"thebasics":{"errorCode":4041}}}""");
-        notFound.Should().Be(new Rules.InstallInfo(null, 4041, null));
+        notFound.Should().Be(new Rules.InstallInfo(null, 4041));
     }
 
     [Fact]
-    public void ParsesRetractionPayload()
+    public void ParsesErrorCodeAsNumberOrNumericString()
     {
-        // Keys per vsmoddb lib/api/public/mods.php: a retracted release keeps recommendedUpgrade and
-        // gets errorCode + retractionReason, but no fileName/fileUrl.
-        var info = Rules.ParseInstallInfo(
-            """{"data":{"thebasics":{"recommendedUpgrade":"5.9.1","retractionReason":"Breaks <b>worlds</b>","errorCode":4101}}}""");
+        // Keys per vsmoddb lib/api/public/mods.php: a 4101 answer keeps recommendedUpgrade.
+        Rules.ParseInstallInfo("""{"data":{"thebasics":{"recommendedUpgrade":"5.9.1","errorCode":4101}}}""")
+            .Should().Be(new Rules.InstallInfo("5.9.1", 4101));
 
-        info.Should().Be(new Rules.InstallInfo("5.9.1", 4101, "Breaks <b>worlds</b>"));
-
-        // The v1 API quotes its status code; a quoted errorCode must not hide a retraction.
-        Rules.ParseInstallInfo("""{"data":{"thebasics":{"retractionReason":"Bad","errorCode":"4101"}}}""")
-            .Should().Be(new Rules.InstallInfo(null, 4101, "Bad"));
+        // The v1 API quotes its status code; accept a quoted errorCode too.
+        Rules.ParseInstallInfo("""{"data":{"thebasics":{"errorCode":"4101"}}}""")
+            .Should().Be(new Rules.InstallInfo(null, 4101));
         Rules.ParseInstallInfo("""{"data":{"thebasics":{"errorCode":"nope"}}}""")
-            .Should().Be(new Rules.InstallInfo(null, null, null));
+            .Should().Be(new Rules.InstallInfo(null, null));
     }
 
     [Fact]
@@ -319,16 +276,6 @@ public class UpdateCheckTests
 
         Rules.Decide("5.9.0", "1.22.8", NoUpgrade, unreadable).Should().BeNull();
         Rules.Decide("5.9.0", "1.22.8", NoUpgrade, new List<Rules.Release>()).Should().Be(Rules.Decision.None);
-    }
-
-    [Fact]
-    public void RetractionReasonControlCharsBecomeSpaces()
-    {
-        // A newline would let the reason forge a second notice line in admin chat or the server log.
-        var info = Rules.ParseInstallInfo(
-            """{"data":{"thebasics":{"retractionReason":"bug\n[The BASICs] Version 6.0.0\tis available","errorCode":4101}}}""");
-
-        info!.RetractionReason.Should().Be("bug [The BASICs] Version 6.0.0 is available");
     }
 
     [Fact]
@@ -369,15 +316,13 @@ public class UpdateCheckTests
     // --- Decision -------------------------------------------------------------------------------
 
     [Fact]
-    public void KeyChangesWithVersionAndRetraction()
+    public void KeyChangesWithVersion()
     {
-        var a = new Rules.Decision("5.9.1", null, false, null);
-        var b = new Rules.Decision("5.9.2", null, false, null);
-        var c = new Rules.Decision("5.9.1", null, true, "x");
-        var a2 = new Rules.Decision("5.9.1", "1.22.7", false, null);
+        var a = new Rules.Decision("5.9.1", null);
+        var b = new Rules.Decision("5.9.2", null);
+        var a2 = new Rules.Decision("5.9.1", "1.22.7");
 
         a.Key.Should().NotBe(b.Key);
-        a.Key.Should().NotBe(c.Key);
         a.Key.Should().Be(a2.Key);
         Rules.Decision.None.HasNotice.Should().BeFalse();
     }

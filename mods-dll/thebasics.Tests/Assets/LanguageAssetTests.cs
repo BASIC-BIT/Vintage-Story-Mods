@@ -21,7 +21,6 @@ public class LanguageAssetTests
         "charsheet-required-warning",
         "update-available",
         "update-available-untagged",
-        "update-retracted",
         "update-silence-hint"
     ];
 

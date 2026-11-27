@@ -819,7 +819,6 @@
 
   "update-available": "[The BASICs] Version {0} is available (this server runs {1}). https://mods.vintagestory.at/thebasics",
   "update-available-untagged": "[The BASICs] Version {0} is available (this server runs {1}). It is tagged for game {2}; your game {3} is not tagged yet, so read the release notes first. https://mods.vintagestory.at/thebasics",
-  "update-retracted": "[The BASICs] Warning: the installed version {0} was retracted on ModDB. Reason: {1}",
   "update-silence-hint": "Turn this off with EnableUpdateCheck in the config file (or /thebasics config for root admins).",
 
   "block-scene-marker-*": "Scene Marker",

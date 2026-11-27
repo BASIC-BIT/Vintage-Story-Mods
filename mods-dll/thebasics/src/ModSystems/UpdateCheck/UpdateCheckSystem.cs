@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using ProperVersion;
-using thebasics.Utilities;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -27,20 +26,22 @@ namespace thebasics.ModSystems.UpdateCheck
     {
         public const string ModId = "thebasics";
 
-        private const int RetractedErrorCode = 4101;
-        private const int RetractedForcedErrorCode = 4102;
+        // The installed version was retracted (by its author, or by a moderator). ModDB still answers
+        // with recommendedUpgrade, so these are handled like no error at all.
+        private const int InstalledRetractedErrorCode = 4101;
+        private const int InstalledRetractedForcedErrorCode = 4102;
 
-        public sealed record InstallInfo(string RecommendedUpgrade, int? ErrorCode, string RetractionReason);
+        public sealed record InstallInfo(string RecommendedUpgrade, int? ErrorCode);
 
         public sealed record Release(string ModVersion, IReadOnlyList<string> Tags);
 
-        public sealed record Decision(string UpgradeVersion, string TaggedForGameVersion, bool Retracted, string RetractionReason)
+        public sealed record Decision(string UpgradeVersion, string TaggedForGameVersion)
         {
-            public static readonly Decision None = new(null, null, false, null);
+            public static readonly Decision None = new(null, null);
 
-            public bool HasNotice => UpgradeVersion != null || Retracted;
+            public bool HasNotice => UpgradeVersion != null;
 
-            public string Key => $"{UpgradeVersion}|{Retracted}";
+            public string Key => UpgradeVersion;
         }
 
         /// <summary>Call A body (`/api/v2/mods/install-information`). Null when it is not the expected shape.</summary>
@@ -57,8 +58,7 @@ namespace thebasics.ModSystems.UpdateCheck
 
                 return new InstallInfo(
                     StringOrNull(entry["recommendedUpgrade"]),
-                    ErrorCodeOrNull(entry["errorCode"]),
-                    StripControlChars(StringOrNull(entry["retractionReason"])));
+                    ErrorCodeOrNull(entry["errorCode"]));
             }
             catch (Exception)
             {
@@ -93,50 +93,38 @@ namespace thebasics.ModSystems.UpdateCheck
         public static bool NeedsReleaseList(InstallInfo info)
         {
             return info != null && !TryRecommended(info, out _) &&
-                   (info.ErrorCode == null || IsRetraction(info.ErrorCode));
+                   !IsQuietError(info.ErrorCode);
         }
 
-        /// <summary>
-        /// Returns null on failure, so the caller keeps its cached result. <paramref name="cached"/> is
-        /// only read when the release list was needed but is missing and A carried a retraction.
-        /// </summary>
+        /// <summary>Returns null on failure, so the caller keeps its cached result.</summary>
         public static Decision Decide(string installed, string gameVersion, InstallInfo info,
-            IReadOnlyList<Release> releases, Decision cached = null)
+            IReadOnlyList<Release> releases)
         {
             if (info == null)
             {
                 return null;
             }
 
-            var retracted = IsRetraction(info.ErrorCode);
-            if (info.ErrorCode != null && !retracted)
+            if (IsQuietError(info.ErrorCode) || !TryVersion(installed, out var current))
             {
                 return Decision.None;
             }
 
-            var reason = retracted ? info.RetractionReason : null;
-            var quiet = retracted ? new Decision(null, null, true, reason) : Decision.None;
-
-            if (!TryVersion(installed, out var current))
-            {
-                return quiet;
-            }
-
             if (TryRecommended(info, out var recommended))
             {
-                return recommended > current ? new Decision(recommended.ToString(), null, retracted, reason) : quiet;
+                return recommended > current ? new Decision(recommended.ToString(), null) : Decision.None;
             }
 
             // A list in which no release has a readable version means the v1 shape changed: that is a
             // failure, not "up to date".
             if (releases == null || (releases.Count > 0 && !releases.Any(r => TryVersion(r?.ModVersion, out _))))
             {
-                return retracted ? (cached ?? Decision.None) with { Retracted = true, RetractionReason = reason } : null;
+                return null;
             }
 
             if (!TryVersion(gameVersion, out var game))
             {
-                return quiet;
+                return Decision.None;
             }
 
             var stable = StableReleases(releases);
@@ -144,7 +132,7 @@ namespace thebasics.ModSystems.UpdateCheck
             // 6a: our exact patch is tagged, so A was authoritative. This honours a pin.
             if (stable.Any(r => r.Tags.Contains(game)))
             {
-                return quiet;
+                return Decision.None;
             }
 
             // 6b: the newest stable tag of our own minor that is older than our patch. Never cross a minor.
@@ -153,12 +141,12 @@ namespace thebasics.ModSystems.UpdateCheck
                 .Max();
             if (fallbackTag == null)
             {
-                return quiet;
+                return Decision.None;
             }
 
             // 6c
             var best = stable.Where(r => r.Tags.Contains(fallbackTag)).Max(r => r.Version);
-            return best > current ? new Decision(best.ToString(), fallbackTag.ToString(), retracted, reason) : quiet;
+            return best > current ? new Decision(best.ToString(), fallbackTag.ToString()) : Decision.None;
         }
 
         // Pre-release mod versions are dropped before any rule runs. Unparseable versions and tags are skipped.
@@ -181,11 +169,9 @@ namespace thebasics.ModSystems.UpdateCheck
         private static bool TryRecommended(InstallInfo info, out SemVer recommended) =>
             TryVersion(info.RecommendedUpgrade, out recommended) && IsStable(recommended);
 
-        // Free text from ModDB: a newline could forge a second notice line in chat or the log.
-        private static string StripControlChars(string s) =>
-            s == null ? null : new string(s.Select(c => char.IsControl(c) ? ' ' : c).ToArray());
-
-        private static bool IsRetraction(int? errorCode) => errorCode is RetractedErrorCode or RetractedForcedErrorCode;
+        // Any error code except the retracted-install ones means there is nothing to offer.
+        private static bool IsQuietError(int? errorCode) =>
+            errorCode is not (null or InstalledRetractedErrorCode or InstalledRetractedForcedErrorCode);
 
         private static bool IsStable(SemVer version) => version.PreReleaseIdentifiers.Length == 0;
 
@@ -229,7 +215,6 @@ namespace thebasics.ModSystems.UpdateCheck
         private const int CheckIntervalMs = 6 * 60 * 60 * 1000;
         private const int CheckJitterMs = 30 * 60 * 1000;
         private const int FailuresBeforeWarning = 4;
-        private const int MaxReasonLength = 200;
 
         private readonly HashSet<string> _notified = new();
         private HttpClient _http;
@@ -344,8 +329,8 @@ namespace thebasics.ModSystems.UpdateCheck
                 var info = UpdateCheck.ParseInstallInfo(await GetBodyAsync(urlA).ConfigureAwait(false));
                 var needsReleases = UpdateCheck.NeedsReleaseList(info);
                 current = urlB;
-                var releases = needsReleases ? UpdateCheck.ParseReleases(await TryGetBodyAsync(urlB).ConfigureAwait(false)) : null;
-                var decision = UpdateCheck.Decide(_installed, _gameVersion, info, releases, _cached);
+                var releases = needsReleases ? UpdateCheck.ParseReleases(await GetBodyAsync(urlB).ConfigureAwait(false)) : null;
+                var decision = UpdateCheck.Decide(_installed, _gameVersion, info, releases);
 
                 API.Logger.Debug($"The BASICs update check: GET {urlA}{(needsReleases ? $" and {urlB}" : "")} -> {DescribeOutcome(decision)}");
                 NoteOutcome(decision != null);
@@ -384,12 +369,7 @@ namespace thebasics.ModSystems.UpdateCheck
                 return "failed, keeping previous result";
             }
 
-            if (decision.UpgradeVersion != null)
-            {
-                return $"upgrade {decision.UpgradeVersion}{(decision.Retracted ? ", installed version retracted" : "")}";
-            }
-
-            return decision.Retracted ? "retracted, no upgrade" : "up to date";
+            return decision.UpgradeVersion != null ? $"upgrade {decision.UpgradeVersion}" : "up to date";
         }
 
         private async Task<string> GetBodyAsync(string url)
@@ -404,21 +384,6 @@ namespace thebasics.ModSystems.UpdateCheck
             return response.StatusCode == HttpStatusCode.OK
                 ? await response.Content.ReadAsStringAsync().ConfigureAwait(false)
                 : null;
-        }
-
-        // A failed release-list fetch must still reach Decide: a retraction already confirmed by the
-        // first call is reported on top of the cached result instead of being dropped with the exception.
-        private async Task<string> TryGetBodyAsync(string url)
-        {
-            try
-            {
-                return await GetBodyAsync(url).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                API.Logger.Debug($"The BASICs update check: GET {url} failed ({e.GetType().Name})");
-                return null;
-            }
         }
 
         private void ApplyResult(UpdateCheck.Decision decision)
@@ -468,47 +433,24 @@ namespace thebasics.ModSystems.UpdateCheck
                 return;
             }
 
-            if (decision.Retracted)
-            {
-                Send(player, Lang.Get("thebasics:update-retracted", _installed, VtmlUtils.EscapeVtml(Truncate(decision.RetractionReason))));
-            }
-
-            if (decision.UpgradeVersion != null)
-            {
-                Send(player, decision.TaggedForGameVersion == null
-                    ? Lang.Get("thebasics:update-available", decision.UpgradeVersion, _installed)
-                    : Lang.Get("thebasics:update-available-untagged", decision.UpgradeVersion, _installed, decision.TaggedForGameVersion, _gameVersion));
-            }
+            Send(player, decision.TaggedForGameVersion == null
+                ? Lang.Get("thebasics:update-available", decision.UpgradeVersion, _installed)
+                : Lang.Get("thebasics:update-available-untagged", decision.UpgradeVersion, _installed, decision.TaggedForGameVersion, _gameVersion));
 
             Send(player, Lang.Get("thebasics:update-silence-hint"));
         }
 
         private void LogDecision(UpdateCheck.Decision decision)
         {
-            if (decision.Retracted)
-            {
-                // The reason is free text from ModDB: pass it as an argument, never as the format string.
-                API.Logger.Warning("The BASICs: the installed version {0} was retracted on ModDB. Reason: {1}", _installed, Truncate(decision.RetractionReason));
-            }
-
-            if (decision.UpgradeVersion != null)
-            {
-                var tagged = decision.TaggedForGameVersion == null
-                    ? ""
-                    : $" It is tagged for game {decision.TaggedForGameVersion}; this game {_gameVersion} is not tagged yet.";
-                API.Logger.Notification($"The BASICs {decision.UpgradeVersion} is available (this server runs {_installed}).{tagged} https://mods.vintagestory.at/thebasics");
-            }
+            var tagged = decision.TaggedForGameVersion == null
+                ? ""
+                : $" It is tagged for game {decision.TaggedForGameVersion}; this game {_gameVersion} is not tagged yet.";
+            API.Logger.Notification($"The BASICs {decision.UpgradeVersion} is available (this server runs {_installed}).{tagged} https://mods.vintagestory.at/thebasics");
         }
 
         private static void Send(IServerPlayer player, string message)
         {
             player.SendMessage(GlobalConstants.CurrentChatGroup, message, EnumChatType.Notification);
-        }
-
-        private static string Truncate(string reason)
-        {
-            reason ??= "";
-            return reason.Length <= MaxReasonLength ? reason : reason[..MaxReasonLength] + "...";
         }
     }
 }
