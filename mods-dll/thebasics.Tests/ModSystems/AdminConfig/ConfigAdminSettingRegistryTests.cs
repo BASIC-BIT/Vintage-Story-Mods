@@ -291,6 +291,19 @@ public class ConfigAdminSettingRegistryTests
     }
 
     [Fact]
+    public void UpdateCheckSettingIsRegisteredAsLive()
+    {
+        var config = CreateConfig();
+        var setting = GetSetting("EnableUpdateCheck");
+        setting.ReloadBehavior.Should().Be(ConfigAdminReloadBehavior.Live);
+        setting.Group.Should().Be("Server Notifications");
+        setting.GetValue(config).Should().Be("1");
+
+        setting.TrySetValue(config, "false", out var error).Should().BeTrue(error);
+        config.EnableUpdateCheck.Should().BeFalse();
+    }
+
+    [Fact]
     public void ChatFormattingIsolation_CanBeToggledLive()
     {
         var config = CreateConfig();

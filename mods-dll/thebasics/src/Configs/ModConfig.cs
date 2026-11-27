@@ -654,6 +654,14 @@ namespace thebasics.Configs
         [ProtoMember(28)]
         public bool SendServerSaveFinishedAnnouncement { get; set; } = true;
 
+        /// <summary>
+        /// Dedicated servers only: ask ModDB every few hours whether a newer stable release exists and
+        /// tell online admins (controlserver) in chat. Notify only; nothing is downloaded.
+        /// </summary>
+        [ProtoMember(161)]
+        [DefaultValue(true)]
+        public bool EnableUpdateCheck { get; set; } = true;
+
         [ProtoMember(29)]
         public string TEXT_ServerSaveAnnouncement { get; set; } = "Server save has started - expect lag for a few seconds.";
 
