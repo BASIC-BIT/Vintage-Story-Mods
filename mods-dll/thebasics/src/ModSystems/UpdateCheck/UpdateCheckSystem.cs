@@ -10,6 +10,7 @@ using ProperVersion;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
+using thebasics.Utilities;
 
 namespace thebasics.ModSystems.UpdateCheck
 {
@@ -115,9 +116,9 @@ namespace thebasics.ModSystems.UpdateCheck
                 return recommended > current ? new Decision(recommended.ToString(), null) : Decision.None;
             }
 
-            // A list in which no release has a readable version means the v1 shape changed: that is a
+            // An empty list, or one in which no release has a readable version, means the v1 shape changed: that is a
             // failure, not "up to date".
-            if (releases == null || (releases.Count > 0 && !releases.Any(r => TryVersion(r?.ModVersion, out _))))
+            if (releases == null || !releases.Any(r => TryVersion(r?.ModVersion, out _)))
             {
                 return null;
             }
@@ -235,17 +236,30 @@ namespace thebasics.ModSystems.UpdateCheck
                 return;
             }
 
-            _installed = Mod.Info.Version;
-            // ShortGameVersion is a const: reading it directly would freeze the version this mod was
-            // compiled against. The field's metadata comes from the VintagestoryAPI.dll that is running.
-            _gameVersion = typeof(GameVersion).GetField(nameof(GameVersion.ShortGameVersion))?.GetRawConstantValue() as string;
-            if (string.IsNullOrEmpty(_installed) || string.IsNullOrEmpty(_gameVersion))
+            // Nothing in here may stop the mod from loading: a notify-only feature just switches itself off.
+            HttpClient http = null;
+            try
             {
+                _installed = Mod.Info.Version;
+                // ShortGameVersion is a const: reading it directly would freeze the version this mod was
+                // compiled against. The field's metadata comes from the VintagestoryAPI.dll that is running.
+                _gameVersion = typeof(GameVersion).GetField(nameof(GameVersion.ShortGameVersion))?.GetRawConstantValue() as string;
+                if (string.IsNullOrEmpty(_installed) || string.IsNullOrEmpty(_gameVersion))
+                {
+                    return;
+                }
+
+                http = new HttpClient { Timeout = TimeSpan.FromSeconds(10), MaxResponseContentBufferSize = 4_000_000 };
+                http.DefaultRequestHeaders.UserAgent.ParseAdd($"thebasics-updatecheck/{_installed}");
+            }
+            catch (Exception e)
+            {
+                http?.Dispose();
+                API.Logger.Warning("The BASICs update check is off: it could not start ({0}).", e.GetType().Name);
                 return;
             }
 
-            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(10), MaxResponseContentBufferSize = 4_000_000 };
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd($"thebasics-updatecheck/{_installed}");
+            _http = http;
 
             API.Event.PlayerNowPlaying += OnPlayerNowPlaying;
 
@@ -332,7 +346,7 @@ namespace thebasics.ModSystems.UpdateCheck
                 var releases = needsReleases ? UpdateCheck.ParseReleases(await GetBodyAsync(urlB).ConfigureAwait(false)) : null;
                 var decision = UpdateCheck.Decide(_installed, _gameVersion, info, releases);
 
-                API.Logger.Debug($"The BASICs update check: GET {urlA}{(needsReleases ? $" and {urlB}" : "")} -> {DescribeOutcome(decision)}");
+                API.Logger.Debug($"The BASICs update check: GET {urlA}{(needsReleases ? $" and {urlB}" : "")} -> {DescribeOutcome(decision, info)}");
                 NoteOutcome(decision != null);
 
                 API.Event.EnqueueMainThreadTask(() => ApplyResult(decision), "thebasics-updatecheck");
@@ -362,14 +376,21 @@ namespace thebasics.ModSystems.UpdateCheck
             }
         }
 
-        private static string DescribeOutcome(UpdateCheck.Decision decision)
+        private static string DescribeOutcome(UpdateCheck.Decision decision, UpdateCheck.InstallInfo info)
         {
             if (decision == null)
             {
                 return "failed, keeping previous result";
             }
 
-            return decision.UpgradeVersion != null ? $"upgrade {decision.UpgradeVersion}" : "up to date";
+            if (decision.UpgradeVersion != null)
+            {
+                return $"upgrade {decision.UpgradeVersion}";
+            }
+
+            // An error code is ModDB declining to answer (4041: it does not know this version, as with an
+            // unreleased build). That is not the same as being up to date.
+            return info?.ErrorCode is { } code ? $"ModDB answered error code {code}, nothing to report" : "up to date";
         }
 
         private async Task<string> GetBodyAsync(string url)
@@ -434,8 +455,8 @@ namespace thebasics.ModSystems.UpdateCheck
             }
 
             Send(player, decision.TaggedForGameVersion == null
-                ? Lang.Get("thebasics:update-available", decision.UpgradeVersion, _installed)
-                : Lang.Get("thebasics:update-available-untagged", decision.UpgradeVersion, _installed, decision.TaggedForGameVersion, _gameVersion));
+                ? Lang.Get("thebasics:update-available", VtmlUtils.EscapeVtml(decision.UpgradeVersion), _installed)
+                : Lang.Get("thebasics:update-available-untagged", VtmlUtils.EscapeVtml(decision.UpgradeVersion), _installed, VtmlUtils.EscapeVtml(decision.TaggedForGameVersion), _gameVersion));
 
             Send(player, Lang.Get("thebasics:update-silence-hint"));
         }

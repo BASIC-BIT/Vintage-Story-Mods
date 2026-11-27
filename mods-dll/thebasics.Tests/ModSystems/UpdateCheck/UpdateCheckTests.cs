@@ -275,7 +275,8 @@ public class UpdateCheckTests
         var unreadable = new List<Rules.Release> { R(null, "1.22.7"), R(null, "1.22.6") };
 
         Rules.Decide("5.9.0", "1.22.8", NoUpgrade, unreadable).Should().BeNull();
-        Rules.Decide("5.9.0", "1.22.8", NoUpgrade, new List<Rules.Release>()).Should().Be(Rules.Decision.None);
+        // A mod with published releases never has an empty list, so empty is a failure too.
+        Rules.Decide("5.9.0", "1.22.8", NoUpgrade, new List<Rules.Release>()).Should().BeNull();
     }
 
     [Fact]
