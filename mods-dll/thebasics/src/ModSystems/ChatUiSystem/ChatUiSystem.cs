@@ -2361,7 +2361,7 @@ public class ChatUiSystem : ModSystem
             __state = PerfStats.Timestamp();
         }
 
-        if (_api?.World is ClientMain world)
+        if (ClearedChat.HasHidden && _api?.World is ClientMain world)
         {
             if (groupId == GlobalConstants.AllChatGroups)
             {
@@ -2427,9 +2427,10 @@ public class ChatUiSystem : ModSystem
             __state = PerfStats.Timestamp();
         }
 
+        var isolate = _config?.IsolateChatMessageFormatting == true;
+        if (!isolate && !ClearedChat.HasHidden) return true;
         if (_api?.World is not ClientMain game ||
             !game.ChatHistoryByPlayerGroup.TryGetValue(game.currentGroupid, out var history)) return true;
-        var isolate = _config?.IsolateChatMessageFormatting == true;
         if (!isolate && ClearedChat.HiddenCount(history) == 0) return true;
 
         var richtext = __instance.Composers["chat-group-" + game.currentGroupid].GetRichtext("chathistory");

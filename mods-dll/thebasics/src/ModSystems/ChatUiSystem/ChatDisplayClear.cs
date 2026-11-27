@@ -7,6 +7,7 @@ namespace thebasics.ModSystems.ChatUiSystem;
 internal sealed class ChatDisplayClear
 {
     private readonly Dictionary<LimitedList<string>, int> _hiddenByBuffer = new();
+    internal bool HasHidden => _hiddenByBuffer.Count > 0;
 
     internal void Clear(LimitedList<string> buffer)
     {
