@@ -794,11 +794,6 @@
   "analytics-consent-prompt-intro": "Allow this server to send analytics to BASIC so we can understand how The BASICs is used and where it needs work.",
   "analytics-consent-prompt-privacy": "Server analytics shares feature usage, settings, session metrics, and reliability signals. Full analytics adds a pseudonymous player identifier to commands, feature use, reliability outcomes, and sessions.",
   "analytics-consent-prompt-actions": "Choose: /{0} server for server analytics, /{0} personalized for full analytics, or /{0} off to decline. Use /{0} status anytime.",
-
-  "update-available": "[The BASICs] Version {0} is available (this server runs {1}). https://mods.vintagestory.at/thebasics",
-  "update-available-untagged": "[The BASICs] Version {0} is available (this server runs {1}). It is tagged for game {2}; your game {3} is not tagged yet, so read the release notes first. https://mods.vintagestory.at/thebasics",
-  "update-retracted": "[The BASICs] Warning: the installed version {0} was retracted on ModDB. Reason: {1}",
-  "update-silence-hint": "Turn this off with EnableUpdateCheck in the config or /thebasics config.",
   "analytics-status": "Analytics consent: {0} (policy v{1}). Relay endpoint: {2}. Server install id: {3}.",
   "analytics-endpoint-configured": "configured",
   "analytics-endpoint-invalid": "invalid",
@@ -821,6 +816,11 @@
   "analytics-ui-later-button": "Decide later",
   "analytics-ui-personalized-button": "Share full analytics",
   "analytics-ui-command-fallback": "Change this later with /{0}.",
+
+  "update-available": "[The BASICs] Version {0} is available (this server runs {1}). https://mods.vintagestory.at/thebasics",
+  "update-available-untagged": "[The BASICs] Version {0} is available (this server runs {1}). It is tagged for game {2}; your game {3} is not tagged yet, so read the release notes first. https://mods.vintagestory.at/thebasics",
+  "update-retracted": "[The BASICs] Warning: the installed version {0} was retracted on ModDB. Reason: {1}",
+  "update-silence-hint": "Turn this off with EnableUpdateCheck in the config file (or /thebasics config for root admins).",
 
   "block-scene-marker-*": "Scene Marker",
   "scene-unlock": "Unlock",

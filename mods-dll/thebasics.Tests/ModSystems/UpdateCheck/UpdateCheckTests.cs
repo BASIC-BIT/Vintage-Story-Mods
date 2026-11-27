@@ -210,6 +210,20 @@ public class UpdateCheckTests
         Rules.Decide("5.9.0", "1.22.8", Upgrade("not-a-version"), Today())!.UpgradeVersion.Should().Be("5.9.1");
         Rules.Decide("5.9.0", "1.22.8", Upgrade(null!), Today())!.UpgradeVersion.Should().Be("5.9.1");
 
+        // CheckAsync must fetch B for the same values Decide falls through on, or Decide gets no list.
+        Rules.NeedsReleaseList(Upgrade("not-a-version")).Should().BeTrue();
+        Rules.NeedsReleaseList(Upgrade("")).Should().BeTrue();
+
+        // A numeric part too large for an int makes SemVer.TryParse throw; it must be skipped instead.
+        Rules.NeedsReleaseList(Upgrade("5.99999999999.0")).Should().BeTrue();
+        Rules.Decide("5.9.0", "1.22.8", Upgrade("5.99999999999.0"), Today())!.UpgradeVersion.Should().Be("5.9.1");
+        Rules.Decide("5.9.0", "1.22.8", NoUpgrade, [.. Today(), R("5.9.9", "1.22.99999999999")])!.UpgradeVersion.Should().Be("5.9.1");
+
+        // A pre-release recommendation is ignored (stable only) and the release list decides.
+        Rules.NeedsReleaseList(Upgrade("5.10.0-pre.2")).Should().BeTrue();
+        Rules.Decide("5.9.0", "1.22.8", Upgrade("5.10.0-pre.2"), Today())!.UpgradeVersion.Should().Be("5.9.1");
+        Rules.Decide("5.10.0-pre.1", "1.22.7", Upgrade("5.10.0-pre.2"), Today()).Should().Be(Rules.Decision.None);
+
         List<Rules.Release> releases =
         [
             R("garbage", "1.22.7"),
@@ -289,6 +303,16 @@ public class UpdateCheckTests
             """{"data":{"thebasics":{"recommendedUpgrade":"5.9.1","retractionReason":"Breaks <b>worlds</b>","errorCode":4101}}}""");
 
         info.Should().Be(new Rules.InstallInfo("5.9.1", 4101, "Breaks <b>worlds</b>"));
+    }
+
+    [Fact]
+    public void RetractionReasonControlCharsBecomeSpaces()
+    {
+        // A newline would let the reason forge a second notice line in admin chat or the server log.
+        var info = Rules.ParseInstallInfo(
+            """{"data":{"thebasics":{"retractionReason":"bug\n[The BASICs] Version 6.0.0\tis available","errorCode":4101}}}""");
+
+        info!.RetractionReason.Should().Be("bug [The BASICs] Version 6.0.0 is available");
     }
 
     [Fact]

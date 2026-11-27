@@ -58,7 +58,7 @@ namespace thebasics.ModSystems.UpdateCheck
                 return new InstallInfo(
                     StringOrNull(entry["recommendedUpgrade"]),
                     entry["errorCode"]?.Type == JTokenType.Integer ? entry.Value<int>("errorCode") : null,
-                    StringOrNull(entry["retractionReason"]));
+                    StripControlChars(StringOrNull(entry["retractionReason"])));
             }
             catch (Exception)
             {
@@ -92,7 +92,7 @@ namespace thebasics.ModSystems.UpdateCheck
 
         public static bool NeedsReleaseList(InstallInfo info)
         {
-            return info != null && info.RecommendedUpgrade == null &&
+            return info != null && !TryRecommended(info, out _) &&
                    (info.ErrorCode == null || IsRetraction(info.ErrorCode));
         }
 
@@ -122,7 +122,7 @@ namespace thebasics.ModSystems.UpdateCheck
                 return quiet;
             }
 
-            if (TryVersion(info.RecommendedUpgrade, out var recommended))
+            if (TryRecommended(info, out var recommended))
             {
                 return recommended > current ? new Decision(recommended.ToString(), null, retracted, reason) : quiet;
             }
@@ -175,15 +175,32 @@ namespace thebasics.ModSystems.UpdateCheck
             return stable;
         }
 
+        // Unparseable or pre-release recommendations are ignored and the release-list rules decide.
+        private static bool TryRecommended(InstallInfo info, out SemVer recommended) =>
+            TryVersion(info.RecommendedUpgrade, out recommended) && IsStable(recommended);
+
+        // Free text from ModDB: a newline could forge a second notice line in chat or the log.
+        private static string StripControlChars(string s) =>
+            s == null ? null : new string(s.Select(c => char.IsControl(c) ? ' ' : c).ToArray());
+
         private static bool IsRetraction(int? errorCode) => errorCode is RetractedErrorCode or RetractedForcedErrorCode;
 
         private static bool IsStable(SemVer version) => version.PreReleaseIdentifiers.Length == 0;
 
-        // SemVer.TryParse throws on null, and most A responses have no recommendedUpgrade.
+        // SemVer.TryParse throws on null (most A responses have no recommendedUpgrade) and int.Parse
+        // inside it throws on a numeric part too large for an int.
         private static bool TryVersion(string s, out SemVer version)
         {
             version = null;
-            return s != null && SemVer.TryParse(s, out version);
+            try
+            {
+                return s != null && SemVer.TryParse(s, out version);
+            }
+            catch (OverflowException)
+            {
+                version = null;
+                return false;
+            }
         }
 
         private static string StringOrNull(JToken token) => token?.Type == JTokenType.String ? (string)token : null;
@@ -309,10 +326,12 @@ namespace thebasics.ModSystems.UpdateCheck
 
             var urlA = $"{ModDbHost}/api/v2/mods/install-information?ids={UpdateCheck.ModId}@{Uri.EscapeDataString(_installed)}&gv={Uri.EscapeDataString(_gameVersion)}";
             var urlB = $"{ModDbHost}/api/mod/{UpdateCheck.ModId}";
+            var current = urlA;
             try
             {
                 var info = UpdateCheck.ParseInstallInfo(await GetBodyAsync(urlA).ConfigureAwait(false));
                 var needsReleases = UpdateCheck.NeedsReleaseList(info);
+                current = urlB;
                 var releases = needsReleases ? UpdateCheck.ParseReleases(await GetBodyAsync(urlB).ConfigureAwait(false)) : null;
                 var decision = UpdateCheck.Decide(_installed, _gameVersion, info, releases, _cached);
 
@@ -322,7 +341,7 @@ namespace thebasics.ModSystems.UpdateCheck
             }
             catch (Exception e)
             {
-                API.Logger.Debug($"The BASICs update check: GET {urlA} failed ({e.GetType().Name}), keeping previous result");
+                API.Logger.Debug($"The BASICs update check: GET {current} failed ({e.GetType().Name}), keeping previous result");
             }
             finally
             {
